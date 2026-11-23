@@ -116,6 +116,8 @@ const SCAFFOLD_ARCH = 20 * DEG;
 const NARROW = 0.35;
 /** Wood further than this share of the crown's depth below its base, or further out than this share of its radius, has strayed and is shed (`shedStrays`). */
 const STRAY_BELOW = 0.12;
+/** A crown narrower than this (radius, m) is lit through: leaves to its middle. */
+const SMALL_CROWN = 2.5;
 const STRAY_BEYOND = 1.15;
 /** How far a scaffold's way wanders each internode at crooked 1 (radians, a deviate's spread), and how much of its wander it keeps from the last. */
 const LIMB_WANDER = 0.09;
@@ -1063,7 +1065,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
 
   // Leaves: on the lit shoots near their twigs' ends (further back the deeper the species keeps its leaves),
   // the lighter the bigger; each at its node, a little on along its twig and out of the crown.
-  const reach = LEAF_REACH + Math.round(LEAF_REACH_DEPTH * Math.min(1, Math.max(0, sp.foliageDepth)));
+  // (A small or narrow crown is lit through and full of leaves to its middle, along its leader too: kept to
+  // a shell, a crown two or three metres across is a ring, which from afar reads as a hook.)
+  const lit = R / depth < NARROW || R < SMALL_CROWN;
+  const reach = lit ? LEAF_REACH + LEAF_REACH_DEPTH : LEAF_REACH + Math.round(LEAF_REACH_DEPTH * Math.min(1, Math.max(0, sp.foliageDepth)));
   const fromTip = new Int32Array(count).fill(1 << 20);
   for (let i = count - 1; i >= 0; i--) {
     if (!alive[i]) continue;
@@ -1076,7 +1081,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const h = newHung();
   const heart = base + 0.5 * depth;
   for (let i = 0; i < count; i++) {
-    if (!alive[i] || kind[i] === 0 || fromTip[i] > reach || light[i] < LEAF_LIGHT || py[i] < base) continue;
+    if (!alive[i] || (kind[i] === 0 && !lit) || fromTip[i] > reach || light[i] < (lit ? 0.5 * LEAF_LIGHT : LEAF_LIGHT) || py[i] < base) continue;
     const end = main[i] < 0 && lat[i] < 0;
     const t: V3 = end ? dirOf(i) : [0, 0, 0];
     const o = norm([px[i], py[i] - heart, pz[i]]);
