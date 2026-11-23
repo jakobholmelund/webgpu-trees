@@ -114,6 +114,9 @@ const SCAFFOLD_CURVE = 35 * DEG;
 const SCAFFOLD_ARCH = 20 * DEG;
 /** A crown narrower than this for its depth (radius over depth) is a column: its limbs rise steeply and arch little. */
 const NARROW = 0.35;
+/** Wood further than this share of the crown's depth below its base, or further out than this share of its radius, has strayed and is shed (`shedStrays`). */
+const STRAY_BELOW = 0.12;
+const STRAY_BEYOND = 1.15;
 /** How far a scaffold's way wanders each internode at crooked 1 (radians, a deviate's spread), and how much of its wander it keeps from the last. */
 const LIMB_WANDER = 0.09;
 const LIMB_KEEP = 0.85;
@@ -1797,6 +1800,61 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
     clumps.ty[k] = t[1];
     clumps.tz[k] = t[2];
   }
+  return sp.architecture === "palm" ? { size, skeleton, clumps } : shedStrays(size, skeleton, clumps);
+}
+
+/**
+ * Wood that has strayed well out of the tree's own space is shed, from where it strays on: a long thin
+ * branch bowed by its weight out below the crown's base or out past its reach (in a narrow crown, a hook
+ * hanging from it), as a tree drops a limb it cannot hold up or light. Stems stay; a clump on shed wood
+ * goes with it.
+ */
+function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
+  const depth = Math.max(0.01, size.height - size.crownBase);
+  const low = size.crownBase - STRAY_BELOW * depth;
+  const far = STRAY_BEYOND * size.crownRadius;
+  const keep = new Uint8Array(sk.count);
+  let shed = 0;
+  for (let i = 0; i < sk.count; i++) {
+    const p = sk.parent[i];
+    const out = sk.order[i] > 0 && (sk.y[i] < low || Math.hypot(sk.x[i], sk.z[i]) > far);
+    keep[i] = (p < 0 || keep[p]) && !out ? 1 : 0;
+    if (!keep[i]) shed++;
+  }
+  if (shed === 0) return { size, skeleton: sk, clumps: cl };
+  const to = new Int32Array(sk.count).fill(-1);
+  let n = 0;
+  for (let i = 0; i < sk.count; i++) if (keep[i]) to[i] = n++;
+  const pick = <A extends Float32Array | Int32Array | Uint8Array>(a: A, make: (n: number) => A) => {
+    const b = make(n);
+    for (let i = 0; i < sk.count; i++) if (keep[i]) b[to[i]] = a[i];
+    return b;
+  };
+  const skeleton: Skeleton = {
+    count: n,
+    x: pick(sk.x, (k) => new Float32Array(k)),
+    y: pick(sk.y, (k) => new Float32Array(k)),
+    z: pick(sk.z, (k) => new Float32Array(k)),
+    radius: pick(sk.radius, (k) => new Float32Array(k)),
+    parent: new Int32Array(n),
+    order: pick(sk.order, (k) => new Uint8Array(k)),
+    limb: new Int32Array(n),
+    along: pick(sk.along, (k) => new Float32Array(k)),
+  };
+  for (let i = 0; i < sk.count; i++) {
+    if (!keep[i]) continue;
+    skeleton.parent[to[i]] = sk.parent[i] < 0 ? -1 : to[sk.parent[i]];
+    skeleton.limb[to[i]] = to[sk.limb[i]];
+  }
+  const kept: number[] = [];
+  for (let c = 0; c < cl.count; c++) if (keep[cl.node[c]]) kept.push(c);
+  const m = kept.length;
+  const f = () => new Float32Array(m);
+  const clumps: Clumps = { count: m, x: f(), y: f(), z: f(), radius: f(), nx: f(), ny: f(), nz: f(), node: new Int32Array(m), depth: f(), tx: f(), ty: f(), tz: f() };
+  kept.forEach((c, k) => {
+    for (const key of ["x", "y", "z", "radius", "nx", "ny", "nz", "depth", "tx", "ty", "tz"] as const) clumps[key][k] = cl[key][c];
+    clumps.node[k] = to[cl.node[c]];
+  });
   return { size, skeleton, clumps };
 }
 
