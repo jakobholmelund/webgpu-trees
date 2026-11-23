@@ -70,8 +70,10 @@ export interface TreeStyle {
 
 export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35 };
 
-/** The realistic look's style: light as the sun gives it, the crown's full shade, light through the leaves, furrowed bark. */
-export const REAL_STYLE: TreeStyle = { steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.8, wrap: 0.3, strokes: 1, selfShade: 1, fullLight: 1, bark: 1, faceEye: 0.35 };
+/** The realistic look's style: light as the sun gives it, the crown's shade, light through the leaves, furrowed bark. */
+// (selfShade a half, as the painted look's: the crown's own shade taken in full, through a whole leafy
+// shell, leaves out the light the leaves scatter to one another, and a sunlit crown comes out dark.)
+export const REAL_STYLE: TreeStyle = { steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.8, wrap: 0.3, strokes: 1, selfShade: 0.45, fullLight: 0.9, bark: 1, faceEye: 0.35 };
 
 /**
  * How the trees are drawn, chosen when they are made (the pieces differ, not only the light): `stylized`,
@@ -230,7 +232,7 @@ export function createTrees(options: TreesOptions): Trees {
   // ---- The pieces, and their draws. ----
 
   // (The realistic look's near leaves are cards set in the crown; further off, both looks' are dabs.)
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 5, 0.85) : dabPieces(grown, s)));
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 7, 1.1) : dabPieces(grown, s)));
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
   const makeArgs = (sets: Pieces[]) => {
@@ -533,6 +535,12 @@ export function createTrees(options: TreesOptions): Trees {
       const toward = pow(max(dot(toEye.negate(), uSun), float(0)), float(4));
       const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
       colour = albedo.mul(mix(uShadeTint.mul(sky), uSunTint, lit)).add(through);
+      if (card) {
+        // (A leaf seen from the side away from the sun is lit through: a thin leaf passes on about as much
+        // light as it sends back, greener and warmer (throughTint), by how squarely the sun is behind it.)
+        const behind = max(dot(nLit, uSun).negate(), float(0)).mul(C.sunIn).mul(C.cloud);
+        colour = colour.add(albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(behind.mul(uStyle2.y).mul(0.75)));
+      }
       colour = intoAir(colour, at);
 
       // The corner: turned to face the eye, and spun to an angle of its own (with a flutter in the wind).
