@@ -440,7 +440,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkColor: "#d4d0c4",
     barkPale: 0.3,
     stiffness: 0.35,
-    weep: 0.25,
+    weep: 0.12,
   },
   // UF/IFAS ST-70 (common alder): 40–50 ft tall, 20–40 ft spread. Conical to oval on a leader that keeps
   // on, by water; dark green, dark bark.

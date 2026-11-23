@@ -630,7 +630,11 @@ export function createTrees(options: TreesOptions): Trees {
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)
     const pale = bark.w.mul(smoothstep(float(0.05), float(0.5), surface.y.div(T.r1.x)));
-    const albedo = mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
+    // (Twigs are a twig's dark grey-brown whatever the trunk is: a birch is white only on its trunk and big
+    // limbs, and white sticks out of its crown read as bones.)
+    const thick = aRadial.w.mul(fit.wood);
+    const twig = float(1).sub(smoothstep(float(0.03), float(0.11), thick));
+    const albedo = mix(mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)), vec3(0.055, 0.047, 0.038), twig.mul(0.85)).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
     // (Darker at its foot, in the grass and its own shade.)
     const foot = mix(float(0.6), float(1), smoothstep(float(0), float(1.2), surface.y));
     const col = albedo.mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2)))).mul(foot);
