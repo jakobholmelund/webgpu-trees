@@ -245,7 +245,7 @@ upper crowns to Rautiainen's exponents.
   its own beat. Nothing is kept from frame to frame.
 
 On this Mac (Apple, 3200 x 2000, 4x MSAA), 30,000 trees over 2.4 km of 30
-species cost 3 to 3.7 ms of the graphics card's time a frame in the painted
+species cost 2.4 to 3.4 ms of the graphics card's time a frame in the painted
 look and 4.5 to 7.2 ms in the realistic one, ground and sky included; the
 cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
 
