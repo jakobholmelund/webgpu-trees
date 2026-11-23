@@ -334,7 +334,10 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const a = hash01(k, 22) * Math.PI * 2;
         const s = Math.sqrt(1 - u * u);
         const off = [s * Math.cos(a), u, s * Math.sin(a)];
-        const at = [cl.x[c] + off[0] * r * 0.4, cl.y[c] + off[1] * r * 0.4, cl.z[c] + off[2] * r * 0.4];
+        // (Spread along the twig more than about it: a spray of leaves is longer than it is round, and
+        // twelve cards about one point read as a ball.)
+        const along0 = (hash01(k, 25) * 2 - 1) * r * 0.85;
+        const at = [cl.x[c] + off[0] * r * 0.3 + cl.tx[c] * along0, cl.y[c] + off[1] * r * 0.3 + cl.ty[c] * along0, cl.z[c] + off[2] * r * 0.3 + cl.tz[c] * along0];
         // (Its facing: out of the crown and up, turned its own way by as much again.)
         const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
         // (Its twig: along the twig the clump hangs on, turned a little its own way (a frond's leaves follow
