@@ -244,13 +244,16 @@ upper crowns to Rautiainen's exponents.
   reach it, a tall one later and slower; each limb swings about its foot on
   its own beat. Nothing is kept from frame to frame.
 
-On this Mac (Apple, 3200 x 2000, 4x MSAA), 30,000 trees over 2.4 km cost
-3 to 3.7 ms of the graphics card's time a frame, ground and sky included;
-the cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
+On this Mac (Apple, 3200 x 2000, 4x MSAA), 30,000 trees over 2.4 km of 30
+species cost 3 to 3.7 ms of the graphics card's time a frame in the painted
+look and 4.5 to 7.2 ms in the realistic one, ground and sky included; the
+cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
 
 ## Left out, for now
 
 - Trees' shadows on each other and on what stands under them (the ground's
   shade is baked; see above).
 - Impostors for the farthest trees.
+- A fan palm's skirt of dead fronds; multi-stemmed trees (a sycamore's, a
+  live oak's); leaning trunks.
 - Phones: WebGPU only.
