@@ -112,6 +112,8 @@ const SCAFFOLD_SWING = 40 * DEG;
 /** How far a scaffold turns up over a crown radius of its length, at bend 1 (down at -1), and how far it arches over by its weight. */
 const SCAFFOLD_CURVE = 35 * DEG;
 const SCAFFOLD_ARCH = 20 * DEG;
+/** A crown narrower than this for its depth (radius over depth) is a column: its limbs rise steeply and arch little. */
+const NARROW = 0.35;
 /** How far a scaffold's way wanders each internode at crooked 1 (radians, a deviate's spread), and how much of its wander it keeps from the last. */
 const LIMB_WANDER = 0.09;
 const LIMB_KEEP = 0.85;
@@ -879,7 +881,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     for (const { node, scaffold: k } of holds) {
       const pos = scaffolds > 1 ? k / (scaffolds - 1) : 0.5;
       const g = Math.max(-2, Math.min(2, rng.gauss()));
-      const angle = Math.min(110 * DEG, Math.max(8 * DEG, (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos)));
+      // (No wider than the crown has room for: in a crown narrow for its depth (a tree grown in a wood, a
+      // column), the limbs rise steeply, or they would reach its side at once and curl over into hooks.)
+      const room = R / depth < NARROW ? Math.atan((2.4 * R) / depth) : Math.PI;
+      const angle = Math.min(110 * DEG, room, Math.max(8 * DEG, (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos)));
       const a0 = azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
       const e0 = 0.5 * Math.PI - angle;
       const sway = SCAFFOLD_SWAY * sp.crooked * rng.range(-1, 1);
@@ -888,7 +893,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       let we = 0;
       let wa = 0;
       const pts = spine(node, (u) => {
-        const f = u / R;
+        // (Its arch over the crown, reckoned over the crown's reach: the larger of its radius and most of its
+        // depth, so a long limb in a narrow crown rises rather than arching back down.)
+        const f = u / (R / depth < NARROW ? Math.max(R, 0.6 * depth) : R);
         we = LIMB_KEEP * we + LIMB_WANDER * sp.crooked * rng.gauss();
         wa = LIMB_KEEP * wa + LIMB_WANDER * sp.crooked * rng.gauss();
         const e = Math.min(0.5 * Math.PI, e0 + sp.bend * SCAFFOLD_CURVE * f - SCAFFOLD_ARCH * f * f + we);
@@ -1077,7 +1084,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   // Smoothed, bowed by its weight, and its straight runs joined; then a tree that weeps hangs its whips.
   const unit = L;
   smoothWood(w, h);
-  sagWood(w, h, sagOf(sp), unit);
+  // (Less in a narrow crown: its wood rises steep and short-armed, and bowed it hooks.)
+  sagWood(w, h, sagOf(sp) * (R / depth < NARROW ? Math.max(0.25, R / depth / NARROW) : 1), unit);
   const most = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
   const simple = simplifyWood(w, h, unit * SIMPLIFY_SPAN, most);
   if (weep <= 0) return h;

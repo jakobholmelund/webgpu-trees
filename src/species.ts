@@ -848,7 +848,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     whorlsPerMetre: 0,
     branchiness: 1,
     leafKind: "needle",
-    clumpSize: 1.8,
+    clumpSize: 1.62,
     clumpSpread: 0.45,
     leafColor: "#5c7350",
     leafVariation: 0.25,
