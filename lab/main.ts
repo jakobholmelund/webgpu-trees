@@ -16,7 +16,7 @@
 //   ?fresh           ignore what the lab kept from last time
 
 import * as THREE from "three/webgpu";
-import { dot, float, max, mix, normalize, positionGeometry, pow, smoothstep, uniform, vec3 } from "three/tsl";
+import { dot, float, max, mix, normalize, positionGeometry, positionWorld, pow, smoothstep, uniform, vec3 } from "three/tsl";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import GUI from "three/addons/libs/lil-gui.module.min.js";
 import {
@@ -25,7 +25,10 @@ import {
   DEFAULT_DETAIL,
   DEFAULT_STYLE,
   DEFAULT_VARIANT_OPTIONS,
+  LEAF_KIND_ROWS,
+  REAL_STYLE,
   STARTER_SPECIES,
+  type TreeLook,
   type TreeDetail,
   type TreeInstance,
   type TreeSpecies,
@@ -166,7 +169,9 @@ async function start() {
     scene: (SCENES.find(([, name]) => name === sceneAsked)?.[1] ?? "grove") as SceneName,
     fill: query.get("fill") === "1",
     envelope: false,
+    look: (query.get("look") === "real" ? "real" : "stylized") as TreeLook,
   };
+  if (state.look === "real") Object.assign(style, REAL_STYLE);
 
   // What was kept from last time, unless asked not to.
   const applyPreset = (p: Preset) => {
@@ -216,13 +221,19 @@ async function start() {
   const uSun = uniform(new THREE.Vector3(0, 1, 0));
   const uSunTint = uniform(new THREE.Vector3(1.14, 1.04, 0.86));
   const uShadeTint = uniform(new THREE.Vector3(0.6, 0.7, 0.88));
-  {
+  // (In the trees' shade where they cast it: the package's `sunAt`, from its `bakeShade`. So the ground's
+  // material is made again with each making of the trees.)
+  const groundFor = (t: Trees | null) => {
     const mat = new THREE.MeshBasicNodeMaterial();
     const lit = max(dot(vec3(0, 1, 0), uSun), float(0));
-    mat.colorNode = vec3(0.16, 0.25, 0.09).mul(mix(uShadeTint, uSunTint, lit));
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), mat);
-    scene.add(ground);
-  }
+    const sunLeft = t ? t.sunAt(positionWorld.xz) : float(1);
+    mat.colorNode = vec3(0.16, 0.25, 0.09).mul(mix(uShadeTint, uSunTint, lit.mul(sunLeft)));
+    return mat;
+  };
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), groundFor(null));
+  scene.add(ground);
+  /** What the shade was last worked out for: the trees and the hour. */
+  let shadeFor: { trees: Trees | null; hour: number } = { trees: null, hour: NaN };
 
   // ---- The trees. ----
 
@@ -245,7 +256,7 @@ async function start() {
   const growNow = () => {
     const list = treesFor();
     const t0 = performance.now();
-    const made = createTrees({ trees: list, species, variants: { ...variants } });
+    const made = createTrees({ trees: list, species, variants: { ...variants }, look: state.look });
     return { made, count: list.length, ms: performance.now() - t0 };
   };
   let grownAt = growNow();
@@ -449,6 +460,14 @@ async function start() {
     light.windSpeed = w;
     refreshNumbers();
   });
+  // The look: the pieces differ (dabs, or leaf cards), so the trees are made again, with the look's own style.
+  segment(el("look"), [["Painted", "stylized"], ["Real", "real"]] as [string, TreeLook][], () => state.look, (look) => {
+    state.look = look;
+    Object.assign(style, look === "real" ? REAL_STYLE : DEFAULT_STYLE);
+    sceneGui.controllersRecursive().forEach((c) => c.updateDisplay());
+    save();
+    void regrow();
+  });
   el("envelope").addEventListener("click", () => {
     state.envelope = !state.envelope;
     refreshEnvelope();
@@ -479,6 +498,7 @@ async function start() {
   el("copy-view").addEventListener("click", () => {
     const q = new URLSearchParams();
     q.set("scene", state.scene);
+    if (state.look === "real") q.set("look", "real");
     q.set("species", String(chosen.row));
     if (state.fill) q.set("fill", "1");
     q.set("hour", String(light.hour));
@@ -605,6 +625,7 @@ async function start() {
     branches.add(s, "whorlsPerMetre", 0, 4, 0.05).name("whorls a metre").onChange(grows);
     branches.add(s, "branchiness", 0, 1, 0.01).name("branchiness").onChange(grows);
     const leaves = folder("Clumps of leaves");
+    leaves.add(s, "leafKind", [...LEAF_KIND_ROWS]).name("leaves (real look)").onChange(live);
     leaves.add(s, "clumpSize", 0.1, 4, 0.05).name("across (m)").onChange(grows);
     leaves.add(s, "clumpSpread", 0, 1, 0.01).name("size spread").onChange(grows);
     const colour = folder("Colour");
@@ -637,6 +658,9 @@ async function start() {
   stylePanel.add(style, "wrap", 0, 1, 0.01).name("light wraps").onChange(save);
   stylePanel.add(style, "strokes", 0, 1, 0.01).name("brush strokes").onChange(save);
   stylePanel.add(style, "selfShade", 0, 1, 0.01).name("crown shades itself").onChange(save);
+  stylePanel.add(style, "fullLight", 0.2, 1, 0.01).name("full sun from").onChange(save);
+  stylePanel.add(style, "bark", 0, 1, 0.01).name("bark furrows").onChange(save);
+  stylePanel.add(style, "faceEye", 0, 1, 0.01).name("cards face the eye").onChange(save);
   const detailPanel = sceneGui.addFolder("Detail");
   detailPanel.add(detail, "nearPx", 20, 1200, 1).name("near above (px)").onChange(save);
   detailPanel.add(detail, "farPx", 5, 600, 1).name("far below (px)").onChange(save);
@@ -738,6 +762,17 @@ async function start() {
     Object.assign(trees.style, style);
     Object.assign(trees.detail, detail);
     Object.assign(trees.show, show);
+    // (The shade on the ground, again whenever the trees or the sun have changed. Over the scene's ground:
+    // finer for a few trees, coarser for a course.)
+    if (shadeFor.trees !== trees || shadeFor.hour !== light.hour) {
+      if (shadeFor.trees !== trees) {
+        (ground.material as THREE.Material).dispose();
+        ground.material = groundFor(trees);
+      }
+      const side = state.scene === "course" ? 2600 : state.scene === "grove" ? 400 : 200;
+      trees.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: state.scene === "course" ? 1.25 : 0.4 });
+      shadeFor = { trees, hour: light.hour };
+    }
     trees.update(renderer, camera, clock.getElapsed());
     renderer.render(scene, camera);
     frames++;

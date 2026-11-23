@@ -19,11 +19,12 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, atan, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
-import { type Pieces, TIER_SHAPES, dabPieces, woodPieces } from "./geometry.ts";
+import { makeLeafAtlas } from "./leaves.ts";
+import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, woodPieces } from "./geometry.ts";
 import { growTree } from "./grow.ts";
-import { type TreeSpecies } from "./species.ts";
+import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
 import { type GrownTree, type TreeSize } from "./tree.ts";
 import { DEFAULT_VARIANT_OPTIONS, type Plan, type TreeInstance, type VariantOptions, packTrees, planVariants } from "./variants.ts";
 
@@ -59,9 +60,25 @@ export interface TreeStyle {
    * than there is.
    */
   selfShade: number;
+  /** How square to the sun a leaf must face to take all of it: 0.65 lights a form as a painter does, 1 as the sun does. */
+  fullLight: number;
+  /** How furrowed the bark is, 0 (smooth, a painted trunk) to 1. */
+  bark: number;
+  /** How far a realistic tree's near leaf cards turn towards the eye, 0..1: none at all shows some edge-on as slivers. */
+  faceEye: number;
 }
 
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5 };
+export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35 };
+
+/** The realistic look's style: light as the sun gives it, the crown's full shade, light through the leaves, furrowed bark. */
+export const REAL_STYLE: TreeStyle = { steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.8, wrap: 0.3, strokes: 1, selfShade: 1, fullLight: 1, bark: 1, faceEye: 0.35 };
+
+/**
+ * How the trees are drawn, chosen when they are made (the pieces differ, not only the light): `stylized`,
+ * crowns laid in dabs of paint; `real`, near crowns of leaf cards set in the crown, each a spray of the
+ * species' leaves, and far ones of the same sprays.
+ */
+export type TreeLook = "stylized" | "real";
 
 /** At what size in the picture each tier takes over, and how far trees are drawn at all. Read each frame. */
 export interface TreeDetail {
@@ -93,6 +110,8 @@ export interface TreesOptions {
   world?: TreeWorld;
   /** Grow trees some other way than this library's (see `growTree`). */
   grow?: (species: TreeSpecies, size: TreeSize, seed: number) => GrownTree;
+  /** The look (`stylized` unless given). `style` starts as the look's (DEFAULT_STYLE or REAL_STYLE). */
+  look?: TreeLook;
 }
 
 export interface Trees {
@@ -121,6 +140,18 @@ export interface Trees {
    * shapes a tree (its branching, clumps, crown) is read when it is grown: for those, create the trees again.
    */
   setSpecies(list: readonly TreeSpecies[]): void;
+  /**
+   * Work out the trees' shade on the ground over an area (`cell` metres to a texel), for the sun as
+   * `environment.sun` has it now: how much of the sun reaches each place past the crowns, which take it
+   * as their leaves do (exp(-k L) over the leafy shell it crosses, the crown as its ellipsoid). The ground
+   * is taken as level at each tree's foot. Do it again when the sun has moved.
+   */
+  bakeShade(area: { x0: number; z0: number; width: number; depth: number; cell: number }): void;
+  /**
+   * How much of the sun reaches a place on the ground past the trees, 0..1, from the last `bakeShade` (1
+   * outside it, or before it): for a host's ground and grass (the grass library's `world.sun`).
+   */
+  sunAt(xz: Vec2): Float;
   /** Which tiers are drawn (for looking at one alone). */
   show: { near: boolean; mid: boolean; far: boolean; wood: boolean; leaves: boolean };
   dispose(): void;
@@ -142,7 +173,9 @@ export function createTrees(options: TreesOptions): Trees {
 
   const group = new THREE.Group();
   group.name = "trees";
-  const style: TreeStyle = { ...DEFAULT_STYLE };
+  const look: TreeLook = options.look ?? "stylized";
+  const real = look === "real";
+  const style: TreeStyle = { ...(real ? REAL_STYLE : DEFAULT_STYLE) };
   const detail: TreeDetail = { ...DEFAULT_DETAIL };
   const show = { near: true, mid: true, far: true, wood: true, leaves: true };
 
@@ -174,7 +207,7 @@ export function createTrees(options: TreesOptions): Trees {
       // (Leaf area per cubic metre of crown, about 0.3 in an open crown to 1.4 in a dense one, half of it
       // facing any one way: Monsi and Saeki's extinction through a crown, with G = 0.5.)
       const k = 0.5 * (0.3 + (1 - s.openness) * 1.1);
-      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, 0, 0], i * 16);
+      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), 0], i * 16);
     });
   };
   packSpecies();
@@ -196,7 +229,8 @@ export function createTrees(options: TreesOptions): Trees {
 
   // ---- The pieces, and their draws. ----
 
-  const dabSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s));
+  // (The realistic look's near leaves are cards set in the crown; further off, both looks' are dabs.)
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 5, 0.85) : dabPieces(grown, s)));
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
   const makeArgs = (sets: Pieces[]) => {
@@ -229,7 +263,8 @@ export function createTrees(options: TreesOptions): Trees {
   const uDetail = uniform(new THREE.Vector4(DEFAULT_DETAIL.nearPx, DEFAULT_DETAIL.farPx, DEFAULT_DETAIL.band, DEFAULT_DETAIL.range));
   const uStyle = uniform(new THREE.Vector4());
   const uStyle2 = uniform(new THREE.Vector4());
-  const uSelfShade = uniform(0.5);
+  /** selfShade, fullLight, bark, faceEye. */
+  const uStyle3 = uniform(new THREE.Vector4(0.5, 0.65, 0, 0.35));
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -384,7 +419,7 @@ export function createTrees(options: TreesOptions): Trees {
    * crown taken as its ellipsoid), and the sky, as much as the crown above lets through.
    */
   const crownAt = (T: TreeRows, at: Vec3) => {
-    const k = T.srow(3).x.mul(uSelfShade);
+    const k = T.srow(3).x.mul(uStyle3.x);
     const ry = max(T.r1.x.sub(T.r1.y).mul(0.5), float(0.05));
     const rx = max(T.r1.z, float(0.05));
     const centre = vec3(T.r0.x, T.r0.y.add(T.r1.y).add(ry), T.r0.z);
@@ -416,7 +451,7 @@ export function createTrees(options: TreesOptions): Trees {
    * How much sun a piece facing `n` gets: all of it from well short of square-on, none from `wrap` past its
    * side (as a painter lights a form, and Couch Golf Club's own trees: smoothstep(-wrap, 0.65, n . sun)).
    */
-  const sunOn = (C: Crown, n: Vec3, wrap: Float): Float => smoothstep(wrap.negate(), float(0.65), dot(n, uSun)).mul(C.sunIn).mul(C.cloud);
+  const sunOn = (C: Crown, n: Vec3, wrap: Float): Float => smoothstep(wrap.negate(), uStyle3.y, dot(n, uSun)).mul(C.sunIn).mul(C.cloud);
 
   /** Into the air between it and the eye. */
   const intoAir = (col: Vec3, at: Vec3): Vec3 => (world.air ? world.air(col, at) : col);
@@ -448,12 +483,12 @@ export function createTrees(options: TreesOptions): Trees {
     Discard(s.lessThan(shares.x).or(s.greaterThanEqual(shares.y)));
   };
 
-  const atlas = makeDabAtlas();
+  const atlas = real ? makeLeafAtlas() : makeDabAtlas();
 
   // ---- The dabs. ----
 
   /** The dabs of a tier: its leaves, or (`stroke`) the far tier's one upright stroke for each trunk. */
-  const dabMaterial = (t: number, stroke: boolean) => {
+  const dabMaterial = (t: number, stroke: boolean, card = false) => {
     const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: true });
     m.alphaToCoverage = !stroke;
     const aDab = attribute<"vec4">("aDab", "vec4");
@@ -476,9 +511,15 @@ export function createTrees(options: TreesOptions): Trees {
       // Which way it faces: the crown's outside here, turned towards its clump's face and its own place on
       // the clump as far as `round` says (the crown's form first, then its clumps'); lit as one stroke of
       // paint, in steps.
-      const nClump = dirToWorld(T, fit.normal(normalize(aNormal.xyz.add(aOffset.xyz.mul(0.6)))));
+      const toEye = normalize(cameraPosition.sub(at));
       const C = crownAt(T, at);
-      const nLit = normalize(mix(C.form, nClump, uStyle.z));
+      // (A card: its own face, turned towards the eye as far as `faceEye` says, and lit from the side the eye
+      // sees, as a leaf is: the other side's light is what comes through it.)
+      const face0 = dirToWorld(T, fit.normal(aOffset.xyz));
+      const face = normalize(mix(face0, toEye, uStyle3.w));
+      const seen = face.mul(select(dot(face, toEye).lessThan(0), float(-1), float(1)));
+      const nClump = card ? normalize(mix(seen, dirToWorld(T, fit.normal(aNormal.xyz)), uStyle.z)) : dirToWorld(T, fit.normal(normalize(aNormal.xyz.add(aOffset.xyz.mul(0.6)))));
+      const nLit = card ? nClump : normalize(mix(C.form, nClump, uStyle.z));
       const jit = own.sub(0.5).mul(uStyle.w);
       const raw = clamp(sunOn(C, nLit, uStyle2.z).add(jit.mul(0.35)), 0, 1);
       const bands = max(uStyle.y, float(1));
@@ -488,7 +529,6 @@ export function createTrees(options: TreesOptions): Trees {
       const albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
       // (Deep in the crown the leaves see little sky as well as little sun: the crown's own shade.)
       const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w));
-      const toEye = normalize(cameraPosition.sub(at));
       // (The sun through the leaves, to an eye looking towards it: strongest where little crown lies between.)
       const toward = pow(max(dot(toEye.negate(), uSun), float(0)), float(4));
       const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
@@ -504,7 +544,17 @@ export function createTrees(options: TreesOptions): Trees {
       const sa = sin(ang);
       const corner = vec2(ca.mul(aDab.x).sub(sa.mul(aDab.y)), sa.mul(aDab.x).add(ca.mul(aDab.y)));
       const size = aDab.z.mul(fit.size).mul(uStyle2.x);
-      position = at.add(right.mul(corner.x.mul(size))).add(upCam.mul(corner.y.mul(size)));
+      if (card) {
+        // (Its twig runs along `aTangent`, fitted and turned as the tree is, and kept square to its face.)
+        const aTangent = attribute<"vec4">("aTangent", "vec4");
+        const twig0 = dirToWorld(T, normalize(fit.radial(aTangent.xyz).mul(vec3(fit.across, fit.crownUp, fit.across))));
+        const twig = normalize(twig0.sub(face.mul(dot(twig0, face))).add(vec3(0, 1e-4, 0)));
+        const across = cross(face, twig);
+        const sway = vec2(aDab.x, aDab.y).add(vec2(flutter.mul(0.5), flutter));
+        position = at.add(across.mul(sway.x.mul(size))).add(twig.mul(sway.y.mul(size)));
+      } else {
+        position = at.add(right.mul(corner.x.mul(size))).add(upCam.mul(corner.y.mul(size)));
+      }
     } else {
       // The trunk's stroke stands upright from the ground into the crown, turned about its own axis to the
       // eye, and is lit as a cylinder seen side-on.
@@ -523,12 +573,17 @@ export function createTrees(options: TreesOptions): Trees {
 
     const vCol = varying(colour, "vTreeCol");
     const vShares = varying(sharesFor(t, T), "vTreeShares");
-    const vCorner = varying(aDab.xy, "vTreeCorner");
     if (!stroke) {
-      const vCell = varying(floor(own.mul(4)), "vTreeCell");
+      // (Which picture in the atlas: one of four brush marks; or, for the realistic look, one of the two sprays
+      // of the species' kind of leaf, four columns by two rows, `leafCell` in leaves.ts.)
+      const kind = T.srow(3).z;
+      const realCell = vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
+      const vCell = varying(real ? realCell : vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2))), "vTreeCell");
+      const vSpin = varying(aDab.xy, "vTreeUv");
       m.colorNode = Fn(() => {
         handOver(vShares);
-        const cuv = vec2(vCell.mod(2), floor(vCell.div(2))).mul(0.5).add(vCorner.mul(0.25).add(0.25));
+        const cells = real ? vec2(4, 2) : vec2(2, 2);
+        const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
         const mark = texture(atlas, cuv);
         Discard(mark.a.lessThan(uAlphaCut));
         return vec4(vCol.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
@@ -571,9 +626,14 @@ export function createTrees(options: TreesOptions): Trees {
     m.positionNode = at;
     const vCol = varying(intoAir(col, at), "vWoodCol");
     const vShares = varying(sharesFor(t, T), "vWoodShares");
+    // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go.)
+    const vBark = varying(vec3(aRadial.x, aRadial.z, aWood.x), "vWoodBark");
     m.colorNode = Fn(() => {
       handOver(vShares);
-      return vec4(vCol, 1);
+      const round = atan(vBark.y, vBark.x);
+      const ridge = sin(round.mul(9).add(sin(vBark.z.mul(1.7).add(round.mul(2))).mul(1.4)));
+      const furrows = mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z);
+      return vec4(vCol.mul(furrows), 1);
     })();
     m.name = `trees-wood-${t}`;
     return m;
@@ -597,7 +657,7 @@ export function createTrees(options: TreesOptions): Trees {
     if (V === 0) break;
     if (dabSets[t].index.length > 0) {
       const g = geometryOf(dabSets[t], dabArgs, t);
-      const m = dabMaterial(t, false);
+      const m = dabMaterial(t, false, real && t === 0);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
       mesh.name = m.name;
@@ -630,6 +690,79 @@ export function createTrees(options: TreesOptions): Trees {
     }
   }
 
+  // ---- The trees' shade on the ground. ----
+
+  const shadeTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+  shadeTex.magFilter = shadeTex.minFilter = THREE.LinearFilter;
+  shadeTex.needsUpdate = true;
+  const shadeNode = texture(shadeTex);
+  const uShadeArea = uniform(new THREE.Vector4(0, 0, 1, 1));
+  const bakeShade = (area: { x0: number; z0: number; width: number; depth: number; cell: number }) => {
+    const nx = Math.max(1, Math.ceil(area.width / area.cell));
+    const nz = Math.max(1, Math.ceil(area.depth / area.cell));
+    const sun = uSun.value.clone().normalize();
+    const trans = new Float32Array(nx * nz).fill(1);
+    if (sun.y > 0.02) {
+      const ks = species.map((sp) => 0.5 * (0.3 + (1 - sp.openness) * 1.1));
+      for (const p of plan.placements) {
+        const s = p.size;
+        const ry = Math.max(0.05, (s.height - s.crownBase) / 2);
+        const rx = Math.max(0.05, s.crownRadius);
+        const cy = s.crownBase + ry;
+        const sp = species[plan.variants[p.variant].species];
+        const k = ks[plan.variants[p.variant].species];
+        const shell = Math.max(sp.foliageDepth, 0.15) * Math.min(rx, ry);
+        const air = Math.min(rx, ry) * 0.18;
+        // (Where the crown's shadow falls: its centre carried down the sun's ray to the ground at its foot.)
+        const sx = p.x - (sun.x * cy) / sun.y;
+        const sz = p.z - (sun.z * cy) / sun.y;
+        const reach = Math.max(rx, ry) / Math.max(sun.y, 0.15) + rx;
+        const i0 = Math.max(0, Math.floor((sx - reach - area.x0) / area.cell));
+        const i1 = Math.min(nx - 1, Math.ceil((sx + reach - area.x0) / area.cell));
+        const j0 = Math.max(0, Math.floor((sz - reach - area.z0) / area.cell));
+        const j1 = Math.min(nz - 1, Math.ceil((sz + reach - area.z0) / area.cell));
+        const dx = sun.x / rx;
+        const dy = sun.y / ry;
+        const dz = sun.z / rx;
+        const a = dx * dx + dy * dy + dz * dz;
+        for (let j = j0; j <= j1; j++) {
+          for (let i = i0; i <= i1; i++) {
+            // (The ray from this place on the ground towards the sun, in the crown's own unit sphere.)
+            const px = (area.x0 + (i + 0.5) * area.cell - p.x) / rx;
+            const py = -cy / ry;
+            const pz = (area.z0 + (j + 0.5) * area.cell - p.z) / rx;
+            const b = px * dx + py * dy + pz * dz;
+            const c = px * px + py * py + pz * pz - 1;
+            const disc = b * b - a * c;
+            if (disc <= 0) continue;
+            const chord = (2 * Math.sqrt(disc)) / a;
+            const leafy = Math.min(Math.max(chord - air, 0), shell * 2);
+            trans[j * nx + i] *= Math.exp(-k * leafy);
+          }
+        }
+      }
+    }
+    const data = new Uint8Array(nx * nz * 4);
+    for (let q = 0; q < nx * nz; q++) {
+      const v = Math.round(trans[q] * 255);
+      data[q * 4] = data[q * 4 + 1] = data[q * 4 + 2] = v;
+      data[q * 4 + 3] = 255;
+    }
+    const next = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
+    next.magFilter = next.minFilter = THREE.LinearFilter;
+    next.wrapS = next.wrapT = THREE.ClampToEdgeWrapping;
+    next.needsUpdate = true;
+    const old = shadeNode.value;
+    shadeNode.value = next;
+    if (old !== shadeTex) old.dispose();
+    uShadeArea.value.set(area.x0, area.z0, nx * area.cell, nz * area.cell);
+  };
+  const sunAt = (xz: Vec2): Float => {
+    const uv = xz.sub(vec2(uShadeArea.x, uShadeArea.y)).div(vec2(uShadeArea.z, uShadeArea.w));
+    const inside = step(float(0), uv.x).mul(step(float(0), uv.y)).mul(step(uv.x, float(1))).mul(step(uv.y, float(1)));
+    return mix(float(1), shadeNode.sample(uv).level(float(0)).r, inside);
+  };
+
   const frustum = new THREE.Frustum();
   const pv = new THREE.Matrix4();
   const size = new THREE.Vector2();
@@ -657,13 +790,15 @@ export function createTrees(options: TreesOptions): Trees {
       uDetail.value.set(detail.nearPx, detail.farPx, detail.band, detail.range);
       uStyle.value.set(style.steps, style.bands, style.round, style.jitter);
       uStyle2.value.set(style.dabScale, style.through, style.wrap, style.strokes);
-      uSelfShade.value = style.selfShade;
+      uStyle3.value.set(style.selfShade, style.fullLight, style.bark, style.faceEye);
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);
       }
       if (N > 0 && V > 0) renderer.compute([cull, finish]);
     },
+    bakeShade,
+    sunAt,
     setSpecies(list) {
       species = list;
       packSpecies();
@@ -684,6 +819,8 @@ export function createTrees(options: TreesOptions): Trees {
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       atlas.dispose();
+      if (shadeNode.value !== shadeTex) shadeNode.value.dispose();
+      shadeTex.dispose();
     },
   };
 }

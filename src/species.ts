@@ -21,6 +21,13 @@ export type Architecture = "broadleaf" | "conifer" | "shrub";
  * The outline of the crown seen from the side: how wide it is at each height, from its base to its top.
  * Weber and Penn's shapes (1995), less the ones that serve only a tree's first branches.
  */
+/**
+ * What its leaves are like, for the realistic look's sprays of them: broad (oak, maple, plane), narrow
+ * (eucalyptus, willow), needle (spruce, pine), small (box, holly, a shrub's).
+ */
+export type LeafKind = "broad" | "narrow" | "needle" | "small";
+export const LEAF_KIND_ROWS: readonly LeafKind[] = ["broad", "narrow", "needle", "small"];
+
 export type CrownShape = "conical" | "spherical" | "hemispherical" | "cylindrical" | "taperedCylindrical" | "flame" | "inverseConical" | "tendFlame";
 
 export interface TreeSpecies {
@@ -73,6 +80,7 @@ export interface TreeSpecies {
   branchiness: number;
 
   // The leaves, gathered into clumps: a twig's spray, a branchlet's.
+  leafKind: LeafKind;
   /** How big a clump of leaves is (m across), on a tree of this kind at its own size. */
   clumpSize: number;
   /** How much one clump differs in size from the next, 0..1. */
@@ -121,6 +129,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.8,
+    leafKind: "broad",
     clumpSize: 1.6,
     clumpSpread: 0.35,
     leafColor: "#5b7f3a",
@@ -150,6 +159,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.8,
+    leafKind: "broad",
     clumpSize: 1.7,
     clumpSpread: 0.3,
     leafColor: "#62873f",
@@ -179,6 +189,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.55,
+    leafKind: "narrow",
     clumpSize: 1.4,
     clumpSpread: 0.45,
     leafColor: "#7d8c62",
@@ -208,6 +219,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 5,
     whorlsPerMetre: 1.6,
     branchiness: 1,
+    leafKind: "needle",
     clumpSize: 1.0,
     clumpSpread: 0.25,
     leafColor: "#34553a",
@@ -237,6 +249,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 4,
     whorlsPerMetre: 1.4,
     branchiness: 0.85,
+    leafKind: "needle",
     clumpSize: 1.7,
     clumpSpread: 0.4,
     leafColor: "#4b6440",
@@ -266,6 +279,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.9,
+    leafKind: "small",
     clumpSize: 0.55,
     clumpSpread: 0.3,
     leafColor: "#4f6e3b",
@@ -293,6 +307,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (!(s.stems >= 1)) out.push("stems must be 1 or more");
   if (s.architecture === "conifer" && !(s.whorl >= 1 && s.whorlsPerMetre > 0)) out.push("a conifer needs whorl and whorlsPerMetre");
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
+  if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {
     if (!(s[k] >= 0 && s[k] <= 1)) out.push(`${k} must be 0..1`);
   }

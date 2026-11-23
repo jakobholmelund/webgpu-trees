@@ -305,3 +305,52 @@ function basis(d: number[]): [number[], number[]] {
   const w = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
   return [u, w];
 }
+
+/**
+ * The realistic look's near leaves: each clump as `perClump` cards, each a spray of leaves on a twig, set
+ * in the crown at angles of their own (not turned to the eye: a card's face shows as it is). They face
+ * out of the crown and a little up, as leaves turn to the light, each its own way about that. Each card:
+ * `position` its centre; `aDab` its corner, its size (m, across half of it), a number of its own;
+ * `aNormal` its clump's outward normal and depth; `aOffset` its own facing (unit) and 0; `aTangent` the
+ * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant.
+ */
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number): Pieces {
+  const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
+  trees.forEach((tree, v) => {
+    b.begin();
+    const { clumps: cl, skeleton: sk } = tree;
+    for (let c = 0; c < cl.count; c++) {
+      const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
+      const r = cl.radius[c];
+      const node = cl.node[c];
+      const l = sk.limb[node];
+      const limb = sk.order[node] === 0 ? [0, -1, 0] : [sk.x[l], sk.y[l], sk.z[l]];
+      // (Deep in the crown, fewer: little of it shows.)
+      const count = cl.depth[c] > 0.65 ? Math.max(1, perClump >> 1) : perClump;
+      for (let d = 0; d < count; d++) {
+        const k = c * 37 + d;
+        const own = hash01(k, v * 613 + 7);
+        const u = hash01(k, 21) * 2 - 1;
+        const a = hash01(k, 22) * Math.PI * 2;
+        const s = Math.sqrt(1 - u * u);
+        const off = [s * Math.cos(a), u, s * Math.sin(a)];
+        const at = [cl.x[c] + off[0] * r * 0.4, cl.y[c] + off[1] * r * 0.4, cl.z[c] + off[2] * r * 0.4];
+        // (Its facing: out of the crown and up, turned its own way by as much again.)
+        const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
+        // (Its twig: square to its facing, at an angle of its own about it, leaning outward and down.)
+        const [e1, e2] = basis(face);
+        const t = hash01(k, 23) * Math.PI * 2;
+        const tangent = norm([e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)]);
+        const half = r * size * (0.8 + hash01(k, 24) * 0.4);
+        let f = -1;
+        for (const [cx, cy] of CORNERS) {
+          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, 0], aTangent: [...tangent, 0], aLimb: [...limb, v] });
+          if (f < 0) f = i;
+        }
+        b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);
+      }
+    }
+    b.end();
+  });
+  return b.done();
+}

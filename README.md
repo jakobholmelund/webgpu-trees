@@ -5,8 +5,9 @@ each tree's own measured size, and drawn in their tens of thousands. It is the
 sibling of [webgpu-grass](https://github.com/jakobholmelund/webgpu-grass), and
 began as the trees of Couch Golf Club, a browser golf game.
 
-It is early: the stylized look comes first (crowns laid in dabs of paint, as
-the game draws them); a realistic look from the same grown trees is next.
+It is early. It has two looks from the same grown trees: `stylized`, crowns
+laid in dabs of paint, as the game draws them, and `real`, crowns of leaf
+cards, each a spray of the species' leaves, with furrowed bark.
 WebGPU only (three.js r187, `three/webgpu`).
 
 ```
@@ -43,6 +44,13 @@ trees.update(renderer, camera, timeSeconds);
   light in painted bands, how round each clump is lit, the dabs' size,
   light through the leaves. **Detail** (`trees.detail`) says at what size
   in the picture each tier takes over.
+- **Look** (`createTrees({ look: "real" })`) is chosen when the trees are
+  made, the pieces being different; `style` starts as the look's
+  (`DEFAULT_STYLE`, `REAL_STYLE`) and can be changed at any time.
+- **Shade on the ground**: `trees.bakeShade(area)` works out how much sun
+  reaches the ground past the crowns (as their leaves take it), and
+  `trees.sunAt(xz)` hands it to a host's ground or grass as a TSL node (the
+  grass library takes it as `world.sun`).
 - **Light and wind** (`trees.environment`) are the host's to set, as the
   grass takes them: the sun's direction, the colour of sunlight and of
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
@@ -91,6 +99,14 @@ and `?fresh` (ignore what the lab kept) set it from the address.
   once per variant by an indirect draw for as many trees as are on its
   list: nothing out of view costs a vertex. A tree passing between tiers is
   drawn by both, each in the pixels the other leaves.
+- **The realistic look** draws a near tree's clumps as leaf cards set in
+  the crown at angles of their own, facing out and up as leaves turn to the
+  light, turned a little to the eye so none is seen edge-on; lit as the sun
+  lights them, with light through the leaves to an eye looking towards it.
+  The sprays are drawn by arithmetic, eight of them (broad, oak, eucalyptus,
+  willow, fir, pine, box, a round-leaved shrub): a species says which kind
+  its leaves are (`leafKind`). Mid and far trees are the same sprays turned
+  to the eye.
 - **Light from the crown's shape.** Sunlight reaching a leaf falls off as
   exp(-k L) over the length L of leafy crown it crosses (Monsi and Saeki),
   the crown taken as its ellipsoid with a hollow heart; a dab faces as the
@@ -105,9 +121,8 @@ the cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
 
 ## Left out, for now
 
-- The realistic look (leaf cards, bark) from the same grown trees.
-- Trees' shadows: on the ground, on each other and on what stands under
-  them. (Couch Golf Club bakes its own from the same numbers.)
+- Trees' shadows on each other and on what stands under them (the ground's
+  shade is baked; see above).
 - Impostors for the farthest trees.
 - Weeping and palm forms.
 - Phones: WebGPU only.
