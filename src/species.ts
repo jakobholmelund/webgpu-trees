@@ -81,6 +81,11 @@ export interface TreeSpecies {
   // Its colour. Hex colours are sRGB.
   /** The colour of the crown in sunlight, seen from a way off (leaves, not one leaf). */
   leafColor: string;
+  /**
+   * Colours its trees take instead, one each, chosen by the tree's seed: a host whose look gives each kind
+   * of tree a few greens. Left out, every tree is `leafColor`, varied by `treeVariation`.
+   */
+  leafColors?: string[];
   /** How much one clump differs in tone from the next, and one tree from the next, 0..1. */
   leafVariation: number;
   treeVariation: number;
@@ -275,7 +280,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
 
 /** A copy to change, that changes no one else's. */
 export function cloneSpecies(s: TreeSpecies): TreeSpecies {
-  return { ...s, throughTint: [...s.throughTint] };
+  return { ...s, throughTint: [...s.throughTint], ...(s.leafColors ? { leafColors: [...s.leafColors] } : {}) };
 }
 
 /** What is wrong with a species, if anything: a list of plain sentences, empty when it is sound. */
@@ -292,5 +297,6 @@ export function checkSpecies(s: TreeSpecies): string[] {
     if (!(s[k] >= 0 && s[k] <= 1)) out.push(`${k} must be 0..1`);
   }
   if (!(s.bend >= -1 && s.bend <= 1)) out.push("bend must be -1..1");
+  if (s.leafColors && !s.leafColors.every((c) => /^#[0-9a-f]{6}$/i.test(c))) out.push("leafColors must be hex colours like #5b7f3a");
   return out;
 }

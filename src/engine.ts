@@ -317,6 +317,9 @@ export function createTrees(options: TreesOptions): Trees {
     return { across, trunkUp, crownUp, wood, point, normal, radial, size: across.add(crownUp).mul(0.5) };
   };
 
+  /** How light a tree's bark is beside its species': a tenth either way, by its own number (its tint and palette are its leaves'). */
+  const barkTone = (T: TreeRows): Float => float(0.9).add(T.r2.w.mul(0.2));
+
   /** Into the world: leant, turned and stood at the tree's foot. */
   const toWorld = (T: TreeRows, q: Vec3): Vec3 => {
     const lx = q.x.add(T.r3.x.mul(q.y));
@@ -504,7 +507,7 @@ export function createTrees(options: TreesOptions): Trees {
       const C = crownAt(T, position);
       const n = normalize(side.mul(aDab.x).add(normalize(vec3(toEye.x, 0, toEye.z).add(vec3(0, 0, 1e-4))).mul(0.4)));
       const bark = T.srow(1);
-      colour = intoAir(bark.xyz.mul(T.r2.xyz).mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, n, float(0.3)))), position);
+      colour = intoAir(bark.xyz.mul(barkTone(T)).mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, n, float(0.3)))), position);
     }
     m.positionNode = position;
 
@@ -551,7 +554,7 @@ export function createTrees(options: TreesOptions): Trees {
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)
     const pale = bark.w.mul(smoothstep(float(0.05), float(0.5), surface.y.div(T.r1.x)));
-    const albedo = mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)).mul(T.r2.xyz).mul(float(0.9).add(aWood.z.mul(0.2)));
+    const albedo = mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
     // (Darker at its foot, in the grass and its own shade.)
     const foot = mix(float(0.6), float(1), smoothstep(float(0), float(1.2), surface.y));
     const col = albedo.mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2)))).mul(foot);

@@ -71,6 +71,13 @@ export function hash01(n: number, salt: number): number {
   return (h >>> 0) / 4294967296;
 }
 
+/** A hex colour (sRGB) as linear red, green and blue. */
+export function linearRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return [lin(((n >> 16) & 255) / 255), lin(((n >> 8) & 255) / 255), lin((n & 255) / 255)];
+}
+
 /** An integer seed from a place on the ground: stable between loads, to the centimetre. */
 export function seedOfPlace(x: number, z: number): number {
   return (Math.imul(Math.round(x * 100), 73856093) ^ Math.imul(Math.round(z * 100), 19349663)) >>> 0;
@@ -112,7 +119,7 @@ export interface Placement {
   leanZ: number;
   /** 1, or -1 for its variant mirrored. */
   mirror: number;
-  /** A tint for the tree as a whole, about 1 in each of r, g and b. */
+  /** A tint for the tree's leaves, about 1 in each of r, g and b (its bark takes only how light it is). */
   tint: [number, number, number];
   /** A number of its own, 0..1. */
   own: number;
@@ -232,6 +239,11 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
       const tv = sp.treeVariation;
       const tone = 1 + (hash01(seed, 5) - 0.5) * 0.3 * tv;
       const warm = (hash01(seed, 6) - 0.5) * 0.2 * tv;
+      // (A species with a palette: this tree's colour from it, as a tint over the species' own.)
+      const own = sp.leafColors && sp.leafColors.length > 0 ? sp.leafColors[Math.floor(hash01(seed, 9) * sp.leafColors.length)] : sp.leafColor;
+      const pick = linearRgb(own);
+      const base = linearRgb(sp.leafColor);
+      const ratio = pick.map((c, k) => c / Math.max(base[k], 1e-4));
       placements[i] = {
         variant: v,
         x,
@@ -242,7 +254,7 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
         leanX: Math.cos(leanA) * leanR,
         leanZ: Math.sin(leanA) * leanR,
         mirror: options.mirror && hash01(seed, 7) < 0.5 ? -1 : 1,
-        tint: [tone * (1 + warm), tone, tone * (1 - warm)],
+        tint: [ratio[0] * tone * (1 + warm), ratio[1] * tone, ratio[2] * tone * (1 - warm)],
         own: hash01(seed, 8),
       };
     });
