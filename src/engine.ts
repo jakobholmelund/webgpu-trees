@@ -231,8 +231,10 @@ export function createTrees(options: TreesOptions): Trees {
 
   // ---- The pieces, and their draws. ----
 
-  // (The realistic look's near leaves are cards set in the crown; further off, both looks' are dabs.)
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8) : dabPieces(grown, s)));
+  // (The realistic look's near and mid leaves are cards set in the crown; far off, both looks' are dabs.)
+  // (Mid trees too: gathered into broad billboards, the leaf sprays smeared into blots; two large cards a
+  // clump keep a crown of leaves at a cost the mid tier can carry.)
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8) : real && t === 1 ? cardPieces(grown, 2, 1.45) : dabPieces(grown, s)));
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
   const makeArgs = (sets: Pieces[]) => {
@@ -666,7 +668,7 @@ export function createTrees(options: TreesOptions): Trees {
     if (V === 0) break;
     if (dabSets[t].index.length > 0) {
       const g = geometryOf(dabSets[t], dabArgs, t);
-      const m = dabMaterial(t, false, real && t === 0);
+      const m = dabMaterial(t, false, real && t <= 1);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
       mesh.name = m.name;
