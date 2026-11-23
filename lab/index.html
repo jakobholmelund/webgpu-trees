@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Tree lab</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <header id="bar">
+      <div class="group paper">
+        <span id="mark">Tree lab</span>
+        <div class="seg" id="scene" role="group" aria-label="What stands on the ground"></div>
+        <button class="plain" id="envelope" type="button" aria-pressed="false" title="Draw each tree's envelope over it: its crown's ellipsoid, its crown's outline and its trunk">Envelope</button>
+      </div>
+      <div class="group paper">
+        <div class="seg" id="eye" role="group" aria-label="Eye height"></div>
+      </div>
+      <div class="group paper" id="hour-group">
+        <div class="seg" id="hour" role="group" aria-label="Time of day"></div>
+      </div>
+      <div class="group paper" id="wind-group">
+        <div class="seg" id="wind" role="group" aria-label="Wind"></div>
+      </div>
+      <span class="spacer"></span>
+      <div class="group paper">
+        <button class="plain" id="open-preset" type="button" title="The species, the style and the detail as JSON, to keep or to hand to a game">Preset</button>
+        <button class="plain" id="open-bench" type="button" title="Time the trees over fixed views of this scene">Measure</button>
+        <button class="plain" id="copy-view" type="button" title="Put this view in the address and copy a link to it">Share view</button>
+        <button class="plain" id="bare" type="button" aria-pressed="false" title="Put the panels away (H)">Picture only</button>
+      </div>
+    </header>
+
+    <nav id="rail" class="paper" aria-label="Species">
+      <h2>Species</h2>
+      <ul id="species"></ul>
+      <div class="foot">
+        <button class="plain" id="fill" type="button" aria-pressed="false" title="Make the scene again with only this species in it">Fill with it</button>
+      </div>
+    </nav>
+
+    <aside id="inspector" class="paper" aria-label="Settings">
+      <div class="tabs">
+        <div class="seg" id="tabs" role="group" aria-label="What to set">
+          <button type="button" data-tab="species" aria-pressed="true">Species</button>
+          <button type="button" data-tab="scene" aria-pressed="false">Scene</button>
+        </div>
+      </div>
+      <div class="body" id="tab-species">
+        <div id="who">
+          <span class="swatch" id="who-swatch"></span>
+          <input id="who-name" type="text" maxlength="40" spellcheck="false" aria-label="The species' name" />
+        </div>
+        <ul id="problems" hidden></ul>
+        <div id="species-gui"></div>
+      </div>
+      <div class="body" id="tab-scene" hidden>
+        <div id="scene-gui"></div>
+      </div>
+    </aside>
+
+    <div id="status" role="status">
+      <div id="status-line">Growing the trees…</div>
+      <div class="keys" id="status-keys">Drag to turn · right-drag to move · wheel: nearer and further · [ ]: scenes · H: picture only</div>
+    </div>
+
+    <dialog id="preset" class="sheet" aria-labelledby="preset-title">
+      <h1 id="preset-title">Preset</h1>
+      <p>The species, the style, the detail and the variants as JSON: copy it to keep it, or paste one here and load it.</p>
+      <textarea id="preset-text" spellcheck="false" aria-label="Preset as JSON"></textarea>
+      <div class="row">
+        <button class="go" id="preset-load" type="button">Load this</button>
+        <button class="plain" id="preset-copy" type="button">Copy</button>
+        <button class="plain" id="preset-reset" type="button">Starter species</button>
+        <span class="note" id="preset-note"></span>
+        <button class="plain" id="preset-close" type="button">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="bench" class="sheet" aria-labelledby="bench-title">
+      <h1 id="bench-title">What a frame costs</h1>
+      <p>The graphics card's own time for the trees and the rest of the picture, over fixed views of this scene: its compute passes and its drawing, in milliseconds a frame, with how many trees each tier drew. A frame at 60 a second has 16.7 ms.</p>
+      <pre id="bench-text">Measuring…</pre>
+      <div class="row">
+        <button class="plain" id="bench-copy" type="button">Copy</button>
+        <span class="note" id="bench-note"></span>
+        <button class="plain" id="bench-close" type="button">Close</button>
+      </div>
+    </dialog>
+
+    <div id="fail"><p id="fail-text"></p></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

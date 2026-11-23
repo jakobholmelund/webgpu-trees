@@ -1,0 +1,192 @@
+/*
+ * The tree lab's look (the grass lab's, so the two read as one family). The picture comes first; everything else stands at
+ * its edges and can be put away (H).
+ *
+ * One rule: what is read is ink, what is touched is paper, and the one
+ * next thing to do is green.
+ */
+:root {
+  --paper: #f6f1e4;
+  --paper-edge: #e2dac6;
+  --paper-deep: #ebe4d2;
+  --ink: #1f3a2b;
+  --ink-soft: #55695c;
+  --green: #2f7a4c;
+  --paper-glass: color-mix(in srgb, var(--paper) 92%, transparent);
+  --ink-glass: color-mix(in srgb, #14281d 66%, transparent);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --gap: 12px;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(20 40 29 / 0.12), 0 8px 28px rgb(20 40 29 / 0.16);
+}
+
+html, body { margin: 0; height: 100%; overflow: hidden; background: #b9cfe0; font: 13px/1.4 var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+canvas#view { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+canvas#view.dragging { cursor: grabbing; }
+
+/* Paper: what is touched. */
+.paper { background: var(--paper-glass); border: 1px solid color-mix(in srgb, var(--paper-edge) 80%, transparent); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+
+/* The top bar: what is looked at, and from where. */
+#bar { position: fixed; top: var(--gap); left: var(--gap); right: var(--gap); display: flex; align-items: center; gap: 10px; pointer-events: none; }
+#bar > * { pointer-events: auto; }
+#bar .group { display: flex; align-items: center; gap: 8px; padding: 5px; }
+#mark { font: 600 16px/1 var(--serif); letter-spacing: 0.01em; padding: 0 8px 0 9px; white-space: nowrap; }
+#bar .spacer { flex: 1; }
+.seg { display: flex; gap: 2px; background: var(--paper-deep); border-radius: 9px; padding: 2px; }
+.seg button { border: 0; background: none; padding: 5px 11px; border-radius: 7px; white-space: nowrap; color: var(--ink-soft); transition: background 0.12s, color 0.12s; }
+.seg button:hover { color: var(--ink); background: color-mix(in srgb, var(--paper) 70%, transparent); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.plain { border: 1px solid var(--paper-edge); background: var(--paper); padding: 5px 12px; border-radius: 8px; white-space: nowrap; transition: background 0.12s, border-color 0.12s; }
+.plain:hover { background: #fffaf0; border-color: color-mix(in srgb, var(--ink-soft) 40%, var(--paper-edge)); }
+.plain[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.go { border: 0; background: var(--green); color: #fff; padding: 6px 14px; border-radius: 8px; font-weight: 600; }
+.go:hover { background: color-mix(in srgb, var(--green) 88%, black); }
+[hidden] { display: none !important; }
+
+/* The species: a rail down the left. */
+#rail { position: fixed; top: 64px; left: var(--gap); width: 248px; max-height: calc(100vh - 64px - 64px); display: flex; flex-direction: column; overflow: hidden; }
+#rail h2, #inspector h2 { margin: 0; padding: 11px 14px 7px; font: 600 11px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+#species { list-style: none; margin: 0; padding: 0 6px 6px; overflow-y: auto; }
+#species button { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px; width: 100%; text-align: left; border: 1px solid transparent; background: none; padding: 6px 8px; border-radius: 9px; }
+#species button:hover { background: color-mix(in srgb, var(--paper-deep) 70%, transparent); }
+#species button[aria-current="true"] { background: #fffaf0; border-color: var(--paper-edge); box-shadow: 0 1px 2px rgb(20 40 29 / 0.08); }
+#species .swatch { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(20 40 29 / 0.18), inset 0 -5px 7px rgb(0 0 0 / 0.14); }
+#species .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#species .tall { font: 12px/1 var(--serif); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#rail .foot { padding: 6px 10px 10px; border-top: 1px solid var(--paper-edge); }
+#rail .foot .plain { width: 100%; }
+
+/* The inspector: down the right. */
+#inspector { position: fixed; top: 64px; right: var(--gap); width: 308px; max-height: calc(100vh - 64px - var(--gap)); display: flex; flex-direction: column; overflow: hidden; }
+#inspector .tabs { padding: 8px 8px 0; }
+#inspector .tabs .seg button { flex: 1; }
+#inspector .body { overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; }
+#who { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; padding: 12px 14px 8px; }
+#who .swatch { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(20 40 29 / 0.18), inset 0 -7px 9px rgb(0 0 0 / 0.14); }
+#who input { width: 100%; box-sizing: border-box; border: 1px solid transparent; background: none; border-radius: 6px; padding: 3px 6px; margin-left: -6px; font: 600 17px/1.2 var(--serif); }
+#who input:hover { border-color: var(--paper-edge); }
+#who input:focus { border-color: var(--green); background: #fffaf0; outline: none; }
+
+/* lil-gui, dressed as paper. */
+.lil-gui {
+  --background-color: transparent;
+  --text-color: var(--ink);
+  --title-background-color: transparent;
+  --title-text-color: var(--ink);
+  --widget-color: var(--paper-deep);
+  --hover-color: #e1d9c4;
+  --focus-color: #d9d0b8;
+  --number-color: var(--green);
+  --string-color: var(--ink);
+  --font-size: 12px;
+  --input-font-size: 12px;
+  --font-family: var(--sans);
+  --font-family-mono: var(--sans);
+  --padding: 6px;
+  --spacing: 5px;
+  --widget-height: 22px;
+  --name-width: 42%;
+  --slider-input-width: 30%;
+  --widget-border-radius: 6px;
+  --folder-indent: 0px;
+  --checkbox-size: 16px;
+}
+.lil-gui.root { width: 100%; }
+.lil-gui.root > .title { display: none; }
+.lil-gui .title { font: 600 11px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); height: 30px; line-height: 30px; padding: 0 14px; }
+.lil-gui .title:before { opacity: 0.6; }
+.lil-gui .lil-gui { border-top: 1px solid var(--paper-edge); }
+.lil-gui .children { padding: 0 8px 6px; }
+.lil-gui.root > .children { padding: 0; }
+.lil-gui .controller { padding: 0 6px; }
+.lil-gui .controller .name { color: var(--ink-soft); }
+.lil-gui .controller.number input, .lil-gui .controller.string input { font-variant-numeric: tabular-nums; }
+.lil-gui .controller.number .slider { border-radius: 6px; overflow: hidden; }
+.lil-gui .controller.number .fill { border-right: 0; background: color-mix(in srgb, var(--green) 55%, var(--paper-deep)); }
+.lil-gui select { background: var(--paper-deep); }
+.lil-gui .controller.option .display { border-radius: 6px; }
+.lil-gui input[type="checkbox"]:checked:before { color: var(--green); }
+.lil-gui .lil-gui.transition > .children { transition-duration: 0.18s; }
+
+/* Ink: what is read. */
+#status { position: fixed; left: var(--gap); bottom: var(--gap); max-width: min(560px, calc(100vw - 2 * var(--gap))); padding: 8px 13px; border-radius: 10px; background: var(--ink-glass); color: var(--paper); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none; }
+#status-line { font: 14px/1.3 var(--serif); font-variant-numeric: tabular-nums; }
+#status .keys { font-size: 11.5px; opacity: 0.72; margin-top: 2px; }
+
+/* Presets. */
+dialog.sheet { width: min(560px, calc(100vw - 32px)); padding: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: 0 24px 80px rgb(20 40 29 / 0.35); }
+dialog.sheet::backdrop { background: rgb(20 40 29 / 0.35); backdrop-filter: blur(2px); }
+dialog.sheet h1 { margin: 0; padding: 16px 18px 4px; font: 600 19px/1.2 var(--serif); }
+dialog.sheet p { margin: 0; padding: 0 18px 10px; color: var(--ink-soft); }
+dialog.sheet textarea { display: block; box-sizing: border-box; width: calc(100% - 36px); height: min(46vh, 340px); margin: 0 18px; padding: 10px; border: 1px solid var(--paper-edge); border-radius: 8px; background: #fffaf0; font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+dialog.sheet .row { display: flex; gap: 8px; align-items: center; padding: 12px 18px 16px; }
+dialog.sheet .note { flex: 1; color: var(--ink-soft); min-height: 1.4em; }
+
+#fail { position: fixed; inset: 0; display: none; place-items: center; padding: 24px; text-align: center; background: var(--paper); font: 18px/1.4 var(--serif); }
+#fail.on { display: grid; }
+
+/* Put away: the picture alone, but for the bar. */
+body.bare #rail, body.bare #inspector, body.bare #status .keys { display: none; }
+
+/* A narrow window: the rail is its swatches, the inspector a little slimmer, the bar wraps. */
+@media (max-width: 900px) {
+  #rail { width: 50px; }
+  #rail h2, #species .name, #species .tall, #rail .foot { display: none; }
+  #species { padding: 6px; }
+  #species button { grid-template-columns: 22px; padding: 6px 7px; }
+  #inspector { width: 272px; }
+  #bar { flex-wrap: wrap; }
+  #mark { display: none; }
+  #rail, #inspector { top: 106px; }
+  #inspector { max-height: calc(100vh - 106px - var(--gap)); }
+  #rail { max-height: calc(100vh - 106px - 64px); }
+}
+/* A phone held upright: the bar in rows, the species a row of swatches under it, the inspector a sheet at the foot. */
+@media (max-width: 560px) {
+  #bar { gap: 6px; }
+  #bar .spacer { display: none; }
+  #rail { top: 166px; width: auto; max-height: none; }
+  #species { display: flex; gap: 2px; padding: 4px; }
+  #inspector { left: var(--gap); right: var(--gap); width: auto; top: auto; bottom: var(--gap); max-height: 40vh; }
+  #status { bottom: calc(40vh + 2 * var(--gap)); }
+  #status .keys { display: none; }
+  body.bare #status { bottom: var(--gap); }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* What the benchmark found. */
+#bench-text { margin: 0 18px; padding: 10px; border: 1px solid var(--paper-edge); border-radius: 8px; background: #fffaf0; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; overflow-x: auto; }
+
+dialog#bench { width: min(760px, calc(100vw - 32px)); }
+
+/* What is wrong with the species being edited: said under its name, until it is put right. */
+#problems { margin: 0 14px 8px; padding: 7px 10px 7px 26px; border: 1px solid color-mix(in srgb, #b4492f 45%, var(--paper-edge)); border-radius: 8px; background: color-mix(in srgb, #b4492f 9%, var(--paper)); color: #8a3420; font-size: 12px; line-height: 1.4; }
+#problems li + li { margin-top: 2px; }
+
+/* The envelope's button shows only where there are few enough trees to draw it round. */
+#envelope { margin-left: 2px; }
+
+/* A window of middling width: the bar's buttons draw in so that all of them are on it. */
+@media (max-width: 1560px) and (min-width: 901px) {
+  #bar { gap: 6px; }
+  #bar .group { gap: 5px; padding: 4px; }
+  .seg button { padding: 5px 8px; }
+  .plain { padding: 5px 9px; }
+  #mark { padding: 0 4px 0 6px; }
+}
+/* (The tree lab's bar has four rows of choices, so below this it takes two lines, and the panels move down.) */
+@media (max-width: 1340px) and (min-width: 901px) {
+  #bar { flex-wrap: wrap; }
+  #bar .spacer { display: none; }
+  #rail, #inspector { top: 106px; }
+  #inspector { max-height: calc(100vh - 106px - var(--gap)); }
+  #rail { max-height: calc(100vh - 106px - 64px); }
+}
