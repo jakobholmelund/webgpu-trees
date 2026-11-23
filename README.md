@@ -56,6 +56,53 @@ trees.update(renderer, camera, timeSeconds);
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
   at)` let a host's clouds and haze reach the trees.
 
+## Species
+
+`STARTER_SPECIES` are six trees of a temperate course; `MORE_SPECIES` adds
+rows by the regions Couch Golf Club's courses are in, keyed by a short id
+(`MORE_SPECIES.stonePine`); `ALL_SPECIES` is both. A row's size is a typical
+open-grown tree of its kind on a course or in a park there (not a forest
+record), with its source named over the row in `species.ts`; a tree's own
+measured size replaces it. `regions` are from `REGION_ROWS`: california,
+pacific-northwest, great-britain, france, ontario, netherlands, denmark.
+
+| Name | Latin | Look | Regions | Height (m) | Crown radius (m) | Crown base (m) |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| Oak | *Quercus robur* | a broad dome, wider than tall, on crooked limbs | great-britain, france, netherlands, denmark | 17 | 11 | 2.5 |
+| Plane | *Platanus × hispanica* | a big full oval, pale mottled bark | france, great-britain, netherlands, california | 22 | 10 | 3 |
+| Eucalyptus | *Eucalyptus globulus* | a high open vase of pale limbs, grey-green sprays | california | 26 | 8.5 | 7.5 |
+| Spruce | *Picea abies* | a dark cone, boughs hanging to the ground | denmark, netherlands, ontario | 20 | 3.4 | 1.5 |
+| Scots pine | *Pinus sylvestris* | a flat lopsided top on a tall orange trunk | great-britain, denmark, netherlands | 19 | 6.5 | 11.5 |
+| Shrub | (generic) | a dense mound of small leaves | california, pacific-northwest, great-britain, france, ontario, netherlands, denmark | 2.4 | 1.6 | 0.1 |
+| Beech | *Fagus sylvatica* | a dense dome, smooth grey bark | denmark, great-britain, netherlands, france | 20 | 8 | 2.5 |
+| Silver birch | *Betula pendula* | a narrow open oval, white bark | great-britain, denmark, netherlands | 15 | 3.5 | 3 |
+| Black alder | *Alnus glutinosa* | a dark cone-to-oval on a leader, by water | denmark, netherlands, france | 15 | 4 | 2.5 |
+| Lombardy poplar | *Populus nigra 'Italica'* | a narrow column | france, netherlands | 22 | 2.5 | 2 |
+| Weeping willow | *Salix × sepulcralis* | a broad drooping dome, yellow-green | france, denmark, netherlands | 11 | 7.5 | 1.2 |
+| Hawthorn | *Crataegus monogyna* | a small crooked tree, dense and dark | great-britain, denmark, netherlands, france | 6 | 3 | 1.2 |
+| Gorse | *Ulex europaeus* | a dense dark spiny heath shrub | great-britain, denmark, netherlands | 1.6 | 1 | 0.15 |
+| Sitka spruce | *Picea sitchensis* | a big blue-green cone | denmark, pacific-northwest | 28 | 4.5 | 1.5 |
+| Corsican pine | *Pinus nigra* | a dark dense oval pine | netherlands, denmark, france, great-britain | 18 | 4.5 | 5 |
+| Douglas fir | *Pseudotsuga menziesii* | a tall, somewhat open cone | pacific-northwest, denmark | 30 | 5 | 3 |
+| Western red cedar | *Thuja plicata* | a cone of drooping sprays, red bark | pacific-northwest | 20 | 4.5 | 1 |
+| Monterey cypress | *Hesperocyparis macrocarpa* | a wind-shaped flat top on a few great limbs | california | 18 | 7 | 3 |
+| Monterey pine | *Pinus radiata* | an irregular rounded crown, grass-green | california | 20 | 6.5 | 5 |
+| Torrey pine | *Pinus torreyana* | an open crooked crown, long grey-green needles | california | 15 | 5.5 | 4 |
+| Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 5.5 | 4 |
+| Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 9.5 | 6 |
+| Coast live oak | *Quercus agrifolia* | a low, broad, dark evergreen dome | california | 11 | 8.5 | 1.8 |
+| California sycamore | *Platanus racemosa* | open and crooked, pale bark | california | 18 | 7 | 3.5 |
+| Sugar maple | *Acer saccharum* | a dense oval | ontario | 20 | 6.5 | 3 |
+| Red oak | *Quercus rubra* | a rounded crown on a few big limbs | ontario, denmark, netherlands | 20 | 8 | 3 |
+| Eastern white pine | *Pinus strobus* | tiers of level boughs, soft blue-green | ontario | 22 | 5.5 | 3 |
+| White spruce | *Picea glauca* | a narrow blue-green cone | ontario | 16 | 2.8 | 0.8 |
+
+What the grower cannot do yet, so those rows come as close as their data
+allows: a weeping willow's curtain of whips (it grows a broad drooping dome),
+a lean (Torrey, Aleppo, California sycamore; a host leans a tree at most 3
+degrees), several trunks from one foot (a sycamore's, a coast live oak's),
+and a buttressed foot (western red cedar).
+
 ## The lab
 
 ```bash

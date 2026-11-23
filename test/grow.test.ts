@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { breastHeight, growTree } from "../src/grow.ts";
-import { STARTER_SPECIES, type TreeSpecies } from "../src/species.ts";
+import { ALL_SPECIES, type TreeSpecies } from "../src/species.ts";
 import { crownProfile, type GrownTree, type TreeSize } from "../src/tree.ts";
 
 const SEEDS = [1, 2, 77];
@@ -39,7 +39,7 @@ function stemRadiusAt(t: GrownTree, foot: number, y: number): number {
   }
 }
 
-for (const sp of STARTER_SPECIES) {
+for (const sp of ALL_SPECIES) {
   for (const [label, size] of sizes(sp)) {
     for (const seed of SEEDS) {
       const name = `${sp.name}, ${label}, seed ${seed}`;

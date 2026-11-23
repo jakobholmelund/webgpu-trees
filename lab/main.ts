@@ -25,6 +25,7 @@ import {
   DEFAULT_DETAIL,
   DEFAULT_STYLE,
   DEFAULT_VARIANT_OPTIONS,
+  ALL_SPECIES,
   LEAF_KIND_ROWS,
   REAL_STYLE,
   STARTER_SPECIES,
@@ -42,7 +43,8 @@ import {
 import { course, grove, oneTree, specimenRow, specimens } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
 
-const STORE_KEY = "tree-lab-preset-v1";
+// (v2: the regional species joined the starters, and the style has fullLight, bark and faceEye.)
+const STORE_KEY = "tree-lab-preset-v2";
 const query = new URLSearchParams(location.search);
 
 /** What the lab keeps and hands out: everything set here that is not where the eye is. */
@@ -93,11 +95,15 @@ function tintsFor(sun: THREE.Vector3, sunTint: THREE.Vector3, shadeTint: THREE.V
 }
 
 /** What is wrong with a species read from JSON, or null: every field there and of its kind, then the package's own check. */
+const OPTIONAL_FIELDS = new Set(["latin", "regions", "leafColors"]);
+
 function speciesProblem(value: unknown, i: number): string | null {
   if (typeof value !== "object" || value === null) return `species ${i + 1} is not an object`;
   const o = value as Record<string, unknown>;
   const name = typeof o.name === "string" ? o.name : `species ${i + 1}`;
+  // (Every field a species must have; `latin`, `regions` and `leafColors` may be left out.)
   for (const [key, like] of Object.entries(STARTER_SPECIES[0])) {
+    if (OPTIONAL_FIELDS.has(key)) continue;
     if (typeof o[key] !== typeof like) return `${name}: ${key} is missing or not a ${typeof like}`;
   }
   if (!Array.isArray(o.throughTint) || o.throughTint.length !== 3 || !o.throughTint.every((v) => Number.isFinite(v))) return `${name}: throughTint must be three numbers`;
@@ -154,7 +160,8 @@ async function start() {
 
   // ---- What the lab is set to. The trees are made from these, and these outlive any one making of them. ----
 
-  let species: TreeSpecies[] = STARTER_SPECIES.map((s) => cloneSpecies(s));
+  // (Every species the package has: its starters and the regional ones.)
+  let species: TreeSpecies[] = ALL_SPECIES.map((s) => cloneSpecies(s));
   const style: TreeStyle = { ...DEFAULT_STYLE };
   const detail: TreeDetail = { ...DEFAULT_DETAIL };
   const variants: VariantOptions = { ...DEFAULT_VARIANT_OPTIONS };
@@ -711,7 +718,7 @@ async function start() {
     navigator.clipboard.writeText(text.value).then(() => (note.textContent = "Copied."), () => (note.textContent = "Could not copy: select the text instead."));
   });
   el("preset-reset").addEventListener("click", async () => {
-    await load({ version: 1, species: STARTER_SPECIES.map((s) => cloneSpecies(s)), style: DEFAULT_STYLE, detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
+    await load({ version: 1, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: DEFAULT_STYLE, detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
     text.value = JSON.stringify(preset(), null, 2);
     note.textContent = "Back to the package's starter species.";
   });
