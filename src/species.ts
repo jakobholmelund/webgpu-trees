@@ -14,8 +14,11 @@
  * - `conifer`: one leader to the top, with branches in whorls along it, longest low down (spruce, fir,
  *   most pines when young). Grown whorl by whorl.
  * - `shrub`: several stems from the ground, no trunk to speak of (holly, gorse, broom, rhododendron).
+ * - `palm`: one unbranched stem, as thick at the top as at the foot, crowned with a head of fronds that
+ *   arch out from its top and hang (date palm, fan palm). `whorl` is how many fronds the head carries,
+ *   `bend` how far they arch over, and `crownRadius` how far they reach.
  */
-export type Architecture = "broadleaf" | "conifer" | "shrub";
+export type Architecture = "broadleaf" | "conifer" | "shrub" | "palm";
 
 /**
  * The outline of the crown seen from the side: how wide it is at each height, from its base to its top.
@@ -23,10 +26,11 @@ export type Architecture = "broadleaf" | "conifer" | "shrub";
  */
 /**
  * What its leaves are like, for the realistic look's sprays of them: broad (oak, maple, plane), narrow
- * (eucalyptus, willow), needle (spruce, pine), small (box, holly, a shrub's).
+ * (eucalyptus, willow), needle (spruce, pine), small (box, holly, a shrub's), frond (a palm's: a pinnate
+ * frond or a fan).
  */
-export type LeafKind = "broad" | "narrow" | "needle" | "small";
-export const LEAF_KIND_ROWS: readonly LeafKind[] = ["broad", "narrow", "needle", "small"];
+export type LeafKind = "broad" | "narrow" | "needle" | "small" | "frond";
+export const LEAF_KIND_ROWS: readonly LeafKind[] = ["broad", "narrow", "needle", "small", "frond"];
 
 export type CrownShape = "conical" | "spherical" | "hemispherical" | "cylindrical" | "taperedCylindrical" | "flame" | "inverseConical" | "tendFlame";
 
@@ -118,6 +122,13 @@ export interface TreeSpecies {
   // How it behaves.
   /** How little the wind moves it, 0 (a willow's whips) to 1 (an old oak's trunk). */
   stiffness: number;
+
+  /**
+   * How much of the crown hangs in whips, 0..1: twigs that grow out and then fall straight down under their
+   * own weight, to as low as the crown's base, leaved along all their length (a weeping willow's curtain,
+   * a weeping birch's tresses). 0 or left out: none.
+   */
+  weep?: number;
 }
 
 /**
@@ -362,7 +373,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stiffness: 0.8,
   },
   // UF/IFAS ST-97 (European birch): 40–50 ft tall, 15–25 ft spread. A narrow open oval with a leader,
-  // drooping twigs, light yellow-green; white bark, dark and fissured at its foot.
+  // drooping twigs (some of them hang in tresses), light yellow-green; white bark, dark and fissured at its
+  // foot.
   silverBirch: {
     name: "Silver birch",
     latin: "Betula pendula",
@@ -394,6 +406,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkColor: "#d4d0c4",
     barkPale: 0.3,
     stiffness: 0.35,
+    weep: 0.25,
   },
   // UF/IFAS ST-70 (common alder): 40–50 ft tall, 20–40 ft spread. Conical to oval on a leader that keeps
   // on, by water; dark green, dark bark.
@@ -464,8 +477,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stiffness: 0.4,
   },
   // UF/IFAS ENH-734 (weeping willow): 30–50 ft tall and as wide. A broad weeping dome, light yellow-green,
-  // by lakes. The grower cannot hang whips from arching limbs: branches bend down under bend -1 but still
-  // fill the crown from inside, so this is a low, broad, drooping dome, not a curtain.
+  // by lakes: limbs that rise and arch, and from them a curtain of whips hanging nearly to the ground.
   weepingWillow: {
     name: "Weeping willow",
     latin: "Salix × sepulcralis",
@@ -473,7 +485,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     architecture: "broadleaf",
     height: 11,
     crownRadius: 7.5,
-    crownBase: 1.2,
+    crownBase: 1,
     trunkRadius: 0.5,
     shape: "hemispherical",
     foliageDepth: 0.35,
@@ -481,7 +493,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stems: 1,
     branchAngle: 50,
     branchAngleSpread: 15,
-    bend: -0.95,
+    bend: 0.1,
     crooked: 0.35,
     leader: 0.1,
     whorl: 0,
@@ -497,6 +509,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkColor: "#6b5e4e",
     barkPale: 0,
     stiffness: 0.1,
+    weep: 0.85,
   },
   // The Conservation Volunteers' tree library (hawthorn): typically 5–8 m. A small crooked tree, or a hedge
   // left to grow up; dense small leaves, dark.
@@ -878,6 +891,76 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkPale: 0.3,
     stiffness: 0.8,
   },
+  // UF/IFAS, Gilman and Watson's fact sheet (Phoenix canariensis): 40–60 ft tall, 20–40 ft spread, a trunk
+  // to 3 ft across. California's grand avenue palm: a thick trunk patterned with old leaf bases, a big round
+  // head of 40–50 arching pinnate fronds 5–6 m long, the old ones hanging.
+  canaryDatePalm: {
+    name: "Canary date palm",
+    latin: "Phoenix canariensis",
+    regions: ["california"],
+    architecture: "palm",
+    height: 15,
+    crownRadius: 5,
+    crownBase: 7,
+    trunkRadius: 0.45,
+    shape: "spherical",
+    foliageDepth: 0.5,
+    openness: 0.3,
+    stems: 1,
+    branchAngle: 60,
+    branchAngleSpread: 20,
+    bend: -0.6,
+    crooked: 0.2,
+    leader: 1,
+    whorl: 45,
+    whorlsPerMetre: 0,
+    branchiness: 1,
+    leafKind: "frond",
+    clumpSize: 0.8,
+    clumpSpread: 0.2,
+    leafColor: "#556f2f",
+    leafVariation: 0.2,
+    treeVariation: 0.15,
+    throughTint: [0.85, 1.0, 0.45],
+    barkColor: "#7a6a52",
+    barkPale: 0,
+    stiffness: 0.6,
+  },
+  // UF/IFAS, Gilman and Watson's fact sheet (Washingtonia robusta): 80–100 ft tall, 10–15 ft spread, a trunk
+  // about 1 ft across. The tall thin palm of Los Angeles' streets and courses: a pole with a small tight
+  // head of about 25 fan leaves on long stalks (the skirt of dead leaves under it is not grown).
+  mexicanFanPalm: {
+    name: "Mexican fan palm",
+    latin: "Washingtonia robusta",
+    regions: ["california"],
+    architecture: "palm",
+    height: 22,
+    crownRadius: 2.2,
+    crownBase: 18,
+    trunkRadius: 0.2,
+    shape: "spherical",
+    foliageDepth: 0.5,
+    openness: 0.25,
+    stems: 1,
+    branchAngle: 50,
+    branchAngleSpread: 20,
+    bend: -0.2,
+    crooked: 0.35,
+    leader: 1,
+    whorl: 25,
+    whorlsPerMetre: 0,
+    branchiness: 1,
+    leafKind: "frond",
+    clumpSize: 1,
+    clumpSpread: 0.2,
+    leafColor: "#5f7d36",
+    leafVariation: 0.2,
+    treeVariation: 0.15,
+    throughTint: [0.9, 1.0, 0.45],
+    barkColor: "#857866",
+    barkPale: 0.1,
+    stiffness: 0.45,
+  },
   // University of Redlands tree species accounts (Quercus agrifolia): 25–80 ft tall in cultivation; UC Davis
   // Arboretum: 20–50 ft tall and wide. A broad spreading evergreen oak, low on crooked limbs, small dark
   // holly-like leaves.
@@ -1107,6 +1190,8 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (!(s.trunkRadius > 0)) out.push("trunkRadius must be above 0");
   if (!(s.stems >= 1)) out.push("stems must be 1 or more");
   if (s.architecture === "conifer" && !(s.whorl >= 1 && s.whorlsPerMetre > 0)) out.push("a conifer needs whorl and whorlsPerMetre");
+  if (s.architecture === "palm" && !(s.whorl >= 3)) out.push("a palm needs whorl (its fronds) of 3 or more");
+  if (s.weep !== undefined && !(s.weep >= 0 && s.weep <= 1)) out.push("weep must be 0..1");
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
   if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {

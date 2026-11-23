@@ -103,6 +103,13 @@ export interface Clumps {
   node: Int32Array;
   /** How deep in the crown it is, 0 (its outside) to 1 (its heart): how much of the sky its leaves see. */
   depth: Float32Array;
+  /**
+   * Which way its twig runs at the clump (unit): from the node's parent to the node. A leaf card lies along
+   * it, so a frond's leaves follow the frond and a whip's hang with the whip.
+   */
+  tx: Float32Array;
+  ty: Float32Array;
+  tz: Float32Array;
 }
 
 /** A tree, grown. */

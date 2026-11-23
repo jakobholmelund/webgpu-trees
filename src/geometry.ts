@@ -337,10 +337,15 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const at = [cl.x[c] + off[0] * r * 0.4, cl.y[c] + off[1] * r * 0.4, cl.z[c] + off[2] * r * 0.4];
         // (Its facing: out of the crown and up, turned its own way by as much again.)
         const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
-        // (Its twig: square to its facing, at an angle of its own about it, leaning outward and down.)
+        // (Its twig: along the twig the clump hangs on, turned a little its own way (a frond's leaves follow
+        // the frond, a whip's hang with the whip), and square to its facing.)
         const [e1, e2] = basis(face);
         const t = hash01(k, 23) * Math.PI * 2;
-        const tangent = norm([e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)]);
+        const spin = [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
+        const along = [cl.tx[c] + spin[0] * 0.45, cl.ty[c] + spin[1] * 0.45, cl.tz[c] + spin[2] * 0.45];
+        const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
+        const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
+        const tangent = Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
         const half = r * size * (0.8 + hash01(k, 24) * 0.4);
         let f = -1;
         for (const [cx, cy] of CORNERS) {

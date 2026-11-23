@@ -62,7 +62,7 @@ type EyeName = "standing" | "tree" | "overhead" | "course";
 const EYES: [string, EyeName, number][] = [["Standing", "standing", 1.7], ["Up a tree", "tree", 8], ["Overhead", "overhead", 60], ["Course", "course", 30]];
 const HOURS: [string, number][] = [["Dawn", 6], ["Morning", 9], ["Noon", 13], ["Evening", 18]];
 const WINDS: [string, number][] = [["Still", 0], ["Breeze", 4], ["Wind", 9], ["Gale", 16]];
-const ARCHITECTURES: Architecture[] = ["broadleaf", "conifer", "shrub"];
+const ARCHITECTURES: Architecture[] = ["broadleaf", "conifer", "shrub", "palm"];
 const SHAPES: CrownShape[] = ["conical", "spherical", "hemispherical", "cylindrical", "taperedCylindrical", "flame", "inverseConical", "tendFlame"];
 
 function fail(text: string): never {
@@ -628,9 +628,12 @@ async function start() {
     branches.add(s, "bend", -1, 1, 0.01).name("bend (down to up)").onChange(grows);
     branches.add(s, "crooked", 0, 1, 0.01).name("crooked").onChange(grows);
     branches.add(s, "leader", 0, 1, 0.01).name("leader").onChange(grows);
-    branches.add(s, "whorl", 0, 12, 1).name("to a whorl").onChange(grows);
+    branches.add(s, "whorl", 0, 60, 1).name("to a whorl").onChange(grows);
     branches.add(s, "whorlsPerMetre", 0, 4, 0.05).name("whorls a metre").onChange(grows);
     branches.add(s, "branchiness", 0, 1, 0.01).name("branchiness").onChange(grows);
+    // (Left out of a row, it is none: the slider needs a number.)
+    if (s.weep === undefined) s.weep = 0;
+    branches.add(s as Required<Pick<TreeSpecies, "weep">>, "weep", 0, 1, 0.01).name("hangs in whips").onChange(grows);
     const leaves = folder("Clumps of leaves");
     leaves.add(s, "leafKind", [...LEAF_KIND_ROWS]).name("leaves (real look)").onChange(live);
     leaves.add(s, "clumpSize", 0.1, 4, 0.05).name("across (m)").onChange(grows);

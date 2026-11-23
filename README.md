@@ -75,10 +75,10 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Scots pine | *Pinus sylvestris* | a flat lopsided top on a tall orange trunk | great-britain, denmark, netherlands | 19 | 6.5 | 11.5 |
 | Shrub | (generic) | a dense mound of small leaves | california, pacific-northwest, great-britain, france, ontario, netherlands, denmark | 2.4 | 1.6 | 0.1 |
 | Beech | *Fagus sylvatica* | a dense dome, smooth grey bark | denmark, great-britain, netherlands, france | 20 | 8 | 2.5 |
-| Silver birch | *Betula pendula* | a narrow open oval, white bark | great-britain, denmark, netherlands | 15 | 3.5 | 3 |
+| Silver birch | *Betula pendula* | a narrow open oval of drooping tresses, white bark | great-britain, denmark, netherlands | 15 | 3.5 | 3 |
 | Black alder | *Alnus glutinosa* | a dark cone-to-oval on a leader, by water | denmark, netherlands, france | 15 | 4 | 2.5 |
 | Lombardy poplar | *Populus nigra 'Italica'* | a narrow column | france, netherlands | 22 | 2.5 | 2 |
-| Weeping willow | *Salix × sepulcralis* | a broad drooping dome, yellow-green | france, denmark, netherlands | 11 | 7.5 | 1.2 |
+| Weeping willow | *Salix × sepulcralis* | a broad mound of hanging curtains, nearly to the ground, yellow-green | france, denmark, netherlands | 11 | 7.5 | 1 |
 | Hawthorn | *Crataegus monogyna* | a small crooked tree, dense and dark | great-britain, denmark, netherlands, france | 6 | 3 | 1.2 |
 | Gorse | *Ulex europaeus* | a dense dark spiny heath shrub | great-britain, denmark, netherlands | 1.6 | 1 | 0.15 |
 | Sitka spruce | *Picea sitchensis* | a big blue-green cone | denmark, pacific-northwest | 28 | 4.5 | 1.5 |
@@ -90,6 +90,8 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Torrey pine | *Pinus torreyana* | an open crooked crown, long grey-green needles | california | 15 | 5.5 | 4 |
 | Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 5.5 | 4 |
 | Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 9.5 | 6 |
+| Canary date palm | *Phoenix canariensis* | a big round head of arching fronds on a thick trunk | california | 15 | 5 | 7 |
+| Mexican fan palm | *Washingtonia robusta* | a tall thin pole with a small tight head of fan leaves | california | 22 | 2.2 | 18 |
 | Coast live oak | *Quercus agrifolia* | a low, broad, dark evergreen dome | california | 11 | 8.5 | 1.8 |
 | California sycamore | *Platanus racemosa* | open and crooked, pale bark | california | 18 | 7 | 3.5 |
 | Sugar maple | *Acer saccharum* | a dense oval | ontario | 20 | 6.5 | 3 |
@@ -97,11 +99,20 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Eastern white pine | *Pinus strobus* | tiers of level boughs, soft blue-green | ontario | 22 | 5.5 | 3 |
 | White spruce | *Picea glauca* | a narrow blue-green cone | ontario | 16 | 2.8 | 0.8 |
 
+A palm (`architecture: "palm"`) is one stem, as thick at its top as at
+breast height and swollen at its foot, with a head of `whorl` fronds round
+its top by the golden angle: the young ones upright, the old ones hanging,
+each arching over by `bend` as far as the crown lets it reach; its leaves
+hang along each frond's outer four fifths. A broadleaf or a shrub that
+weeps (`weep`, 0..1) hangs whips from that share of its outer twigs: a short
+arch out, then straight down to as low as the crown's base, leaved all
+along (the willow's curtain, the birch's tresses).
+
 What the grower cannot do yet, so those rows come as close as their data
-allows: a weeping willow's curtain of whips (it grows a broad drooping dome),
-a lean (Torrey, Aleppo, California sycamore; a host leans a tree at most 3
-degrees), several trunks from one foot (a sycamore's, a coast live oak's),
-and a buttressed foot (western red cedar).
+allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
+most 3 degrees), several trunks from one foot (a sycamore's, a coast live
+oak's), a buttressed foot (western red cedar), and a fan palm's skirt of
+dead leaves under its head.
 
 ## The lab
 
@@ -171,5 +182,4 @@ the cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
 - Trees' shadows on each other and on what stands under them (the ground's
   shade is baked; see above).
 - Impostors for the farthest trees.
-- Weeping and palm forms.
 - Phones: WebGPU only.

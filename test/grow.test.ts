@@ -12,13 +12,19 @@ import { crownProfile, type GrownTree, type TreeSize } from "../src/tree.ts";
 
 const SEEDS = [1, 2, 77];
 
-/** Each species at its own size, and at two others: shorter with a wider crown, taller with a narrower, higher one. */
+/**
+ * Each species at its own size, and at two others: shorter with a wider crown, taller with a narrower, higher
+ * one. (Its crown raised by a quarter, but keeping at least 60% of its depth: a high-crowned tree, a fan
+ * palm's head at four fifths of its height, would otherwise be asked for a crown above its own top.)
+ */
 function sizes(sp: TreeSpecies): [string, TreeSize][] {
   const own: TreeSize = { height: sp.height, crownRadius: sp.crownRadius, crownBase: sp.crownBase, trunkRadius: sp.trunkRadius };
+  const tall = 1.3 * own.height;
+  const tallBase = Math.min(1.3 * 1.25 * own.crownBase, tall - 0.6 * 1.3 * (own.height - own.crownBase));
   return [
     ["its own size", own],
     ["short and wide", { height: 0.6 * own.height, crownRadius: 1.2 * own.crownRadius, crownBase: 0.6 * own.crownBase, trunkRadius: 0.8 * own.trunkRadius }],
-    ["tall and narrow", { height: 1.3 * own.height, crownRadius: 0.8 * own.crownRadius, crownBase: 1.3 * 1.25 * own.crownBase, trunkRadius: 1.2 * own.trunkRadius }],
+    ["tall and narrow", { height: tall, crownRadius: 0.8 * own.crownRadius, crownBase: tallBase, trunkRadius: 1.2 * own.trunkRadius }],
   ];
 }
 
@@ -53,7 +59,7 @@ for (const sp of ALL_SPECIES) {
         for (const key of ["x", "y", "z", "radius", "parent", "order", "limb", "along"] as const) {
           assert.deepEqual(again.skeleton[key], k[key], `skeleton.${key}`);
         }
-        for (const key of ["x", "y", "z", "radius", "nx", "ny", "nz", "node", "depth"] as const) {
+        for (const key of ["x", "y", "z", "radius", "nx", "ny", "nz", "node", "depth", "tx", "ty", "tz"] as const) {
           assert.deepEqual(again.clumps[key], c[key], `clumps.${key}`);
         }
       });
@@ -97,8 +103,44 @@ for (const sp of ALL_SPECIES) {
           assert.ok(c.depth[i] >= 0 && c.depth[i] <= 1, `clump ${i} depth ${c.depth[i]}`);
           const nl = Math.hypot(c.nx[i], c.ny[i], c.nz[i]);
           assert.ok(Math.abs(nl - 1) < 1e-3, `clump ${i} normal length ${nl}`);
+          // Its twig's way: from its node's parent to its node.
+          const p = k.parent[n];
+          const want = p < 0 ? [0, 1, 0] : [k.x[n] - k.x[p], k.y[n] - k.y[p], k.z[n] - k.z[p]];
+          const wl = Math.hypot(want[0], want[1], want[2]);
+          const dot = (c.tx[i] * want[0] + c.ty[i] * want[1] + c.tz[i] * want[2]) / wl;
+          assert.ok(Math.abs(Math.hypot(c.tx[i], c.ty[i], c.tz[i]) - 1) < 1e-3 && dot > 0.999, `clump ${i}'s twig way is not its twig's (${dot})`);
         }
       });
+
+      if (sp.architecture === "palm") {
+        test(`${name}: a palm is one stem, as thick at its top, crowned with its fronds`, () => {
+          let top = 0;
+          let fronds = 0;
+          for (let i = 0; i < k.count; i++) {
+            if (k.order[i] === 0) top = i;
+            else if (k.order[k.parent[i]] === 0) fronds++;
+            assert.ok(k.order[i] <= 1, `node ${i} is on a branch off a frond`);
+          }
+          assert.ok(Math.abs(k.radius[top] / size.trunkRadius - 1) <= 0.1, `its stem's top is ${k.radius[top].toFixed(3)} m, not ${size.trunkRadius}`);
+          assert.ok(fronds >= 0.8 * sp.whorl && fronds <= sp.whorl, `${fronds} fronds of ${sp.whorl}`);
+          for (let i = 0; i < k.count; i++) if (k.order[i] === 1) assert.ok(k.radius[i] < 0.5 * k.radius[top], `frond node ${i} is as thick as a stem`);
+        });
+      }
+
+      if ((sp.weep ?? 0) >= 0.5) {
+        test(`${name}: it weeps, in whips hanging nearly to its crown's base`, () => {
+          let hanging = 0;
+          let lowest = Infinity;
+          for (let i = 0; i < c.count; i++) {
+            if (c.ty[i] > -0.9) continue;
+            hanging++;
+            lowest = Math.min(lowest, c.y[i] - c.radius[i]);
+          }
+          // (A third at least hang straight down: the rest are its crown's top, and its whips' arches.)
+          assert.ok(hanging >= c.count / 3, `${hanging} of ${c.count} clumps hang`);
+          assert.ok(lowest <= size.crownBase + 0.1 * depth, `its whips stop at ${lowest.toFixed(2)}, the crown's base ${size.crownBase}`);
+        });
+      }
 
       test(`${name}: its skeleton is sound`, () => {
         assert.equal(k.parent[0], -1, "node 0 is a stem's foot");

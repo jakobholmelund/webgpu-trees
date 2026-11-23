@@ -582,7 +582,8 @@ export function createTrees(options: TreesOptions): Trees {
       const vSpin = varying(aDab.xy, "vTreeUv");
       m.colorNode = Fn(() => {
         handOver(vShares);
-        const cells = real ? vec2(4, 2) : vec2(2, 2);
+        // (The leaf atlas: four columns, two kinds of leaf to a row; leaves.ts `leafCell`.)
+        const cells = real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : vec2(2, 2);
         const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
         const mark = texture(atlas, cuv);
         Discard(mark.a.lessThan(uAlphaCut));

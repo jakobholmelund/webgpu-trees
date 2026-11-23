@@ -15,6 +15,14 @@
 // - conifer: a leader to the top, with whorls of boughs along it, each as long
 //   as the crown is wide where it hangs, and side shoots along each bough. A
 //   conifer has one leader: its row's stems are not read.
+// - palm: one stem to the crown, as thick at its top as at its foot, and a
+//   head of fronds spiralling round its top by the golden angle, the young
+//   ones upright, the old ones hanging, each arching over as far as the crown
+//   lets it reach. Its leaves hang along each frond's outer part.
+//
+// A broadleaf or a shrub that weeps (`weep`) then hangs whips from its outer
+// twigs: a short arch out, then straight down towards the crown's base, leaved
+// all along, in place of the leaves at those twigs' ends.
 //
 // Then the same for all: clumps that crowd each other are thinned, the tree is
 // fitted to its size (a survey measured it, and a ball meets it there), and the
@@ -87,6 +95,52 @@ const SHOOT_LENGTH = 0.45;
 /** The angle a side shoot leaves its bough at. */
 const SHOOT_ANGLE = 55 * DEG;
 
+// Palms.
+/** How far a frond leaves the crown from the level: the youngest, nearly upright ... */
+const FROND_YOUNG = 80 * DEG;
+/** ... to the oldest, hanging. */
+const FROND_OLD = -50 * DEG;
+/** How far a frond arches over along its length at arch 1, when it leaves level (less when it leaves upright, which its weight bends less). */
+const FROND_ARCH = 110 * DEG;
+/** The steepest a frond hangs. */
+const FROND_HANG = -85 * DEG;
+/** Where the fronds leave the stem: as a share of the way up the crown. */
+const PALM_HEART = 0.55;
+/** How far down the stem the oldest fronds leave it, below the youngest, as a share of the crown's depth (at most PALM_KNOB_MAX m). */
+const PALM_KNOB = 0.12;
+const PALM_KNOB_MAX = 1.2;
+const PALM_KNOB_NODES = 4;
+/** A frond bears leaflets from this share of the way along it to its tip. */
+const FROND_LEAFY = 0.2;
+/** A frond's rachis radius at its foot, as a share of its length, and at its tip, as a share of its foot's. */
+const RACHIS = 0.011;
+const RACHIS_TIP = 0.3;
+/** How much thicker a palm's stem is at its foot, and over what height the swell dies away (m). */
+const PALM_SWELL = 0.25;
+const PALM_SWELL_HEIGHT = 0.6;
+/** How far a palm's stem bows, per metre of stem at crooked 1 (m). */
+const PALM_BOW = 0.05;
+/** Pieces of a frond, at the most and the least. */
+const FROND_PIECES_MAX = 12;
+const FROND_PIECES_MIN = 3;
+
+// Whips.
+/** The share of the node budget kept from the crown's growing for its whips, at weep 1. */
+const WHIP_NODES = 0.45;
+/** The share of the clumps a crown may keep that go to its whips, at weep 1 (and a fifth more whatever the weep). */
+const WHIP_CLUMPS = 0.75;
+/** The share of the leaves along a weeping tree's twigs that it does not bear, at weep 1: they are on its whips. */
+const WEEP_TWIG_BARE = 0.4;
+/** A whip's clump, as a share of the species'. */
+const WHIP_CLUMP = 0.7;
+/** How far a whip turns down with each piece of its arch. */
+const WHIP_TURN = 35 * DEG;
+/** The steepest a whip leaves its twig upwards, and the lowest. */
+const WHIP_RISE = 35 * DEG;
+const WHIP_DIP = -20 * DEG;
+/** How much shorter a whip may stop than the crown's base, as a share of the way down to it from its twig (squared draws: most reach far). */
+const WHIP_STAGGER = 0.45;
+
 // Clumps.
 /** How far past a twig's end its clump's centre sits, in the clump's radii. */
 const HANG = 0.3;
@@ -97,8 +151,13 @@ const TWIG_TIPS = 3;
 /** How close two clumps may be, as a share of their radii summed, in a solid crown and in an open one. */
 const THIN = 0.6;
 const THIN_OPEN = 0.4;
-/** Past this many clumps, the crown is thinned again, wider. */
+/** Past this many clumps, the crown is thinned again, wider ... */
 const MAX_CLUMPS = 240;
+/** ... more for a tree that weeps, by its share of whips (at weep 1, twice as many: a curtain is leaves all the way down) ... */
+const WEEP_CLUMPS = 1;
+/** ... and for a palm, whose leaves are strung along its fronds, and may be closer (a frond's leaflets overlap). */
+const PALM_CLUMPS = 1.25;
+const PALM_THIN = 0.75;
 /** How far one clump's size strays from the species' (as shares of it), at the most. */
 const CLUMP_MIN = 0.55;
 const CLUMP_MAX = 1.6;
@@ -150,6 +209,9 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number): Gr
     case "shrub":
       hung = colonize(species, sz, rng.fork(), wood, clumpR);
       break;
+    case "palm":
+      hung = palm(species, sz, rng.fork(), wood, clumpR);
+      break;
   }
   return finish(species, sz, wood, hung);
 }
@@ -177,10 +239,12 @@ interface Wood {
   cont: boolean[];
   kids: number[][];
   stems: number;
+  /** Each node's radius (m), when the grower sets them itself (a palm's): the pipe model is then not used. */
+  radius: number[] | null;
 }
 
 function newWood(): Wood {
-  return { x: [], y: [], z: [], parent: [], stem: [], cont: [], kids: [], stems: 0 };
+  return { x: [], y: [], z: [], parent: [], stem: [], cont: [], kids: [], stems: 0, radius: null };
 }
 
 function addNode(w: Wood, x: number, y: number, z: number, parent: number, cont: boolean): number {
@@ -203,18 +267,21 @@ interface Hung {
   y: number[];
   z: number[];
   r: number[];
+  /** Whether it hangs on a whip: kept before the rest when the crown is thinned. */
+  whip: boolean[];
 }
 
 function newHung(): Hung {
-  return { node: [], x: [], y: [], z: [], r: [] };
+  return { node: [], x: [], y: [], z: [], r: [], whip: [] };
 }
 
-function hang(h: Hung, node: number, x: number, y: number, z: number, r: number): void {
+function hang(h: Hung, node: number, x: number, y: number, z: number, r: number, whip = false): void {
   h.node.push(node);
   h.x.push(x);
   h.y.push(y);
   h.z.push(z);
   h.r.push(r);
+  h.whip.push(whip);
 }
 
 /** One clump's radius: the species' mean, varied by its clump spread. */
@@ -580,9 +647,12 @@ function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR:
     }
   }
 
-  // Grow, a step at a time, until no tip feels a point or the wood is all it may be.
+  // Grow, a step at a time, until no tip feels a point or the wood is all it may be (less, for a tree
+  // that weeps: its whips are wood too).
+  const weep = weepOf(sp);
+  const nodeLimit = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
   const growing: number[] = [];
-  for (let step = 0; step < MAX_STEPS && w.x.length < MAX_NODES; step++) {
+  for (let step = 0; step < MAX_STEPS && w.x.length < nodeLimit; step++) {
     for (let a = 0; a < n; a++) {
       const i = near[a];
       if (!alive[a] || i < 0) continue;
@@ -604,7 +674,7 @@ function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR:
     if (growing.length === 0) break;
     let grew = 0;
     for (const i of growing) {
-      if (w.x.length >= MAX_NODES) break;
+      if (w.x.length >= nodeLimit) break;
       const kids = w.kids[i];
       const felt = accN[i] > 0;
       const p = w.parent[i];
@@ -646,13 +716,17 @@ function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR:
     if (w.kids[i].length === 0) tips[i] = 1;
     if (w.parent[i] >= 0) tips[w.parent[i]] += tips[i];
   }
+  const env = new Envelope(sp.shape, size);
+  // A tree that weeps hangs its whips from its outer twigs, and their leaves stand for those twigs' own.
+  const whips = weep > 0 ? hangWhips(sp, size, w, growable, clumpR, weep, rng) : null;
   const h = newHung();
   const heart = inner.cy;
-  const env = new Envelope(sp.shape, size);
   for (let i = 0; i < w.x.length; i++) {
-    if (!growable[i]) continue;
+    if (!growable[i] || whips?.bears.has(i)) continue;
     const end = w.kids[i].length === 0;
     if (!end && (tips[i] > TWIG_TIPS || env.place(w.x[i], w.y[i], w.z[i], 0).depth > shell)) continue;
+    // A tree that weeps bears most of its leaves on its whips, few along its twigs.
+    if (!end && weep > 0 && rng.chance(WEEP_TWIG_BARE * weep)) continue;
     const p = w.parent[i];
     const t = end ? norm([w.x[i] - w.x[p], w.y[i] - w.y[p], w.z[i] - w.z[p]]) : ([0, 0, 0] as V3);
     const o = norm([w.x[i], w.y[i] - heart, w.z[i]]);
@@ -666,7 +740,113 @@ function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR:
       r,
     );
   }
+  if (whips) for (let c = 0; c < whips.h.node.length; c++) hang(h, whips.h.node[c], whips.h.x[c], whips.h.y[c], whips.h.z[c], whips.h.r[c], true);
   return h;
+}
+
+/**
+ * Whips, hung from a share `weep` of the crown's twig ends, its outer and upper ones first: each arches out
+ * a little and then hangs straight down under its weight, to as low as the crown's base (some stop
+ * short), kept inside the crown's outline, and leaved along all its length. Two whips do not hang where
+ * their leaves would crowd each other. Returns the twigs they hang from and their clumps.
+ */
+function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, growable: boolean[], clumpR: number, weep: number, rng: Random): { bears: Set<number>; h: Hung } {
+  const { crownBase: base, crownRadius: R, height: H } = size;
+  const depth = Math.max(0.01, H - base);
+  const rW = WHIP_CLUMP * clumpR;
+  const thinK = thinGap(sp);
+  const piece = 2.3 * thinK * rW;
+  const gap = 2 * thinK * rW;
+  const inner = new Envelope(sp.shape, size, rW, 0.7 * rW, rW);
+  const ends: number[] = [];
+  for (let i = 0; i < w.x.length; i++) if (growable[i] && w.kids[i].length === 0 && w.parent[i] >= 0) ends.push(i);
+  const score = (i: number) => Math.hypot(w.x[i], w.z[i]) / R + (0.5 * (w.y[i] - base)) / depth;
+  const order = ends.map((i) => ({ i, s: score(i) })).sort((a, b) => b.s - a.s || a.i - b.i);
+  const chosen = order.slice(0, Math.round(weep * order.length));
+  let nodesLeft = MAX_NODES - w.x.length - 8;
+  let clumpsLeft = Math.round(clumpCap(sp) * Math.min(1, 0.2 + WHIP_CLUMPS * weep));
+  const bears = new Set<number>();
+  const h = newHung();
+  const lines: number[] = [];
+  const path: number[] = [];
+  for (const { i } of chosen) {
+    if (nodesLeft < 4 || clumpsLeft < 2) break;
+    const p = w.parent[i];
+    const t = norm([w.x[i] - w.x[p], w.y[i] - w.y[p], w.z[i] - w.z[p]]);
+    // Out from the crown's axis, and on the way the twig was going.
+    const rho = Math.hypot(w.x[i], w.z[i]);
+    const th = Math.hypot(t[0], t[2]);
+    let hx = (th > 1e-6 ? t[0] / th : 0) + (rho > 1e-6 ? w.x[i] / rho : 0);
+    let hz = (th > 1e-6 ? t[2] / th : 0) + (rho > 1e-6 ? w.z[i] / rho : 0);
+    const hk = Math.hypot(hx, hz);
+    if (hk < 1e-6) {
+      const a = rng.range(0, 2 * Math.PI);
+      hx = Math.cos(a);
+      hz = Math.sin(a);
+    } else {
+      hx /= hk;
+      hz /= hk;
+    }
+    const stop = base + 0.8 * rW + (w.y[i] - base) * WHIP_STAGGER * rng.next() ** 2;
+    if (w.y[i] - stop < 2 * piece) continue;
+    let e = Math.min(WHIP_RISE, Math.max(WHIP_DIP, Math.asin(Math.max(-1, Math.min(1, t[1])))));
+    let x = w.x[i];
+    let y = w.y[i];
+    let z = w.z[i];
+    let sx = 0;
+    let sz = 0;
+    let hangAt = -1;
+    path.length = 0;
+    for (let k = 0; k < 64 && path.length < 3 * nodesLeft; k++) {
+      e = Math.max(-0.5 * Math.PI, e - WHIP_TURN);
+      // It sways a little as it hangs, by how crooked the species is.
+      const j = rng.onSphere();
+      sx = 0.7 * sx + 0.12 * sp.crooked * j[0];
+      sz = 0.7 * sz + 0.12 * sp.crooked * j[2];
+      const c = Math.cos(e);
+      const d = norm([c * hx + sx + 0.04 * hx, Math.sin(e), c * hz + sz + 0.04 * hz]);
+      let nx = x + d[0] * piece;
+      const ny = y + d[1] * piece;
+      let nz = z + d[2] * piece;
+      if (ny < stop) break;
+      // Inside the crown's outline: drawn in to it (its arch, from a twig at the crown's edge, follows the
+      // edge round), and ended where the outline narrows fast under it as it hangs.
+      const wd = inner.width(ny);
+      if (wd < 0) break;
+      const r = Math.hypot(nx, nz);
+      if (r > wd) {
+        if (hangAt >= 0 && r - wd > 0.7 * piece) break;
+        nx *= wd / r;
+        nz *= wd / r;
+      }
+      x = nx;
+      y = ny;
+      z = nz;
+      path.push(x, y, z);
+      if (hangAt < 0 && e <= -0.5 * Math.PI + 1e-6) hangAt = path.length - 3;
+    }
+    const pieces = path.length / 3;
+    if (pieces < 2) continue;
+    // Where it hangs, seen from above: not on another's line.
+    const at = hangAt >= 0 ? hangAt : path.length - 3;
+    const lx = path[at];
+    const lz = path[at + 2];
+    let free = true;
+    for (let k = 0; k < lines.length && free; k += 2) if (Math.hypot(lines[k] - lx, lines[k + 1] - lz) < gap) free = false;
+    if (!free) continue;
+    lines.push(lx, lz);
+    bears.add(i);
+    let q = i;
+    const n = Math.min(pieces, nodesLeft, clumpsLeft);
+    for (let k = 0; k < n; k++) {
+      q = addNode(w, path[3 * k], path[3 * k + 1], path[3 * k + 2], q, true);
+      const r = rW * Math.min(1.3, Math.max(0.75, 1 + 0.25 * sp.clumpSpread * rng.gauss()));
+      hang(h, q, w.x[q], w.y[q] - 0.15 * r, w.z[q], r);
+    }
+    nodesLeft -= n;
+    clumpsLeft -= n;
+  }
+  return { bears, h };
 }
 
 // ---------------------------------------------------------------------------
@@ -833,6 +1013,123 @@ function hangNeedles(h: Hung, w: Wood, node: number, sp: TreeSpecies, size: Tree
 }
 
 // ---------------------------------------------------------------------------
+// Palms: one stem, and a head of fronds.
+
+/** A frond's line, of unit length: from `rise` over the level, arching down by `curve`, more towards its tip, in n pieces. */
+function frondLine(rise: number, curve: number, n: number): { h: number[]; v: number[] } {
+  const h = [0];
+  const v = [0];
+  for (let k = 0; k < n; k++) {
+    const s = (k + 0.5) / n;
+    const e = Math.max(FROND_HANG, rise - curve * s * Math.sqrt(s));
+    h.push(h[k] + Math.cos(e) / n);
+    v.push(v[k] + Math.sin(e) / n);
+  }
+  return { h, v };
+}
+
+function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
+  const { height: H, crownRadius: R, crownBase: base } = size;
+  const depth = Math.max(0.01, H - base);
+  // Where a clump's centre may be: in the crown, with room for the clump (and for a big one under it).
+  const inner = new Envelope(sp.shape, size, clumpR, 1.2 * clumpR, clumpR);
+  const heart = Math.min(inner.hi - 0.05 * depth, Math.max(inner.lo + 0.05 * depth, base + PALM_HEART * depth));
+  const knob = Math.min(PALM_KNOB_MAX, PALM_KNOB * depth, 0.5 * (heart - inner.lo));
+  const arch = Math.min(1, Math.max(0, 0.5 * (1 - sp.bend)));
+  const fronds = Math.max(3, Math.round(sp.whorl));
+  const h = newHung();
+  const radius: number[] = [];
+  w.radius = radius;
+
+  // The stem: from its foot, bowed once by how crooked it is (a lean it has grown out of, upright at its
+  // top), as thick at its top as at breast height, and swollen at its foot.
+  const bh = breastHeight(size);
+  const swell = (y: number) => 1 + PALM_SWELL * Math.exp(-Math.max(0, y) / PALM_SWELL_HEIGHT);
+  const stemR = (y: number) => (size.trunkRadius * swell(y)) / swell(bh);
+  const lean = rng.range(0, 2 * Math.PI);
+  const bow = PALM_BOW * sp.crooked * heart;
+  const stemAt = (y: number): [number, number] => {
+    const u = Math.min(1, Math.max(0, y / heart));
+    const b = bow * (1 - (1 - u) * (1 - u));
+    return [b * Math.cos(lean), b * Math.sin(lean)];
+  };
+  // (Closer at the foot, where it swells.)
+  const clear = heart - knob;
+  const heights = [0, Math.min(0.25, 0.3 * clear), Math.min(0.6, 0.6 * clear)];
+  const steps = Math.max(1, Math.ceil((clear - heights[2]) / TRUNK_STEP));
+  for (let k = 1; k <= steps; k++) heights.push(heights[2] + ((clear - heights[2]) * k) / steps);
+  for (let k = 1; k <= PALM_KNOB_NODES; k++) heights.push(clear + (knob * k) / PALM_KNOB_NODES);
+  let prev = -1;
+  const knobNodes: number[] = [];
+  for (let k = 0; k < heights.length; k++) {
+    const y = heights[k];
+    const [x, z] = stemAt(y);
+    prev = addNode(w, x, y, z, prev, true);
+    radius.push(stemR(y));
+    if (k >= heights.length - PALM_KNOB_NODES - 1) knobNodes.push(prev);
+  }
+  const top = radius[radius.length - 1];
+
+  // The fronds, the youngest first: round the stem by the golden angle, from nearly upright to hanging,
+  // the older ones leaving the stem lower down. Each arches over by its weight, and is as long as the
+  // crown lets it be.
+  const piece = 2.1 * thinGap(sp) * clumpR;
+  const turn = rng.range(0, 2 * Math.PI);
+  // (The oldest first: where crowded clumps are thinned, the lowest leaves are kept.)
+  for (let f = fronds - 1; f >= 0; f--) {
+    const age = Math.min(1, Math.max(0, (f + rng.range(0.2, 0.8)) / fronds));
+    const at = knobNodes[Math.round((1 - age) * (knobNodes.length - 1))];
+    const az = turn + f * GOLDEN_ANGLE + rng.range(-0.1, 0.1);
+    const ca = Math.cos(az);
+    const sa = Math.sin(az);
+    const rise = FROND_YOUNG + (FROND_OLD - FROND_YOUNG) * age + 4 * DEG * rng.gauss();
+    const curve = arch * FROND_ARCH * (0.35 + 0.65 * Math.max(0, Math.cos(rise)));
+    const ax = w.x[at];
+    const ay = w.y[at];
+    const az0 = w.z[at];
+    const longest = (n: number, most: number) => {
+      const line = frondLine(rise, curve, n);
+      const fits = (len: number) => {
+        for (let k = 1; k <= n; k++) {
+          const y = ay + line.v[k] * len;
+          const wd = inner.width(y);
+          if (wd < 0 || Math.hypot(ax + line.h[k] * len * ca, az0 + line.h[k] * len * sa) > wd) return false;
+        }
+        return true;
+      };
+      let lo = 0;
+      let hi = most;
+      for (let i = 0; i < 24; i++) {
+        const m = 0.5 * (lo + hi);
+        if (fits(m)) lo = m;
+        else hi = m;
+      }
+      return { line, len: lo };
+    };
+    const first = longest(16, 2 * R + depth);
+    // (In a crown with no room for it, a frond is a stub, and has no leaves.)
+    if (first.len < 0.5 * clumpR) continue;
+    const n = Math.min(FROND_PIECES_MAX, Math.max(FROND_PIECES_MIN, Math.round(first.len / piece)));
+    const { line, len } = longest(n, first.len * rng.range(0.92, 1));
+    const r0 = Math.min(0.5 * top, Math.max(0.008, RACHIS * len));
+    // A little wander square to the frond, by how crooked the species is.
+    let jitter = 0;
+    let q = at;
+    for (let k = 1; k <= n; k++) {
+      jitter += (0.06 * sp.crooked * len * rng.gauss()) / n;
+      const hh = line.h[k] * len;
+      q = addNode(w, ax + hh * ca - jitter * sa, ay + line.v[k] * len, az0 + hh * sa + jitter * ca, q, k > 1);
+      radius.push(r0 * (1 - ((1 - RACHIS_TIP) * k) / n));
+      if (k / n < FROND_LEAFY) continue;
+      // Its leaflets, along it: they hang a little under the rachis.
+      const r = clumpRadius(sp, clumpR, rng);
+      hang(h, q, w.x[q], w.y[q] - 0.15 * r, w.z[q], r);
+    }
+  }
+  return h;
+}
+
+// ---------------------------------------------------------------------------
 // For every tree: thin the clumps, fit to size, the radii, and the arrays.
 
 function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree {
@@ -867,8 +1164,7 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
     limb: new Int32Array(n),
     along: new Float32Array(n),
   };
-  const radius = pipeRadii(size, w);
-  skeleton.radius.set(radius);
+  skeleton.radius.set(w.radius ?? pipeRadii(size, w));
   for (let i = 0; i < n; i++) {
     const p = w.parent[i];
     if (p < 0) {
@@ -895,6 +1191,9 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
     nz: new Float32Array(m),
     node: new Int32Array(m),
     depth: new Float32Array(m),
+    tx: new Float32Array(m),
+    ty: new Float32Array(m),
+    tz: new Float32Array(m),
   };
   for (let k = 0; k < m; k++) {
     const c = keep[k];
@@ -908,8 +1207,32 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
     clumps.nx[k] = at.n[0];
     clumps.ny[k] = at.n[1];
     clumps.nz[k] = at.n[2];
+    // Its twig's way: from the node's parent to the node (a stem's foot, up).
+    const nd = hung.node[c];
+    const p = w.parent[nd];
+    const t: V3 = p >= 0 ? norm([w.x[nd] - w.x[p], w.y[nd] - w.y[p], w.z[nd] - w.z[p]]) : [0, 1, 0];
+    clumps.tx[k] = t[0];
+    clumps.ty[k] = t[1];
+    clumps.tz[k] = t[2];
   }
   return { size, skeleton, clumps };
+}
+
+/** How close two clumps may be, as a share of their radii summed. */
+function thinGap(sp: TreeSpecies): number {
+  return (THIN + THIN_OPEN * sp.openness) * (sp.architecture === "palm" ? PALM_THIN : 1);
+}
+
+/** How many clumps a tree of a species keeps, at most. */
+function clumpCap(sp: TreeSpecies): number {
+  if (sp.architecture === "palm") return Math.round(MAX_CLUMPS * PALM_CLUMPS);
+  return Math.round(MAX_CLUMPS * (1 + WEEP_CLUMPS * weepOf(sp)));
+}
+
+/** A species' share of whips, 0..1 (none for a conifer or a palm, which do not grow them). */
+function weepOf(sp: TreeSpecies): number {
+  if (sp.architecture !== "broadleaf" && sp.architecture !== "shrub") return 0;
+  return Math.min(1, Math.max(0, sp.weep ?? 0));
 }
 
 /**
@@ -925,9 +1248,10 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
   // light the crown grows to: dropped.
   const within = (c: number) =>
     Math.hypot(h.x[c], h.z[c]) <= env.width(Math.min(env.hi, Math.max(env.lo, h.y[c]))) && h.y[c] - 0.5 * h.r[c] >= env.lo;
+  // (A whip's leaves first: a weeping tree is its curtain.)
   const byOuter = Array.from({ length: count }, (_, c) => c)
     .filter(within)
-    .sort((a, b) => outer[a] - outer[b] || a - b);
+    .sort((a, b) => Number(h.whip[b]) - Number(h.whip[a]) || outer[a] - outer[b] || a - b);
   let rMax = 0;
   for (let c = 0; c < count; c++) rMax = Math.max(rMax, h.r[c]);
   const pass = (k: number): number[] => {
@@ -966,10 +1290,13 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
   };
   // Clumps fill a shell, so their count goes as the spacing's inverse square: each pass widens it by
   // that, and a little more, so few passes are needed.
-  let k = THIN + THIN_OPEN * sp.openness;
+  let k = thinGap(sp);
+  const most = clumpCap(sp);
   let kept = pass(k);
-  for (let tries = 0; tries < 4 && kept.length > MAX_CLUMPS; tries++) {
-    k *= 1.05 * Math.sqrt(kept.length / MAX_CLUMPS);
+  // A weeping tree keeps its whips' leaves as they are, and loses the deepest of the rest.
+  if (weepOf(sp) > 0) return kept.slice(0, most).sort((a, b) => a - b);
+  for (let tries = 0; tries < 4 && kept.length > most; tries++) {
+    k *= 1.05 * Math.sqrt(kept.length / most);
     kept = pass(k);
   }
   return kept.sort((a, b) => a - b);

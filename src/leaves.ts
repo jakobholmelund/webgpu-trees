@@ -1,7 +1,8 @@
 // The picture a realistic crown's leaf cards carry: a spray of foliage at a
-// twig's end, one to three metres across, as it would look laid flat. Four
+// twig's end, one to three metres across, as it would look laid flat. Five
 // kinds of leaf, two sprays of each, all drawn here by arithmetic (no picture
-// is loaded, so nothing bought or photographed is in the repository).
+// is loaded, so nothing bought or photographed is in the repository). A palm's
+// "spray" is a frond: a feather of leaflets on a rachis, or a pleated fan.
 //
 // A spray is built as a plant is: a twig, side twigs off it, and leaves (or
 // needles) on short stalks along them, each its own size, angle and tone.
@@ -23,12 +24,13 @@ import * as THREE from "three/webgpu";
 import { hash01 } from "./variants.ts";
 
 /** The kinds of leaf the atlas holds, by index (the same as `LEAF_KIND_ROWS` in species.ts). */
-export const LEAF_KINDS = ["broad", "narrow", "needle", "small"] as const;
+export const LEAF_KINDS = ["broad", "narrow", "needle", "small", "frond"] as const;
 export type LeafKind = (typeof LEAF_KINDS)[number];
 
 const CELL = 256;
 const COLS = 4;
-const ROWS = 2;
+/** Two kinds to a row; the last row's right half is empty (transparent). */
+const ROWS = Math.ceil(LEAF_KINDS.length / 2);
 const WIDTH = CELL * COLS;
 const HEIGHT = CELL * ROWS;
 /** How far inside its cell's border a spray's shapes are kept (the clear margin, the edge ramp and a little more). */
@@ -44,7 +46,8 @@ const LEAF = 0.6;
  * 2 (k % 2) + 1.
  */
 export function leafCell(kind: number, variant: number): { u0: number; v0: number; du: number; dv: number } {
-  const k = (((kind | 0) % 4) + 4) % 4;
+  const n = LEAF_KINDS.length;
+  const k = (((kind | 0) % n) + n) % n;
   const col = 2 * (k % 2) + (variant & 1);
   const row = Math.floor(k / 2);
   return { u0: col / COLS, v0: row / ROWS, du: 1 / COLS, dv: 1 / ROWS };
@@ -426,6 +429,112 @@ function smallSpray(v: number, rnd: () => number): Shape[] {
   return [...twigs, ...under(leaves)];
 }
 
+/**
+ * Palms. Canary date palm (v 0): a pinnate frond, a stiff rachis with long narrow leaflets in two ranks on
+ * each side, angled out and forward, short spines at its foot. Washingtonia (v 1): a petiole to about a
+ * third of the way up, then a costapalmate fan of narrow pleated segments radiating over ~200 degrees, joined
+ * for half their length, then split and drooping at their tips, a few threads hanging from them.
+ */
+function frondSpray(v: number, rnd: () => number): Shape[] {
+  return v === 0 ? pinnateFrond(rnd) : fanFrond(rnd);
+}
+
+function pinnateFrond(rnd: () => number): Shape[] {
+  const rachis: Shape[] = [];
+  const spines: Shape[] = [];
+  const leaflets: Shape[] = [];
+  const len = 236;
+  const main = twig(rachis, 0, 0, Math.PI / 2 + (rnd() - 0.5) * 0.08, len, (rnd() - 0.5) * 0.2, 2.6, 1.0, rnd, 12, 0.02);
+  // (A palm's rachis is pale, not bark.)
+  for (const r of rachis) {
+    (r as Stroke).tone = LEAF * 0.98;
+    (r as Stroke).lit = 0.5;
+  }
+  for (const sd of [1, -1]) {
+    for (let s = 0.025 + rnd() * 0.01; s < 0.985; s += 0.014 + rnd() * 0.006) {
+      const p = along(main, s);
+      if (s < 0.1) {
+        // (The lowest leaflets are spines: short, stiff, steep.)
+        const a = p.a + sd * (0.45 + rnd() * 0.25);
+        const l = 7 + s * 140 * (0.8 + rnd() * 0.4);
+        spines.push(stroke(p.x, p.y, p.x + Math.cos(a) * l, p.y + Math.sin(a) * l, 1.1, 0.4, LEAF * 0.9, 0.3));
+        continue;
+      }
+      // (Longest from a third of the way up, shorter to the tip; each its own length, now and then one missing.)
+      if (rnd() < 0.05) continue;
+      const env = s < 0.3 ? 0.4 + 0.6 * Math.sin(((s - 0.1) / 0.2) * (Math.PI / 2)) : 1 - 0.78 * Math.pow((s - 0.3) / 0.7, 1.5);
+      const l = 122 * env * (0.82 + rnd() * 0.3);
+      // (Two ranks, as the leaflets stand in a V about the rachis: one lies wider than the other.)
+      const spread = (rnd() < 0.5 ? 0.82 : 1.1) + (rnd() - 0.5) * 0.16;
+      const a = p.a + sd * spread * (1 - 0.3 * s * s);
+      leaf(leaflets, p.x, p.y, a, 0, { len: l, wid: 1.25 + rnd() * 0.35, p: 0.45, q: 1.05, bend: sd * (0.03 + rnd() * 0.06), shadow: 1.6 }, rnd);
+    }
+  }
+  return [...spines, ...leaflets, ...rachis];
+}
+
+function fanFrond(rnd: () => number): Shape[] {
+  const stalk: Shape[] = [];
+  const pet = twig(stalk, 0, 0, Math.PI / 2 + (rnd() - 0.5) * 0.05, 92, (rnd() - 0.5) * 0.06, 3.2, 2.5, rnd, 6, 0.02);
+  for (const r of stalk) {
+    (r as Stroke).tone = LEAF * 0.85;
+    (r as Stroke).lit = 0.45;
+  }
+  // (Hooked teeth along the petiole's edges.)
+  for (let s = 0.08; s < 0.92; s += 0.075 + rnd() * 0.04) {
+    const p = along(pet, s);
+    for (const sd of [1, -1]) {
+      if (rnd() < 0.3) continue;
+      const nx = -Math.sin(p.a) * sd * 2.6;
+      const ny = Math.cos(p.a) * sd * 2.6;
+      const a = p.a + sd * (0.9 + rnd() * 0.3);
+      spinesOn(stalk, p.x + nx, p.y + ny, a, 3.5 + rnd() * 2);
+    }
+  }
+  const h = pet[pet.length - 1];
+  const n = 34 + Math.floor(rnd() * 5);
+  const from = (-10 * Math.PI) / 180;
+  const sweep = (200 * Math.PI) / 180;
+  const d = sweep / n;
+  const R = 170;
+  const valleys: Shape[] = [];
+  const ridges: Shape[] = [];
+  const threads: Shape[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = from + d * (i + 0.5) + (rnd() - 0.5) * 0.25 * d;
+    // (The fan nearly round, its side segments shorter than its top ones, and a little ragged.)
+    const len = R * (0.74 + 0.26 * Math.max(0, Math.sin(a))) * (0.93 + rnd() * 0.12);
+    // (Wide enough to overlap its neighbours to past half its length, then narrowing to a tip apart from them.)
+    const wid = 0.64 * len * Math.sin(d / 2) * (0.95 + rnd() * 0.1);
+    // (Its free end droops: the more so the nearer level it points.)
+    const bend = -Math.cos(a) * (0.17 + rnd() * 0.08) + (rnd() - 0.5) * 0.03;
+    const ridge = i % 2 === 1;
+    const tone = LEAF * (ridge ? 1.1 : 0.86) * (0.95 + rnd() * 0.1);
+    (ridge ? ridges : valleys).push(frondBlade(h.x, h.y, a, len, wid, 1, 0.8, bend, tone, ridge ? 2.2 : 1.2));
+    // (Now and then a thread hanging from a side segment's tip, drawn under the fan so only its free end shows.)
+    if (Math.abs(Math.cos(a)) > 0.4 && rnd() < 0.5) {
+      const c = bend * len;
+      const tx = h.x + Math.cos(a) * len * 0.97 - Math.sin(a) * c;
+      const ty = h.y + Math.sin(a) * len * 0.97 + Math.cos(a) * c;
+      const ta = towards(a, -Math.PI / 2, 0.75 + rnd() * 0.2);
+      const tl = 9 + rnd() * 12;
+      threads.push(stroke(tx, ty, tx + Math.cos(ta) * tl, ty + Math.sin(ta) * tl, 0.6, 0.4, LEAF * 0.8, 0));
+    }
+  }
+  // (The hastula: a small pale crest where the petiole meets the fan.)
+  const hastula = frondBlade(h.x, h.y - 2, Math.PI / 2, 18, 4.5, 0.8, 1.2, 0, LEAF * 1.05, 1.5);
+  // (The petiole over the fan's foot, where the segments' shadows would gather into a dark spot.)
+  return [...threads, ...valleys, ...ridges, ...stalk, hastula];
+}
+
+function spinesOn(out: Shape[], x: number, y: number, a: number, len: number): void {
+  out.push(stroke(x, y, x + Math.cos(a) * len, y + Math.sin(a) * len, 0.9, 0.35, LEAF * 0.75, 0));
+}
+
+function frondBlade(x: number, y: number, ang: number, len: number, wid: number, p: number, q: number, bend: number, tone: number, shadow: number): Blade {
+  return { t: "blade", x, y, ang, len, wid, p, q, bend, lobes: 0, lobeDepth: 0, teeth: 0, toothDepth: 0, veins: 0, tone, shadow, prof: null };
+}
+
 /** The leaves' stalks first, under every blade (a stalk drawn across another leaf reads as a scratch). */
 function under(leaves: Shape[]): Shape[] {
   return [...leaves.filter((s) => s.t === "stroke"), ...leaves.filter((s) => s.t === "blade")];
@@ -680,10 +789,10 @@ function drawBlade(L: Layer, b: Blade): void {
 export function leafAtlasPixels(): { data: Uint8Array; width: number; height: number } {
   const data = new Uint8Array(WIDTH * HEIGHT * 4);
   const L: Layer = { tone: new Float32Array(CELL * CELL), cover: new Float32Array(CELL * CELL) };
-  for (let kind = 0; kind < 4; kind++) {
+  for (let kind = 0; kind < LEAF_KINDS.length; kind++) {
     for (let v = 0; v < 2; v++) {
       const rnd = rng(7919 * (kind + 1) + 131 * v + 17);
-      const shapes = [broadSpray, narrowSpray, needleSpray, smallSpray][kind](v, rnd);
+      const shapes = [broadSpray, narrowSpray, needleSpray, smallSpray, frondSpray][kind](v, rnd);
       fit(shapes);
       L.tone.fill(0);
       L.cover.fill(0);
@@ -719,10 +828,22 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
       }
     }
   }
+  // (The empty cells of the last row: clear, at a leaf's tone, so a mip of the cells beside them does not darken.)
+  const t = (LEAF * 255 + 0.5) | 0;
+  for (let cell = LEAF_KINDS.length * 2; cell < COLS * ROWS; cell++) {
+    const k = Math.floor(cell / 2);
+    const ox = (2 * (k % 2) + (cell % 2)) * CELL;
+    const oy = Math.floor(k / 2) * CELL;
+    for (let j = 0; j < CELL; j++) {
+      for (let o = ((oy + j) * WIDTH + ox) * 4, end = o + CELL * 4; o < end; o += 4) {
+        data[o] = data[o + 1] = data[o + 2] = t;
+      }
+    }
+  }
   return { data, width: WIDTH, height: HEIGHT };
 }
 
-/** The leaf cards' atlas: four kinds of spray in rows, two of each side by side (see `leafCell`). */
+/** The leaf cards' atlas: five kinds of spray, two kinds to a row, two sprays of each side by side (see `leafCell`). */
 export function makeLeafAtlas(): THREE.DataTexture {
   const { data, width, height } = leafAtlasPixels();
   const tex = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
