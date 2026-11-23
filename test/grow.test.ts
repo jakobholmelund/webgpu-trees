@@ -86,7 +86,7 @@ for (const sp of ALL_SPECIES) {
           const t = (c.y[i] - size.crownBase) / depth;
           const b = Math.min(bands - 1, Math.max(0, Math.floor(t * bands)));
           let widest = 0;
-          for (let s = 0; s <= 8; s++) widest = Math.max(widest, crownProfile(sp.shape, (b + s / 8) / bands));
+          for (let s = 0; s <= 8; s++) widest = Math.max(widest, crownProfile(sp.shape, (b + s / 8) / bands, sp));
           const reach = Math.hypot(c.x[i], c.z[i]) + c.radius[i];
           const may = widest * size.crownRadius * 1.1 + c.radius[i];
           assert.ok(reach <= may, `clump ${i} at band ${b} reaches ${reach.toFixed(2)}, more than ${may.toFixed(2)}`);

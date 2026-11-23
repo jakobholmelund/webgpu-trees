@@ -341,7 +341,7 @@ async function start() {
     el("envelope").setAttribute("aria-pressed", String(state.envelope));
     if (!state.envelope || !envelopeScene()) return;
     // (Each tree as it was fitted: its own size, from the plan, and its species' crown shape.)
-    const standing: Standing[] = trees.plan.placements.map((p) => ({ x: p.x, y: p.y, z: p.z, size: p.size, shape: species[trees.plan.variants[p.variant].species].shape }));
+    const standing: Standing[] = trees.plan.placements.map((p) => ({ x: p.x, y: p.y, z: p.z, size: p.size, shape: species[trees.plan.variants[p.variant].species].shape, over: species[trees.plan.variants[p.variant].species] }));
     envelopes = makeEnvelopes(standing);
     scene.add(envelopes);
   };

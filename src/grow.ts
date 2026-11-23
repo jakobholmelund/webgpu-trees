@@ -2,18 +2,29 @@
 // this one is, and a seed says which one of its kind it is. Out come its
 // branches (a skeleton of nodes) and its leaves (clumps hung on the twigs).
 //
-// Two ways of building, by the species' architecture:
+// Three ways of building, by the species' architecture, each inside the
+// crown's outline: its shape's profile (rounded as Weber and Penn's pruning
+// envelope, upright where it is widest), turned round the trunk.
 //
-// - broadleaf and shrub: space colonization (Runions, Lane and Prusinkiewicz
-//   2007). Points are scattered through the crown where leaves will be;
-//   branches grow towards the nearest of them and use each up as they reach
-//   it. The branches end where the leaves are, so every clump hangs on wood.
-//   (The generator this replaces scattered leaves on a crown's shell with no
-//   wood under them, and most of them floated.) Each stem rises bare to the
-//   crown's base and divides there into its leader and its great limbs, more
-//   of them the less the leader keeps the lead.
+// - broadleaf and shrub: from buds, in the light (Palubicki et al. 2009, made
+//   light). The trunk rises bare to the crown's base; its great limbs (its
+//   scaffolds) leave the top of it, round it by the golden angle and up it one
+//   to a slot, the lowest leaving widest, each laid out to the crown's outline
+//   along a spine that turns by the species' bend and wanders by how crooked it
+//   is; the trunk goes on up the crown as its leader, all the way if it keeps
+//   the lead. Then, for eleven cycles: each bud is lit by how little the wood
+//   above shades its voxel; the light is gathered down to the foot and handed
+//   back up, at each fork more to the main axis (Borchert and Honda's model)
+//   and to a scaffold as much as to its trunk; each bud grows as many
+//   internodes as it is given, turned towards the least shadow and up or down
+//   by the bend, a lateral bud at every one; and a branch that gathers too
+//   little light for its wood is shed (Takenaka). A shrub's stems are its
+//   scaffolds, from feet spread within a third of the crown. Leaves hang on the
+//   lit shoots near their twigs' ends. Then the wood is smoothed (forks held),
+//   bowed by its weight (thin wood more), and its straight runs joined.
 // - conifer: a leader to the top, with whorls of boughs along it, each as long
-//   as the crown is wide where it hangs, and side shoots along each bough. A
+//   as the crown is wide where it hangs (some missing, some broken short), and
+//   side shoots along each bough; smoothed and bowed as a broadleaf is. A
 //   conifer has one leader: its row's stems are not read.
 // - palm: one stem to the crown, as thick at its top as at its foot, and a
 //   head of fronds spiralling round its top by the golden angle, the young
@@ -26,57 +37,108 @@
 //
 // Then the same for all: clumps that crowd each other are thinned, the tree is
 // fitted to its size (a survey measured it, and a ball meets it there), and the
-// radii come from the pipe model: a branch carries the wood of all it bears.
+// radii come from the pipe model: a branch carries the wood of all it bears,
+// of the branches it has shed, and of the twigs it once bore.
 //
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
-import { type CrownShape, type TreeSpecies } from "./species.ts";
+import { type TreeSpecies } from "./species.ts";
 import { crownProfile, type Clumps, type GrownTree, type Skeleton, type TreeSize } from "./tree.ts";
 import { Random } from "./random.ts";
 
 const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-// Space colonization's distances, as shares of the crown's size (the cube root
-// of radius² × depth). Tied to the crown and not to metres, a big tree and a
-// small one of a kind grow alike, with about as many nodes.
-/** A point is used up when wood comes this near it. */
-const KILL = 0.08;
-/** How far a tip grows in a step, as a share of the kill distance. */
-const STEP = 0.5;
-/** How far a tip feels points from, in kill distances. */
-const INFLUENCE = 5;
-/** Crown volume per point at branchiness 1, in kill distances cubed. */
-const ATTRACTOR_VOLUME = 1.6;
-const MIN_ATTRACTORS = 80;
-const MAX_ATTRACTORS = 1600;
 /** Under the 4000 nodes a host can count on, with room for a conifer's last bough. */
 const MAX_NODES = 3900;
-const MAX_STEPS = 300;
-// How a tip turns as it grows: towards the points it feels (weight 1), on the
-// way it was going, up or down by the species' bend, up again on the leader,
-// and a little at random by how crooked the species is.
-const PERSIST = 0.6;
-const BEND_PULL = 0.35;
-const LEADER_PULL = 0.8;
-const CROOK_PULL = 0.3;
-/** How far a new side branch turns towards its species' branch angle (0 not at all, 1 all the way). */
-const LATERAL_PULL = 0.6;
-/** A new shoot closer than this (cosine) to one already there is the same shoot: it is not grown twice. */
-const SAME_SHOOT = 0.92;
-/** How many shoots one node puts out, at most (a trunk's fork is laid out apart). */
-const MAX_KIDS = 3;
-/** The great limbs a trunk divides into when no leader keeps on (leader 0), shared among its stems. */
-const LIMBS = 4;
 /** The length of a piece of trunk below the crown (m). */
 const TRUNK_STEP = 0.8;
-/** The thinnest shell of points, as a share of the way in, whatever the foliage depth. */
+/** The thinnest shell a conifer keeps its needles in, as a share of the way in, whatever its foliage depth. */
 const MIN_SHELL = 0.12;
-/** Directions the crown's reach is tabled for, to scatter its points by volume. */
-const DIRECTIONS = 512;
-/** Points set at the crown's base and at its top, as a share of the rest (each), in a slab this deep (share of the crown). */
-const END_POINTS = 0.02;
-const END_SLAB = 0.06;
+
+// Broadleaves and shrubs: growing by buds in the light (Palubicki et al. 2009).
+/** Growing cycles: years, as it were. */
+const CYCLES = 11;
+/**
+ * The crown's size (the cube root of radius² × depth) in internodes: an internode's length. Tied to the
+ * crown and not to metres, a big tree and a small one of a kind grow alike, with about as many nodes.
+ */
+const INTERNODES = 20;
+/** The most voxels the shadow grid may have: a long thin crown's internodes are lengthened to keep under it. */
+const MAX_VOXELS = 80000;
+/** The wood grown, at the most, before it is smoothed and its straight runs joined (less for a tree that weeps). */
+const FINE_NODES = 6000;
+/** Shadow (Palubicki's): a node shades the voxels in a pyramid under it by a·b^−q, q layers down, to SHADOW_DEPTH layers. */
+const SHADOW_A = 1;
+const SHADOW_B = 2;
+const SHADOW_DEPTH = 5;
+/** Full light, in shadow: a bud under this much is in the dark. More in an open crown, whose leaves let light by. */
+const LIGHT_FULL = 8;
+const LIGHT_OPEN = 3;
+/** The resource at a stem's foot, for each unit of light its buds gather (Palubicki's α). */
+const ALPHA = 3;
+/** The most internodes a bud puts out in a cycle. */
+const MAX_METAMERS = 4;
+/**
+ * Borchert and Honda's λ, how much of the resource at a fork goes on along its main axis rather than to its
+ * lateral: at leader 0 (decurrent: an oak's crown of equal limbs) and at leader 1 (excurrent: one stem to the top).
+ */
+const LAMBDA_LO = 0.47;
+const LAMBDA_HI = 0.55;
+/** How much a stem's own axis is favoured over its laterals in the crown: at leader 0, and more for each unit of leader. */
+const STEM_FAVOUR = 0.6;
+const STEM_FAVOUR_LEADER = 1.4;
+/** How much a scaffold's own axis is favoured over the shoots it puts out. */
+const SCAFFOLD_FAVOUR = 1.3;
+/** How far a shoot turns towards the least shadow it sees (Palubicki's ξ), and up or down by its species' bend (η). */
+const TO_LIGHT = 0.4;
+const TROPISM = 0.22;
+/** How hard a stem's shoots turn up, at leader 1. */
+const LEADER_UP = 0.35;
+/** How far a shoot wanders at random each internode, at crooked 1. */
+const WANDER = 0.22;
+/** A bud sees the voxels within this angle of its way (the cosine), two voxels round. */
+const PERCEIVE = Math.cos(60 * DEG);
+/** The light a branch must gather for each of its internodes to be kept, from `openness` and `branchiness`, when `shed` is not given. */
+const SHED_BASE = 0.05;
+const SHED_OPEN = 0.1;
+const SHED_SPARSE = 0.15;
+/** The scaffolds leave the trunk from just above the crown's base, up a share of the crown's depth: at leader 0, and more for each unit of leader. */
+const SCAFFOLD_FROM = 0;
+const SCAFFOLD_SPAN = 0.14;
+const SCAFFOLD_SPAN_LEADER = 0.5;
+/** How much wider than the species' angle the lowest scaffold leaves (and narrower the highest). */
+const SCAFFOLD_SWING = 40 * DEG;
+/** How far a scaffold turns up over a crown radius of its length, at bend 1 (down at -1), and how far it arches over by its weight. */
+const SCAFFOLD_CURVE = 35 * DEG;
+const SCAFFOLD_ARCH = 20 * DEG;
+/** How far a scaffold's way wanders each internode at crooked 1 (radians, a deviate's spread), and how much of its wander it keeps from the last. */
+const LIMB_WANDER = 0.09;
+const LIMB_KEEP = 0.85;
+/** How far a scaffold sways side to side over its length, at crooked 1. */
+const SCAFFOLD_SWAY = 28 * DEG;
+/** How far a trunk goes on up its crown, from its scaffolds to the top, at leader 0 (and all the way at leader 1). */
+const LEADER_REACH = 0.55;
+/** How lumpy an outline is at lobes 1: how far it falls back between its bulges, and how many bulges. */
+const LOBE_DEPTH = 0.3;
+const LOBE_COUNT = 7;
+/** Leaves: on shoots this light or lighter ... */
+const LEAF_LIGHT = 0.1;
+/** ... within this many internodes of a twig's end at foliage depth 0, and this many more at 1. */
+const LEAF_REACH = 1;
+const LEAF_REACH_DEPTH = 5;
+// The wood, smoothed and simplified, then bowed by its weight.
+/** Laplacian passes over the wood, forks held, each moving a node this share of the way to its neighbours' middle. */
+const SMOOTH_PASSES = 2;
+const SMOOTH = 0.5;
+/** A node that bends its wood less than this is dropped, its neighbours joined straight. */
+const SIMPLIFY = 4 * DEG;
+/** The longest piece simplifying may make, in internodes. */
+const SIMPLIFY_SPAN = 5;
+/** How far wood turns down under its weight per internode of length (Evergrove's sag), at the most each piece, and the radius (in twigs' pipes) at which it is half as pliant. */
+const SAG = 0.06;
+const SAG_MOST = 0.3;
+const SAG_STIFF = 2.6;
 
 // Conifers.
 /** How far a bough bends over its length at bend ±1 ... */
@@ -94,6 +156,10 @@ const MAX_BOUGH_STEPS = 8;
 const SHOOT_LENGTH = 0.45;
 /** The angle a side shoot leaves its bough at. */
 const SHOOT_ANGLE = 55 * DEG;
+/** The share of boughs broken or shaded back, which stop short. */
+const BOUGH_BROKEN = 0.2;
+/** How far a conifer sags under its weight, as a share of what a broadleaf of its bend does. */
+const CONIFER_SAG = 0.5;
 
 // Palms.
 /** How far a frond leaves the crown from the level: the youngest, nearly upright ... */
@@ -146,8 +212,6 @@ const WHIP_STAGGER = 0.45;
 const HANG = 0.3;
 /** How far a clump is lifted out of the crown from its twig, in its radii. */
 const HANG_OUT = 0.2;
-/** Wood bearing this many twig ends or fewer is a twig, and leaves may hang along it. */
-const TWIG_TIPS = 3;
 /** How close two clumps may be, as a share of their radii summed, in a solid crown and in an open one. */
 const THIN = 0.6;
 const THIN_OPEN = 0.4;
@@ -167,12 +231,18 @@ const CLUMP_MAX = 1.6;
 const FIT_REACH = 0.985;
 /** How high the highest leaf or twig is, as a share of the height. */
 const FIT_TOP = 0.995;
+/** How far over the crown's base the lowest leaf may be (a share of the crown's depth) before the fit moves it down to it, and how far under (hanging) before it moves it up. */
+const FIT_LOW = 0.04;
+const FIT_HANG = 0.06;
 
 // Radii.
 /** The pipe model's exponent (da Vinci's rule is 2; measured trees give 2.2 to 2.5). */
-const PIPE = 2.3;
-/** How much thicker wood is a metre further down a branch that does not divide. */
-const TAPER = 0.015;
+const PIPE = 2.4;
+/**
+ * Disused pipes (Shinozaki et al. 1964): wood grows thicker than the twigs it now carries, by the twigs and
+ * leaves it once carried and lost. Each internode of wood carries this share more pipes than it hands on.
+ */
+const DISUSED = 0.08;
 
 /** Where a trunk's radius is measured (m): breast height. */
 export const BREAST_HEIGHT = 1.3;
@@ -207,7 +277,7 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number): Gr
       break;
     case "broadleaf":
     case "shrub":
-      hung = colonize(species, sz, rng.fork(), wood, clumpR);
+      hung = budGrow(species, sz, rng.fork(), wood, clumpR);
       break;
     case "palm":
       hung = palm(species, sz, rng.fork(), wood, clumpR);
@@ -241,10 +311,12 @@ interface Wood {
   stems: number;
   /** Each node's radius (m), when the grower sets them itself (a palm's): the pipe model is then not used. */
   radius: number[] | null;
+  /** The twigs' pipes each node carried to branches it has shed (the pipe model remembers them), or none. */
+  shed: number[] | null;
 }
 
 function newWood(): Wood {
-  return { x: [], y: [], z: [], parent: [], stem: [], cont: [], kids: [], stems: 0, radius: null };
+  return { x: [], y: [], z: [], parent: [], stem: [], cont: [], kids: [], stems: 0, radius: null, shed: null };
 }
 
 function addNode(w: Wood, x: number, y: number, z: number, parent: number, cont: boolean): number {
@@ -256,6 +328,7 @@ function addNode(w: Wood, x: number, y: number, z: number, parent: number, cont:
   w.stem.push(parent < 0 ? w.stems++ : w.stem[parent]);
   w.cont.push(parent >= 0 && cont);
   w.kids.push([]);
+  if (w.shed) w.shed.push(0);
   if (parent >= 0) w.kids[parent].push(i);
   return i;
 }
@@ -291,12 +364,30 @@ function clumpRadius(sp: TreeSpecies, mean: number, rng: Random): number {
 }
 
 // ---------------------------------------------------------------------------
+// A species' crown profile, tabled: growing asks it at every step.
+
+const PROFILE_STEPS = 512;
+
+/** A species' `crownProfile` as a function of `t` (0 the crown's base, 1 its top), from a table of it. */
+function profileOf(sp: TreeSpecies): (t: number) => number {
+  const table = new Float64Array(PROFILE_STEPS + 1);
+  for (let i = 0; i <= PROFILE_STEPS; i++) table[i] = crownProfile(sp.shape, i / PROFILE_STEPS, sp);
+  return (t: number) => {
+    if (!(t > 0)) return table[0];
+    if (t >= 1) return table[PROFILE_STEPS];
+    const f = t * PROFILE_STEPS;
+    const i = Math.floor(f);
+    return table[i] + (table[i + 1] - table[i]) * (f - i);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The crown's envelope: the solid of revolution its profile sweeps, from its
 // base to its top. Every profile is concave in height, so the solid is convex:
 // a ray from inside leaves it once, which is what lets its reach be bisected.
 
 class Envelope {
-  private readonly shape: CrownShape;
+  private readonly profile: (t: number) => number;
   private readonly base: number;
   private readonly depth: number;
   private readonly radius: number;
@@ -313,8 +404,8 @@ class Envelope {
    * The crown's envelope, shrunk by margins (m) at its side, bottom and top: the space a clump's centre
    * may take and keep the clump inside.
    */
-  constructor(shape: CrownShape, size: TreeSize, side = 0, bottom = 0, top = 0) {
-    this.shape = shape;
+  constructor(sp: TreeSpecies, size: TreeSize, side = 0, bottom = 0, top = 0) {
+    this.profile = profileOf(sp);
     this.base = size.crownBase;
     this.depth = Math.max(0.01, size.height - size.crownBase);
     this.radius = size.crownRadius;
@@ -338,7 +429,7 @@ class Envelope {
   /** How far it reaches from the axis at a height (m); below 0 where it does not reach at all. */
   width(y: number): number {
     if (y < this.lo || y > this.hi) return -1;
-    return crownProfile(this.shape, (y - this.base) / this.depth) * this.radius - this.side;
+    return this.profile((y - this.base) / this.depth) * this.radius - this.side;
   }
 
   inside(x: number, y: number, z: number): boolean {
@@ -401,68 +492,6 @@ class Envelope {
   }
 }
 
-/**
- * Points scattered through a shell of the envelope, uniform by volume, with no retries: a direction from
- * the heart is drawn by the volume of crown that lies along it (reach cubed, from a table), then a depth
- * along it by the volume at each depth (the cube root of a uniform draw).
- */
-function scatter(env: Envelope, n: number, shell: number, rng: Random): Float64Array {
-  const dirs = new Float64Array(DIRECTIONS * 3);
-  const cdf = new Float64Array(DIRECTIONS);
-  let total = 0;
-  for (let k = 0; k < DIRECTIONS; k++) {
-    const [dx, dy, dz] = rng.onSphere();
-    dirs[3 * k] = dx;
-    dirs[3 * k + 1] = dy;
-    dirs[3 * k + 2] = dz;
-    const L = env.reach(dx, dy, dz);
-    total += L * L * L;
-    cdf[k] = total;
-  }
-  const a = (1 - shell) ** 3;
-  const out = new Float64Array(n * 3);
-  // A drawn direction is nudged off the table's by about the gap between its directions.
-  const nudge = 2 / Math.sqrt(DIRECTIONS);
-  for (let i = 0; i < n; i++) {
-    const want = rng.next() * total;
-    let lo = 0;
-    let hi = DIRECTIONS - 1;
-    while (lo < hi) {
-      const m = (lo + hi) >> 1;
-      if (cdf[m] < want) lo = m + 1;
-      else hi = m;
-    }
-    const j = rng.onSphere();
-    let dx = dirs[3 * lo] + nudge * j[0];
-    let dy = dirs[3 * lo + 1] + nudge * j[1];
-    let dz = dirs[3 * lo + 2] + nudge * j[2];
-    const k = 1 / Math.hypot(dx, dy, dz);
-    dx *= k;
-    dy *= k;
-    dz *= k;
-    const L = env.reach(dx, dy, dz);
-    const u = Math.cbrt(a + (1 - a) * rng.next());
-    out[3 * i] = dx * L * u;
-    out[3 * i + 1] = env.cy + dy * L * u;
-    out[3 * i + 2] = dz * L * u;
-  }
-  return out;
-}
-
-/** Points uniform in a slab of the envelope, between two heights; on its axis where it has no width. */
-function scatterSlab(env: Envelope, y0: number, y1: number, n: number, rng: Random): Float64Array {
-  const out = new Float64Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    const y = rng.range(y0, y1);
-    const w = Math.max(0, env.width(y));
-    const [dx, dz] = rng.inDisc();
-    out[3 * i] = dx * w;
-    out[3 * i + 1] = y;
-    out[3 * i + 2] = dz * w;
-  }
-  return out;
-}
-
 // ---------------------------------------------------------------------------
 // Small vector helpers, on [x, y, z] tuples.
 
@@ -494,254 +523,780 @@ function cone(axis: V3, angle: number, azimuth: number): V3 {
   ]);
 }
 
-/** A direction turned, in the plane it makes with an axis, part of the way to an angle from that axis. */
-function towardAngle(d: V3, axis: V3, angle: number, part: number): V3 {
-  const c = Math.min(1, Math.max(-1, d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2]));
-  let p: V3 = [d[0] - axis[0] * c, d[1] - axis[1] * c, d[2] - axis[2] * c];
-  p = Math.hypot(p[0], p[1], p[2]) > 1e-6 ? norm(p) : perpendicular(axis);
-  const now = Math.acos(c);
-  const to = now + (angle - now) * part;
-  const ct = Math.cos(to);
-  const st = Math.sin(to);
-  return [axis[0] * ct + p[0] * st, axis[1] * ct + p[1] * st, axis[2] * ct + p[2] * st];
+// ---------------------------------------------------------------------------
+// Broadleaves and shrubs: growing by buds, in the light.
+
+/**
+ * How many great limbs (scaffolds) a broadleaf's trunk carries into its crown: its row's `scaffolds`, or 4
+ * and one more for every third of its leader. A shrub's (or a stool's) stems are its scaffolds: it has none
+ * besides.
+ */
+export function scaffoldCount(sp: TreeSpecies): number {
+  if (sp.architecture !== "broadleaf" && sp.architecture !== "shrub") return 0;
+  if (Math.round(sp.stems) > 1) return 0;
+  return Math.max(0, Math.round(sp.scaffolds ?? 4 + 3 * sp.leader));
 }
 
-// ---------------------------------------------------------------------------
-// Broadleaves and shrubs: space colonization.
+/**
+ * Bulges on a crown's outline: a few directions from its heart where it reaches all the way out, falling
+ * back between them, by how lumpy the species is.
+ */
+class Lobes {
+  private readonly dirs: Float64Array;
+  private readonly amount: number;
 
-function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
+  constructor(amount: number, rng: Random) {
+    this.amount = Math.min(1, Math.max(0, amount)) * LOBE_DEPTH;
+    this.dirs = new Float64Array(LOBE_COUNT * 3);
+    for (let k = 0; k < LOBE_COUNT; k++) this.dirs.set(rng.onSphere(), 3 * k);
+  }
+
+  /** The share of the outline's reach in a direction from the heart (not unit: it is normalized here). */
+  reach(ux: number, uy: number, uz: number): number {
+    if (this.amount <= 0) return 1;
+    const k = Math.hypot(ux, uy, uz);
+    if (k < 1e-9) return 1;
+    let best = 0;
+    for (let j = 0; j < LOBE_COUNT; j++) {
+      const d = (ux * this.dirs[3 * j] + uy * this.dirs[3 * j + 1] + uz * this.dirs[3 * j + 2]) / k;
+      if (d > 0) best = Math.max(best, d * d * d);
+    }
+    return 1 - this.amount * (1 - best);
+  }
+}
+
+/**
+ * A broadleaf or a shrub, grown from its buds (Palubicki et al. 2009, lightened). Its trunk rises bare to the
+ * crown's base; its great limbs leave the top of it, set round it and up it as Weber and Penn set a tree's
+ * first branches, each reaching out to the crown's outline. Then, cycle by cycle: every bud is lit by how
+ * little the wood above shades it (shadow cast down through a grid of voxels); the light is gathered down to
+ * the foot and handed back up as what to grow with, more to the main axis at each fork (Borchert and
+ * Honda); each bud grows as many internodes as it is given, its way turned towards the least shadow and up
+ * or down by the species' bend, with a lateral bud at every one (by the golden angle); and a branch that
+ * gathers too little light for its wood is shed (Takenaka). Nothing grows out of the crown's outline.
+ */
+function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
   const crown = Math.cbrt(R * R * depth);
-  const dk = KILL * crown;
-  const D = STEP * dk;
-  const di = INFLUENCE * dk;
-  const dk2 = dk * dk;
-  const di2 = di * di;
+  let L = crown / INTERNODES;
+  const voxels = (l: number) => (Math.ceil((2 * R) / l) + 7) ** 2 * (Math.ceil(H / l) + 6);
+  while (voxels(L) > MAX_VOXELS) L *= 1.08;
+  const weep = weepOf(sp);
+  const target = Math.round(FINE_NODES * (1 - WHIP_NODES * weep));
+  const cap = 2 * target + 600;
 
-  // The points: where a clump's centre may be, in the shell the species keeps its leaves in.
-  const inner = new Envelope(sp.shape, size, clumpR, clumpR, clumpR);
-  const shell = Math.max(MIN_SHELL, Math.min(1, sp.foliageDepth));
-  const shellVolume = inner.volume * (1 - (1 - shell) ** 3);
-  let n = Math.round(Math.min(MAX_ATTRACTORS, Math.max(MIN_ATTRACTORS, (sp.branchiness * shellVolume) / (dk * dk * dk * ATTRACTOR_VOLUME))));
-  // And a few at the crown's base and its top, whatever its shape: a survey measured the lowest leaves
-  // and the highest, so some wood goes to each, even where a pointed crown has little room.
-  const ends = Math.max(4, Math.round(END_POINTS * n));
-  const att = new Float64Array((n + 2 * ends) * 3);
-  att.set(scatter(inner, n, shell, rng));
-  att.set(scatterSlab(inner, inner.lo, inner.lo + END_SLAB * (inner.hi - inner.lo), ends, rng), n * 3);
-  att.set(scatterSlab(inner, inner.hi - END_SLAB * (inner.hi - inner.lo), inner.hi, ends, rng), (n + ends) * 3);
-  n += 2 * ends;
-  const alive = new Uint8Array(n).fill(1);
-  const near = new Int32Array(n).fill(-1);
-  const nearD2 = new Float64Array(n).fill(Infinity);
+  // The crown its leaves keep to, its outline drawn in by a clump's room: its lobes, and the heights it spans.
+  const lobes = new Lobes(sp.lobes ?? 0, rng);
+  const side = 1.2 * clumpR;
+  const lo = base + Math.min(0.25 * clumpR, 0.2 * depth);
+  const hi = H - Math.min(1.05 * clumpR, 0.3 * depth);
+  const mid = base + 0.5 * depth;
+  const profile = profileOf(sp);
+  const widthAt = (y: number) => profile((y - base) / depth) * R;
+  const inCrown = (x: number, y: number, z: number): boolean => {
+    if (y < lo || y > hi) return false;
+    const wd = widthAt(y) * lobes.reach(x / R, (y - mid) / (0.5 * depth), z / R) - side;
+    return wd > 0 && x * x + z * z <= wd * wd;
+  };
 
-  // A grid of the points, a cell the size of the influence distance, so a new node looks at its
-  // neighbours only.
-  const ox = -R - di;
-  const oz = -R - di;
-  const nx = Math.max(1, Math.ceil((2 * (R + di)) / di));
-  const ny = Math.max(1, Math.ceil((H + di) / di));
+  // The voxels: shadow in each, and whether each is in the crown.
+  const vs = L;
+  const nx = Math.ceil((2 * R) / vs) + 7;
   const nz = nx;
-  const cellOf = (x: number, y: number, z: number) => {
-    const ix = Math.min(nx - 1, Math.max(0, Math.floor((x - ox) / di)));
-    const iy = Math.min(ny - 1, Math.max(0, Math.floor(y / di)));
-    const iz = Math.min(nz - 1, Math.max(0, Math.floor((z - oz) / di)));
-    return ix + nx * (iy + ny * iz);
+  const ny = Math.ceil(H / vs) + 6;
+  const ox = -0.5 * nx * vs;
+  const oz = ox;
+  const oy = -2 * vs;
+  const shadow = new Float64Array(nx * ny * nz);
+  const room = new Uint8Array(nx * ny * nz);
+  for (let iy = 0; iy < ny; iy++) {
+    const y = oy + (iy + 0.5) * vs;
+    if (y < lo || y > hi) continue;
+    for (let iz = 0; iz < nz; iz++)
+      for (let ix = 0; ix < nx; ix++) {
+        if (inCrown(ox + (ix + 0.5) * vs, y, oz + (iz + 0.5) * vs)) room[ix + nx * (iz + nz * iy)] = 1;
+      }
+  }
+  const fall = new Float64Array(SHADOW_DEPTH + 1);
+  for (let q = 0; q <= SHADOW_DEPTH; q++) fall[q] = SHADOW_A * SHADOW_B ** -q;
+  const voxel = (x: number, y: number, z: number): number => {
+    const ix = Math.floor((x - ox) / vs);
+    const iy = Math.floor((y - oy) / vs);
+    const iz = Math.floor((z - oz) / vs);
+    if (ix < 0 || iy < 0 || iz < 0 || ix >= nx || iy >= ny || iz >= nz) return -1;
+    return ix + nx * (iz + nz * iy);
   };
-  const start = new Int32Array(nx * ny * nz + 1);
-  for (let a = 0; a < n; a++) start[cellOf(att[3 * a], att[3 * a + 1], att[3 * a + 2]) + 1]++;
-  for (let c = 0; c < nx * ny * nz; c++) start[c + 1] += start[c];
-  const items = new Int32Array(n);
-  const fill = start.slice(0, nx * ny * nz);
-  for (let a = 0; a < n; a++) items[fill[cellOf(att[3 * a], att[3 * a + 1], att[3 * a + 2])]++] = a;
-
-  // Each node's lot in the growing: whether it may still put out shoots, how many steps it may grow on
-  // feeling nothing (a limb crossing the bare inside of the crown to its leaves), whether it is on the
-  // leader, and what it felt this step.
-  const growable: boolean[] = [];
-  const seekLeft: number[] = [];
-  const leader: boolean[] = [];
-  const acc = new Float64Array((MAX_NODES + 64) * 3);
-  const accN = new Int32Array(MAX_NODES + 64);
-
-  /** A node is grown: the points it is now nearest to are its, and those it is on are used up. */
-  const register = (i: number) => {
-    const x = w.x[i];
-    const y = w.y[i];
-    const z = w.z[i];
-    const ix0 = Math.max(0, Math.floor((x - di - ox) / di));
-    const ix1 = Math.min(nx - 1, Math.floor((x + di - ox) / di));
-    const iy0 = Math.max(0, Math.floor((y - di) / di));
-    const iy1 = Math.min(ny - 1, Math.floor((y + di) / di));
-    const iz0 = Math.max(0, Math.floor((z - di - oz) / di));
-    const iz1 = Math.min(nz - 1, Math.floor((z + di - oz) / di));
-    for (let iz = iz0; iz <= iz1; iz++)
-      for (let iy = iy0; iy <= iy1; iy++)
-        for (let ix = ix0; ix <= ix1; ix++) {
-          const c = ix + nx * (iy + ny * iz);
-          for (let k = start[c]; k < start[c + 1]; k++) {
-            const a = items[k];
-            if (!alive[a]) continue;
-            const ex = att[3 * a] - x;
-            const ey = att[3 * a + 1] - y;
-            const ez = att[3 * a + 2] - z;
-            const d2 = ex * ex + ey * ey + ez * ez;
-            if (d2 < dk2) alive[a] = 0;
-            else if (d2 < di2 && d2 < nearD2[a]) {
-              nearD2[a] = d2;
-              near[a] = i;
-            }
-          }
-        }
+  const shade = (x: number, y: number, z: number, sign: number) => {
+    const ix = Math.floor((x - ox) / vs);
+    const iy = Math.floor((y - oy) / vs);
+    const iz = Math.floor((z - oz) / vs);
+    if (ix < 0 || iz < 0 || ix >= nx || iz >= nz || iy < 0 || iy >= ny) return;
+    for (let q = 0; q <= SHADOW_DEPTH; q++) {
+      const ly = iy - q;
+      if (ly < 0) break;
+      const amt = sign * fall[q];
+      const x0 = Math.max(0, ix - q);
+      const x1 = Math.min(nx - 1, ix + q);
+      const z0 = Math.max(0, iz - q);
+      const z1 = Math.min(nz - 1, iz + q);
+      for (let zz = z0; zz <= z1; zz++) {
+        const row = nx * (zz + nz * ly);
+        for (let xx = x0; xx <= x1; xx++) shadow[row + xx] += amt;
+      }
+    }
+  };
+  const full = LIGHT_FULL + LIGHT_OPEN * sp.openness;
+  const lightAt = (x: number, y: number, z: number): number => {
+    const c = voxel(x, y, z);
+    const s = c < 0 ? 0 : shadow[c];
+    return Math.min(1, Math.max(0, (full - s + SHADOW_A) / full));
+  };
+  // What a bud sees: the voxels two round it, within its cone. The least shaded three of them in the crown
+  // give the way to the light (straight on, where they are alike), as the mean of their directions.
+  const seen: number[] = [];
+  for (let a = -2; a <= 2; a++)
+    for (let b = -2; b <= 2; b++)
+      for (let c = -2; c <= 2; c++) {
+        if (a === 0 && b === 0 && c === 0) continue;
+        const k = Math.hypot(a, b, c);
+        seen.push(a, b, c, a / k, b / k, c / k);
+      }
+  const toLight: V3 = [0, 0, 0];
+  const best = new Float64Array(3);
+  const bestAt = new Int32Array(3);
+  const lookForLight = (x: number, y: number, z: number, d: V3): boolean => {
+    const ix = Math.floor((x - ox) / vs);
+    const iy = Math.floor((y - oy) / vs);
+    const iz = Math.floor((z - oz) / vs);
+    best.fill(Infinity);
+    bestAt.fill(-1);
+    for (let k = 0; k < seen.length; k += 6) {
+      const dot = seen[k + 3] * d[0] + seen[k + 4] * d[1] + seen[k + 5] * d[2];
+      if (dot < PERCEIVE) continue;
+      const jx = ix + seen[k];
+      const jy = iy + seen[k + 1];
+      const jz = iz + seen[k + 2];
+      if (jx < 0 || jy < 0 || jz < 0 || jx >= nx || jy >= ny || jz >= nz) continue;
+      const c = jx + nx * (jz + nz * jy);
+      if (!room[c]) continue;
+      const score = shadow[c] - 0.05 * SHADOW_A * dot;
+      // (Kept in order, least first.)
+      let j = 2;
+      if (score >= best[j]) continue;
+      while (j > 0 && score < best[j - 1]) {
+        best[j] = best[j - 1];
+        bestAt[j] = bestAt[j - 1];
+        j--;
+      }
+      best[j] = score;
+      bestAt[j] = k;
+    }
+    if (bestAt[0] < 0) return false;
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    for (let j = 0; j < 3; j++) {
+      const k = bestAt[j];
+      if (k < 0) break;
+      sx += seen[k + 3];
+      sy += seen[k + 4];
+      sz += seen[k + 5];
+    }
+    const l = Math.hypot(sx, sy, sz);
+    toLight[0] = sx / l;
+    toLight[1] = sy / l;
+    toLight[2] = sz / l;
+    return true;
   };
 
-  const grow = (x: number, y: number, z: number, parent: number, cont: boolean, canGrow: boolean, seek: number, lead: boolean) => {
-    const i = addNode(w, x, y, z, parent, cont);
-    growable.push(canGrow);
-    seekLeft.push(seek);
-    leader.push(lead);
-    if (canGrow) register(i);
+  // The wood as it grows. Each node ends an internode, and bears a terminal bud (until it grows on or dies)
+  // and a lateral bud (until it grows out or dies); its main child goes on its axis, its lateral child
+  // starts a new one.
+  const px = new Float64Array(cap);
+  const py = new Float64Array(cap);
+  const pz = new Float64Array(cap);
+  const dx = new Float64Array(cap);
+  const dy = new Float64Array(cap);
+  const dz = new Float64Array(cap);
+  const par = new Int32Array(cap);
+  const main = new Int32Array(cap);
+  const lat = new Int32Array(cap);
+  /** 0 a stem, 1 a scaffold, 2 a shoot. */
+  const kind = new Uint8Array(cap);
+  const alive = new Uint8Array(cap);
+  const tBud = new Uint8Array(cap);
+  const lBud = new Uint8Array(cap);
+  const az = new Float64Array(cap);
+  const light = new Float64Array(cap);
+  const gathered = new Float64Array(cap);
+  const internodes = new Int32Array(cap);
+  const pipes = new Float64Array(cap);
+  const shedPipes = new Float64Array(cap);
+  const vIn = new Float64Array(cap);
+  const vT = new Float64Array(cap);
+  const vL = new Float64Array(cap);
+  let count = 0;
+  let living = 0;
+  const roots: number[] = [];
+
+  const add = (x: number, y: number, z: number, parent: number, onAxis: boolean, k: number, d: V3): number => {
+    const i = count++;
+    px[i] = x;
+    py[i] = y;
+    pz[i] = z;
+    dx[i] = d[0];
+    dy[i] = d[1];
+    dz[i] = d[2];
+    par[i] = parent;
+    main[i] = -1;
+    lat[i] = -1;
+    kind[i] = k;
+    alive[i] = 1;
+    living++;
+    tBud[i] = 0;
+    lBud[i] = y >= base ? 1 : 0;
+    if (parent >= 0) {
+      if (onAxis) main[parent] = i;
+      else lat[parent] = i;
+      az[i] = onAxis ? az[parent] + GOLDEN_ANGLE : rng.range(0, 2 * Math.PI);
+    } else roots.push(i);
+    shade(x, y, z, 1);
     return i;
   };
+  const dirOf = (i: number): V3 => [dx[i], dy[i], dz[i]];
 
-  // The stems: one for a tree; for a shrub or a stool, several from feet spread within a third of the
+  /**
+   * A spine laid out ahead of growing (a scaffold, a leader, a shrub's stem): from a node along a way that
+   * turns as `way(s)` says (s, metres along it), an internode at a time, until it leaves the crown (once it
+   * has been in it) or has gone `most` metres. Returns its nodes' places.
+   */
+  const spine = (from: number, way: (s: number) => V3, most: number): number[] => {
+    const pts: number[] = [];
+    let x = px[from];
+    let y = py[from];
+    let z = pz[from];
+    let entered = inCrown(x, y, z);
+    for (let s = 0; s < most; s += L) {
+      const d = way(s);
+      const nx2 = x + d[0] * L;
+      const ny2 = y + d[1] * L;
+      const nz2 = z + d[2] * L;
+      if (inCrown(nx2, ny2, nz2)) entered = true;
+      else if (entered || ny2 < 0) break;
+      x = nx2;
+      y = ny2;
+      z = nz2;
+      pts.push(x, y, z);
+    }
+    return pts;
+  };
+  const lay = (from: number, pts: number[], keep: number, k: number, onAxis: boolean): number => {
+    let at = from;
+    for (let j = 0; j < keep; j++) {
+      const x = pts[3 * j];
+      const y = pts[3 * j + 1];
+      const z = pts[3 * j + 2];
+      const d = norm([x - px[at], y - py[at], z - pz[at]]);
+      at = add(x, y, z, at, j > 0 || onAxis, k, d);
+    }
+    if (keep > 0) tBud[at] = 1;
+    return at;
+  };
+
+  // The stems. One for a tree; for a shrub or a stool, several from feet spread within a third of the
   // crown, leaning out from it.
   const stems = Math.max(1, Math.round(sp.stems));
-  const spread = stems > 1 ? R / 3 : 0;
-  const forkY = Math.max(base, D);
-  const maxSeek = Math.ceil((depth + R) / D);
-  const limbs = Math.round(((1 - sp.leader) * LIMBS) / stems);
+  const scaffolds = scaffoldCount(sp);
   const turn = rng.range(0, 2 * Math.PI);
   for (let s = 0; s < stems; s++) {
-    const az = turn + s * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
-    const rr = spread * Math.sqrt((s + 0.5) / stems);
-    // A stem leans out by half the branch angle, but not so far that it reaches its crown outside the
-    // middle half of it.
-    const lean = stems > 1 ? Math.min(0.5 * sp.branchAngle * DEG, Math.atan(Math.max(0, 0.5 * R - rr) / forkY)) : 0;
-    const fx = rr * Math.cos(az);
-    const fz = rr * Math.sin(az);
-    const stemDir: V3 = norm([Math.sin(lean) * Math.cos(az), Math.cos(lean), Math.sin(lean) * Math.sin(az)]);
-    // The trunk, to the crown: straight but for its wander, which is pulled back to the stem's line.
-    let i = grow(fx, 0, fz, -1, false, false, 0, false);
-    const steps = Math.max(1, Math.ceil(forkY / TRUNK_STEP));
-    const rise = forkY / steps;
+    const azs = turn + s * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
+    if (stems > 1) {
+      // A shrub's stem: from its foot, leaning out, turning up by its bend, through the crown to its edge.
+      const rr = (R / 3) * Math.sqrt((s + 0.5) / stems);
+      const lean = Math.min(0.5 * sp.branchAngle * DEG, Math.atan(Math.max(0, 0.6 * R - rr) / Math.max(L, 0.5 * depth)));
+      const foot = add(rr * Math.cos(azs), 0, rr * Math.sin(azs), -1, true, 0, [0, 1, 0]);
+      const e0 = 0.5 * Math.PI - lean * rng.range(0.6, 1.2);
+      const sway = SCAFFOLD_SWAY * sp.crooked * rng.range(-1, 1);
+      const pts = spine(foot, (u) => {
+        const f = u / Math.max(L, R);
+        const e = Math.min(0.5 * Math.PI, e0 + 0.5 * sp.bend * SCAFFOLD_CURVE * f);
+        const a = azs + sway * Math.sin(Math.PI * Math.min(1, f));
+        return [Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a)];
+      }, 2 * (H + R));
+      lay(foot, pts, Math.max(1, Math.round((pts.length / 3) * rng.range(0.75, 1))), 0, true);
+      continue;
+    }
+    // A tree's trunk: bare to its crown's base, then through the scaffolds' span, one of them at each of
+    // their heights (one in each of as many slots up it), its own lateral buds between.
+    const yLo = base + SCAFFOLD_FROM * depth;
+    const span = Math.min(0.8, SCAFFOLD_SPAN + SCAFFOLD_SPAN_LEADER * sp.leader);
+    const yHi = Math.max(yLo + L, base + span * depth);
+    const levels: { y: number; scaffold: number }[] = [];
+    const below = Math.max(1, Math.ceil(yLo / TRUNK_STEP));
+    for (let k = 1; k < below; k++) levels.push({ y: (yLo * k) / below, scaffold: -1 });
+    const marks: number[] = [];
+    for (let k = 0; k < scaffolds; k++) marks.push(yLo + ((k + rng.range(0.15, 0.85)) / scaffolds) * (yHi - yLo));
+    const section: { y: number; scaffold: number }[] = marks.map((y, k) => ({ y, scaffold: k }));
+    for (let y = yLo; y <= yHi + 1e-9; y += L) if (marks.every((m) => Math.abs(m - y) > 0.4 * L)) section.push({ y, scaffold: -1 });
+    section.sort((a, b) => a.y - b.y);
+    levels.push(...section);
+    let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
+    lBud[at] = 0;
     let wx = 0;
     let wz = 0;
-    let dir = stemDir;
-    for (let k = 0; k < steps; k++) {
+    const holds: { node: number; scaffold: number }[] = [];
+    for (const lv of levels) {
       const j = rng.onSphere();
       wx = 0.6 * wx + 0.08 * sp.crooked * j[0];
       wz = 0.6 * wz + 0.08 * sp.crooked * j[2];
-      dir = norm([stemDir[0] + wx, stemDir[1], stemDir[2] + wz]);
-      const len = rise / dir[1];
-      i = grow(w.x[i] + dir[0] * len, w.y[i] + dir[1] * len, w.z[i] + dir[2] * len, i, true, false, 0, false);
+      const d = norm([wx, 1, wz]);
+      const len = (lv.y - py[at]) / d[1];
+      at = add(px[at] + d[0] * len, lv.y, pz[at] + d[2] * len, at, true, 0, d);
+      if (lv.scaffold >= 0) {
+        lBud[at] = 0;
+        holds.push({ node: at, scaffold: lv.scaffold });
+      }
     }
-    // The fork: the stem goes on as the leader, and the great limbs leave it, round it by the golden
-    // angle, at the species' branch angle.
-    const f = i;
-    grow(w.x[f] + dir[0] * D, w.y[f] + dir[1] * D, w.z[f] + dir[2] * D, f, true, true, maxSeek, true);
-    for (let k = 0; k < limbs; k++) {
-      const d = cone(dir, branchAngle(sp, rng), az + (2 * Math.PI * k) / limbs + rng.range(-0.4, 0.4));
-      grow(w.x[f] + d[0] * D, w.y[f] + d[1] * D, w.z[f] + d[2] * D, f, false, true, maxSeek, false);
+    // The trunk goes on up the crown as its leader, all the way when it keeps the lead; otherwise part way,
+    // and its bud grows on from there as one more limb.
+    {
+      const top = yHi + Math.min(1, LEADER_REACH + (1 - LEADER_REACH) * sp.leader) * (hi - L - yHi);
+      let lx = 0;
+      let lz = 0;
+      const pts = spine(at, () => {
+        const j = rng.onSphere();
+        lx = 0.7 * lx + 0.06 * sp.crooked * j[0];
+        lz = 0.7 * lz + 0.06 * sp.crooked * j[2];
+        return norm([lx, 1, lz]);
+      }, Math.max(0, top - py[at]));
+      at = lay(at, pts, pts.length / 3, 0, true);
+    }
+    tBud[at] = 1;
+    // The scaffolds, round the trunk by the golden angle, the lowest leaving widest; each turns up (or down)
+    // by the species' bend and arches over by its weight, sways a little, and reaches out to the crown's
+    // outline (some stop a little short).
+    for (const { node, scaffold: k } of holds) {
+      const pos = scaffolds > 1 ? k / (scaffolds - 1) : 0.5;
+      const g = Math.max(-2, Math.min(2, rng.gauss()));
+      const angle = Math.min(110 * DEG, Math.max(8 * DEG, (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos)));
+      const a0 = azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
+      const e0 = 0.5 * Math.PI - angle;
+      const sway = SCAFFOLD_SWAY * sp.crooked * rng.range(-1, 1);
+      const phase = rng.range(0, Math.PI);
+      // (And it wanders, up and down and side to side, a bend every few internodes: a crooked limb's elbows.)
+      let we = 0;
+      let wa = 0;
+      const pts = spine(node, (u) => {
+        const f = u / R;
+        we = LIMB_KEEP * we + LIMB_WANDER * sp.crooked * rng.gauss();
+        wa = LIMB_KEEP * wa + LIMB_WANDER * sp.crooked * rng.gauss();
+        const e = Math.min(0.5 * Math.PI, e0 + sp.bend * SCAFFOLD_CURVE * f - SCAFFOLD_ARCH * f * f + we);
+        const a = a0 + sway * Math.sin(Math.PI * f + phase) + wa;
+        return [Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a)];
+      }, R + depth);
+      const n = pts.length / 3;
+      lay(node, pts, Math.max(Math.min(2, n), Math.round(n * rng.range(0.82, 1))), 1, false);
     }
   }
 
-  // Grow, a step at a time, until no tip feels a point or the wood is all it may be (less, for a tree
-  // that weeps: its whips are wood too).
-  const weep = weepOf(sp);
-  const nodeLimit = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
-  const growing: number[] = [];
-  for (let step = 0; step < MAX_STEPS && w.x.length < nodeLimit; step++) {
-    for (let a = 0; a < n; a++) {
-      const i = near[a];
-      if (!alive[a] || i < 0) continue;
-      const ex = att[3 * a] - w.x[i];
-      const ey = att[3 * a + 1] - w.y[i];
-      const ez = att[3 * a + 2] - w.z[i];
-      const k = 1 / Math.sqrt(ex * ex + ey * ey + ez * ez);
-      acc[3 * i] += ex * k;
-      acc[3 * i + 1] += ey * k;
-      acc[3 * i + 2] += ez * k;
-      accN[i]++;
+  // Light at every node, then gathered down to each foot: what each axis and branch collects, how many
+  // internodes it is, and how many twigs' pipes it carries (the wood it sheds, too).
+  const gather = () => {
+    for (let i = count - 1; i >= 0; i--) {
+      if (!alive[i]) continue;
+      let q = (tBud[i] ? light[i] : 0) + (lBud[i] ? light[i] : 0);
+      let n = 1;
+      let p = shedPipes[i];
+      const m = main[i];
+      const l = lat[i];
+      if (m >= 0) {
+        q += gathered[m];
+        n += internodes[m];
+        p += pipes[m];
+      }
+      if (l >= 0) {
+        q += gathered[l];
+        n += internodes[l];
+        p += pipes[l];
+      }
+      if (m < 0 && l < 0) p += 1;
+      gathered[i] = q;
+      internodes[i] = n;
+      pipes[i] = p;
     }
-    growing.length = 0;
-    const count = w.x.length;
+  };
+  const cut = (c: number) => {
+    const stack = [c];
+    while (stack.length > 0) {
+      const i = stack.pop() as number;
+      if (!alive[i]) continue;
+      alive[i] = 0;
+      living--;
+      shade(px[i], py[i], pz[i], -1);
+      if (main[i] >= 0) stack.push(main[i]);
+      if (lat[i] >= 0) stack.push(lat[i]);
+    }
+  };
+  /** Shed every branch (a lateral off its axis, not a scaffold) that gathers too little light for its wood. */
+  const shedThreshold = sp.shed ?? SHED_BASE + SHED_OPEN * sp.openness + SHED_SPARSE * (1 - sp.branchiness);
+  const shedDark = (): boolean => {
+    let any = false;
     for (let i = 0; i < count; i++) {
-      if (!growable[i]) continue;
-      if (accN[i] > 0 || (seekLeft[i] > 0 && w.kids[i].length === 0)) growing.push(i);
+      const c = lat[i];
+      if (!alive[i] || c < 0 || !alive[c] || kind[c] === 1 || internodes[c] < 3) continue;
+      if (gathered[c] / internodes[c] >= shedThreshold) continue;
+      shedPipes[i] += pipes[c];
+      cut(c);
+      lat[i] = -1;
+      lBud[i] = 0;
+      any = true;
     }
-    if (growing.length === 0) break;
-    let grew = 0;
-    for (const i of growing) {
-      if (w.x.length >= nodeLimit) break;
-      const kids = w.kids[i];
-      const felt = accN[i] > 0;
-      const p = w.parent[i];
-      const axis = norm([w.x[i] - w.x[p], w.y[i] - w.y[p], w.z[i] - w.z[p]]);
-      // A tip that feels nothing yet goes on: a limb crossing to the crown, the leader to its top. It
-      // stops on leaving the crown's bounds.
-      if (!felt && (w.y[i] > H || Math.hypot(w.x[i], w.z[i]) > R)) continue;
-      let d: V3 = felt ? norm([acc[3 * i], acc[3 * i + 1], acc[3 * i + 2]]) : axis;
-      const lateral = kids.length > 0;
-      if (lateral) {
-        if (kids.length >= MAX_KIDS) continue;
-        d = towardAngle(d, axis, branchAngle(sp, rng), LATERAL_PULL);
-      } else {
-        d = [d[0] + axis[0] * PERSIST, d[1] + axis[1] * PERSIST, d[2] + axis[2] * PERSIST];
-      }
+    return any;
+  };
+
+  const lambda = LAMBDA_LO + (LAMBDA_HI - LAMBDA_LO) * sp.leader;
+  const stemFavour = STEM_FAVOUR + STEM_FAVOUR_LEADER * sp.leader;
+  const lift = TROPISM * sp.bend;
+  const grow = (from: number, onAxis: boolean, n: number) => {
+    let at = from;
+    let d: V3;
+    if (onAxis) d = dirOf(from);
+    else {
+      lBud[from] = 0;
+      d = cone(dirOf(from), branchAngle(sp, rng), az[from]);
+      // (A shoot is not put out straight down: it leaves its axis's other side.)
+      if (d[1] < -0.6) d = cone(dirOf(from), branchAngle(sp, rng), az[from] + Math.PI);
+    }
+    const k = onAxis ? kind[from] : 2;
+    for (let m = 0; m < n && count < cap; m++) {
       const j = rng.onSphere();
-      const lift = sp.bend * BEND_PULL + (leader[i] && !lateral ? sp.leader * LEADER_PULL : 0);
-      d = norm([d[0] + j[0] * sp.crooked * CROOK_PULL, d[1] + lift + j[1] * sp.crooked * CROOK_PULL, d[2] + j[2] * sp.crooked * CROOK_PULL]);
-      let same = false;
-      for (const c of kids) {
-        const kd = norm([w.x[c] - w.x[i], w.y[c] - w.y[i], w.z[c] - w.z[i]]);
-        if (kd[0] * d[0] + kd[1] * d[1] + kd[2] * d[2] > SAME_SHOOT) same = true;
+      const up = lift + (k === 0 ? LEADER_UP * sp.leader : 0);
+      let tx = d[0] + WANDER * sp.crooked * j[0];
+      let ty = d[1] + up + WANDER * sp.crooked * j[1];
+      let tz = d[2] + WANDER * sp.crooked * j[2];
+      if (lookForLight(px[at], py[at], pz[at], d)) {
+        tx += TO_LIGHT * toLight[0];
+        ty += TO_LIGHT * toLight[1];
+        tz += TO_LIGHT * toLight[2];
       }
-      if (same) continue;
-      grow(w.x[i] + d[0] * D, w.y[i] + d[1] * D, w.z[i] + d[2] * D, i, !lateral, true, felt ? 0 : seekLeft[i] - 1, leader[i] && !lateral);
-      grew++;
+      d = norm([tx, ty, tz]);
+      const x = px[at] + d[0] * L;
+      const y = py[at] + d[1] * L;
+      const z = pz[at] + d[2] * L;
+      if (!inCrown(x, y, z)) {
+        if (at !== from || onAxis) tBud[at] = 0;
+        return;
+      }
+      if (at === from && onAxis) tBud[from] = 0;
+      const i = add(x, y, z, at, at !== from || onAxis, k, d);
+      if (at !== from) tBud[at] = 0;
+      tBud[i] = 1;
+      at = i;
     }
-    for (const i of growing) {
-      acc[3 * i] = acc[3 * i + 1] = acc[3 * i + 2] = 0;
-      accN[i] = 0;
+  };
+
+  for (let cycle = 0; cycle < CYCLES && living < target; cycle++) {
+    for (let i = 0; i < count; i++) if (alive[i]) light[i] = lightAt(px[i], py[i], pz[i]);
+    gather();
+    if (cycle > 1 && shedDark()) gather();
+    // The resource, at each foot by the light its stem gathers, but no more than the wood left to grow
+    // allows this cycle; handed up, at each node, between its main axis and its lateral.
+    let total = 0;
+    for (const r of roots) total += gathered[r];
+    const budget = (target - living) / (CYCLES - cycle);
+    vIn.fill(0, 0, count);
+    for (const r of roots) vIn[r] = total > 0 ? Math.min(ALPHA * gathered[r], (budget * gathered[r]) / total) : 0;
+    for (let i = 0; i < count; i++) {
+      vT[i] = 0;
+      vL[i] = 0;
+      if (!alive[i]) continue;
+      const v = vIn[i];
+      if (v <= 0) continue;
+      const m = main[i];
+      const l = lat[i];
+      const qm = m >= 0 ? gathered[m] : tBud[i] ? light[i] : 0;
+      const ql = l >= 0 ? gathered[l] : lBud[i] ? light[i] : 0;
+      // (A scaffold has as much say as the trunk it leaves: the great limbs share by the light each gathers.)
+      const wm = lambda * (kind[i] === 0 ? stemFavour : kind[i] === 1 ? SCAFFOLD_FAVOUR : 1) * qm;
+      const wl = (l >= 0 && kind[l] === 1 ? lambda * stemFavour : 1 - lambda) * ql;
+      if (wm + wl <= 0) continue;
+      const vm = (v * wm) / (wm + wl);
+      if (m >= 0) vIn[m] = vm;
+      else vT[i] = vm;
+      if (l >= 0) vIn[l] = v - vm;
+      else vL[i] = v - vm;
     }
-    if (grew === 0) break;
+    const before = count;
+    for (let i = 0; i < before; i++) {
+      if (!alive[i]) continue;
+      if (tBud[i] && vT[i] >= 1) grow(i, true, Math.min(MAX_METAMERS, Math.floor(vT[i])));
+      if (lBud[i] && vL[i] >= 1) grow(i, false, Math.min(MAX_METAMERS, Math.floor(vL[i])));
+    }
+    if (count === before) break;
+  }
+  // And a last reckoning of the light: what has grown into the dark is shed.
+  for (let i = 0; i < count; i++) if (alive[i]) light[i] = lightAt(px[i], py[i], pz[i]);
+  gather();
+  if (shedDark()) gather();
+
+  // Into the wood, the living nodes in order (a parent before its children), with what each sheds.
+  const index = new Int32Array(count).fill(-1);
+  const shed: number[] = [];
+  for (let i = 0; i < count; i++) {
+    if (!alive[i]) continue;
+    const p = par[i];
+    index[i] = addNode(w, px[i], py[i], pz[i], p < 0 ? -1 : index[p], p >= 0 && main[p] === i);
+    shed.push(shedPipes[i]);
+  }
+  w.shed = shed;
+
+  // Leaves: on the lit shoots near their twigs' ends (further back the deeper the species keeps its leaves),
+  // the lighter the bigger; each at its node, a little on along its twig and out of the crown.
+  const reach = LEAF_REACH + Math.round(LEAF_REACH_DEPTH * Math.min(1, Math.max(0, sp.foliageDepth)));
+  const fromTip = new Int32Array(count).fill(1 << 20);
+  for (let i = count - 1; i >= 0; i--) {
+    if (!alive[i]) continue;
+    const m = main[i];
+    const l = lat[i];
+    if (m < 0 && l < 0) fromTip[i] = 0;
+    const p = par[i];
+    if (p >= 0) fromTip[p] = Math.min(fromTip[p], fromTip[i] + 1);
+  }
+  const h = newHung();
+  const heart = base + 0.5 * depth;
+  for (let i = 0; i < count; i++) {
+    if (!alive[i] || kind[i] === 0 || fromTip[i] > reach || light[i] < LEAF_LIGHT || py[i] < base) continue;
+    const end = main[i] < 0 && lat[i] < 0;
+    const t: V3 = end ? dirOf(i) : [0, 0, 0];
+    const o = norm([px[i], py[i] - heart, pz[i]]);
+    const r = clumpRadius(sp, clumpR, rng) * (0.8 + 0.3 * light[i]);
+    hang(h, index[i], px[i] + (t[0] * HANG + o[0] * HANG_OUT) * r, py[i] + (t[1] * HANG + o[1] * HANG_OUT) * r, pz[i] + (t[2] * HANG + o[2] * HANG_OUT) * r, r);
   }
 
-  // Clumps on the twigs: at every twig's end, a little past it and out of the crown, and along the
-  // twigs (wood that bears few tips) where they are in the shell the species keeps its leaves in.
-  const tips = new Int32Array(w.x.length);
-  for (let i = w.x.length - 1; i >= 0; i--) {
-    if (w.kids[i].length === 0) tips[i] = 1;
-    if (w.parent[i] >= 0) tips[w.parent[i]] += tips[i];
-  }
-  const env = new Envelope(sp.shape, size);
-  // A tree that weeps hangs its whips from its outer twigs, and their leaves stand for those twigs' own.
-  const whips = weep > 0 ? hangWhips(sp, size, w, growable, clumpR, weep, rng) : null;
-  const h = newHung();
-  const heart = inner.cy;
-  for (let i = 0; i < w.x.length; i++) {
-    if (!growable[i] || whips?.bears.has(i)) continue;
-    const end = w.kids[i].length === 0;
-    if (!end && (tips[i] > TWIG_TIPS || env.place(w.x[i], w.y[i], w.z[i], 0).depth > shell)) continue;
+  // Smoothed, bowed by its weight, and its straight runs joined; then a tree that weeps hangs its whips.
+  const unit = L;
+  smoothWood(w, h);
+  sagWood(w, h, sagOf(sp), unit);
+  const most = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
+  const simple = simplifyWood(w, h, unit * SIMPLIFY_SPAN, most);
+  if (weep <= 0) return h;
+  const whips = hangWhips(sp, size, simple, clumpR, weep, rng);
+  const out = newHung();
+  for (let c = 0; c < h.node.length; c++) {
+    if (whips.bears.has(h.node[c])) continue;
     // A tree that weeps bears most of its leaves on its whips, few along its twigs.
-    if (!end && weep > 0 && rng.chance(WEEP_TWIG_BARE * weep)) continue;
-    const p = w.parent[i];
-    const t = end ? norm([w.x[i] - w.x[p], w.y[i] - w.y[p], w.z[i] - w.z[p]]) : ([0, 0, 0] as V3);
-    const o = norm([w.x[i], w.y[i] - heart, w.z[i]]);
-    const r = clumpRadius(sp, clumpR, rng);
-    hang(
-      h,
-      i,
-      w.x[i] + (t[0] * HANG + o[0] * HANG_OUT) * r,
-      w.y[i] + (t[1] * HANG + o[1] * HANG_OUT) * r,
-      w.z[i] + (t[2] * HANG + o[2] * HANG_OUT) * r,
-      r,
-    );
+    if (simple.kids[h.node[c]].length > 0 && rng.chance(WEEP_TWIG_BARE * weep)) continue;
+    hang(out, h.node[c], h.x[c], h.y[c], h.z[c], h.r[c]);
   }
-  if (whips) for (let c = 0; c < whips.h.node.length; c++) hang(h, whips.h.node[c], whips.h.x[c], whips.h.y[c], whips.h.z[c], whips.h.r[c], true);
-  return h;
+  for (let c = 0; c < whips.h.node.length; c++) hang(out, whips.h.node[c], whips.h.x[c], whips.h.y[c], whips.h.z[c], whips.h.r[c], true);
+  return out;
+}
+
+/** How far a species' wood sags under its weight, 0..1: more the more it bends down, little if it turns up. */
+function sagOf(sp: TreeSpecies): number {
+  return Math.min(1, Math.max(0.05, 0.35 - 0.65 * sp.bend));
+}
+
+// ---------------------------------------------------------------------------
+// The wood made good: smoothed, bowed, simplified. Each moves the clumps with the nodes they hang on.
+
+/** Laplacian smoothing (as Evergrove's): each node of a run moves part way to its neighbours' middle; forks, feet and ends stay. */
+function smoothWood(w: Wood, h: Hung, passes = SMOOTH_PASSES, k = SMOOTH): void {
+  const n = w.x.length;
+  const x0 = Float64Array.from(w.x);
+  const y0 = Float64Array.from(w.y);
+  const z0 = Float64Array.from(w.z);
+  const nx = new Float64Array(n);
+  const ny = new Float64Array(n);
+  const nz = new Float64Array(n);
+  for (let pass = 0; pass < passes; pass++) {
+    for (let i = 0; i < n; i++) {
+      nx[i] = w.x[i];
+      ny[i] = w.y[i];
+      nz[i] = w.z[i];
+      const p = w.parent[i];
+      if (p < 0 || w.kids[i].length !== 1) continue;
+      const c = w.kids[i][0];
+      nx[i] += ((w.x[p] + w.x[c]) / 2 - w.x[i]) * k;
+      ny[i] += ((w.y[p] + w.y[c]) / 2 - w.y[i]) * k;
+      nz[i] += ((w.z[p] + w.z[c]) / 2 - w.z[i]) * k;
+    }
+    for (let i = 0; i < n; i++) {
+      w.x[i] = nx[i];
+      w.y[i] = ny[i];
+      w.z[i] = nz[i];
+    }
+  }
+  follow(w, h, x0, y0, z0);
+}
+
+/** Each clump moved as its node has moved, from where it was. */
+function follow(w: Wood, h: Hung, x0: Float64Array, y0: Float64Array, z0: Float64Array): void {
+  for (let c = 0; c < h.node.length; c++) {
+    const i = h.node[c];
+    h.x[c] += w.x[i] - x0[i];
+    h.y[c] += w.y[i] - y0[i];
+    h.z[c] += w.z[i] - z0[i];
+  }
+}
+
+/**
+ * The wood bowed under its weight (as Evergrove's gravity): each piece turns towards straight down by an angle
+ * that grows with its length and falls fast with its thickness (a beam's stiffness goes as its radius to
+ * the fourth, its load slower), at most SAG_MOST, and all beyond it turns with it, so a limb's bends add up
+ * along it and its twigs hang. `unit` is the length the sag is reckoned per.
+ */
+function sagWood(w: Wood, h: Hung, amount: number, unit: number): void {
+  if (amount <= 0) return;
+  const n = w.x.length;
+  const r = pipeUnits(w, unit);
+  const x0 = Float64Array.from(w.x);
+  const y0 = Float64Array.from(w.y);
+  const z0 = Float64Array.from(w.z);
+  // Each node's turn, as a quaternion (x, y, z, w).
+  const q = new Float64Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    q[4 * i + 3] = 1;
+    const p = w.parent[i];
+    if (p < 0) continue;
+    const sx = x0[i] - x0[p];
+    const sy = y0[i] - y0[p];
+    const sz = z0[i] - z0[p];
+    const len = Math.hypot(sx, sy, sz);
+    let qx = q[4 * p];
+    let qy = q[4 * p + 1];
+    let qz = q[4 * p + 2];
+    let qw = q[4 * p + 3];
+    if (len > 1e-9) {
+      const [ex, ey, ez] = rotate(qx, qy, qz, qw, sx / len, sy / len, sz / len);
+      // Its axis: square to it and to straight down (d × down = (ez, 0, -ex)).
+      const ax = ez;
+      const azv = -ex;
+      const al = Math.hypot(ax, azv);
+      if (al > 1e-6) {
+        const toDown = Math.acos(Math.min(1, Math.max(-1, -ey)));
+        const stiff = (r[i] / SAG_STIFF) ** 3;
+        const angle = Math.min(toDown, SAG_MOST, (SAG * amount * len) / unit / (1 + stiff));
+        const s = Math.sin(angle / 2) / al;
+        const bx = ax * s;
+        const bz = azv * s;
+        const bw = Math.cos(angle / 2);
+        // b (about the axis, which has no y) times the parent's turn.
+        const nqx = bw * qx + bx * qw + 0 * qz - bz * qy;
+        const nqy = bw * qy - bx * qz + 0 * qw + bz * qx;
+        const nqz = bw * qz + bx * qy - 0 * qx + bz * qw;
+        const nqw = bw * qw - bx * qx - 0 * qy - bz * qz;
+        qx = nqx;
+        qy = nqy;
+        qz = nqz;
+        qw = nqw;
+      }
+    }
+    q[4 * i] = qx;
+    q[4 * i + 1] = qy;
+    q[4 * i + 2] = qz;
+    q[4 * i + 3] = qw;
+    const [rx, ry, rz] = rotate(qx, qy, qz, qw, sx, sy, sz);
+    w.x[i] = w.x[p] + rx;
+    w.y[i] = w.y[p] + ry;
+    w.z[i] = w.z[p] + rz;
+  }
+  follow(w, h, x0, y0, z0);
+}
+
+/** A vector turned by a unit quaternion. */
+function rotate(qx: number, qy: number, qz: number, qw: number, vx: number, vy: number, vz: number): V3 {
+  // t = 2 q × v; v' = v + w t + q × t
+  const tx = 2 * (qy * vz - qz * vy);
+  const ty = 2 * (qz * vx - qx * vz);
+  const tz = 2 * (qx * vy - qy * vx);
+  return [vx + qw * tx + (qy * tz - qz * ty), vy + qw * ty + (qz * tx - qx * tz), vz + qw * tz + (qx * ty - qy * tx)];
+}
+
+/**
+ * The wood with the nodes that hardly bend it dropped, their neighbours joined straight (as Evergrove's):
+ * every foot, fork and end is kept, and no joined piece is longer than `longest`. If that leaves more nodes
+ * than `most`, again with a wider angle. A clump on a dropped node goes to the nearer kept one along its
+ * twig. Returns the new wood, which `w` now is.
+ */
+function simplifyWood(w: Wood, h: Hung, longest: number, most: number): Wood {
+  let angle = SIMPLIFY;
+  for (let tries = 0; ; tries++) {
+    const done = simplifyOnce(w, h, angle, longest);
+    if (w.x.length <= most || tries >= 6 || !done) return w;
+    angle *= 1.6;
+    longest *= 1.3;
+  }
+}
+
+function simplifyOnce(w: Wood, h: Hung, angle: number, longest: number): boolean {
+  const n = w.x.length;
+  const parent = w.parent.slice();
+  const kids = w.kids.map((k) => k.slice());
+  const cont = w.cont.slice();
+  const shed = w.shed ? w.shed.slice() : new Array<number>(n).fill(0);
+  const gone = new Uint8Array(n);
+  const cos = Math.cos(angle);
+  let dropped = 0;
+  for (let i = 0; i < n; i++) {
+    const p = parent[i];
+    if (p < 0 || kids[i].length !== 1) continue;
+    const c = kids[i][0];
+    if (!cont[c]) continue;
+    const ax = w.x[i] - w.x[p];
+    const ay = w.y[i] - w.y[p];
+    const az = w.z[i] - w.z[p];
+    const bx = w.x[c] - w.x[i];
+    const by = w.y[c] - w.y[i];
+    const bz = w.z[c] - w.z[i];
+    const la = Math.hypot(ax, ay, az);
+    const lb = Math.hypot(bx, by, bz);
+    if (la < 1e-9 || lb < 1e-9) continue;
+    if ((ax * bx + ay * by + az * bz) / (la * lb) < cos) continue;
+    if (Math.hypot(w.x[c] - w.x[p], w.y[c] - w.y[p], w.z[c] - w.z[p]) > longest) continue;
+    parent[c] = p;
+    kids[p][kids[p].indexOf(i)] = c;
+    cont[c] = cont[i];
+    shed[p] += shed[i];
+    gone[i] = 1;
+    dropped++;
+  }
+  if (dropped === 0) return false;
+  const remap = new Int32Array(n).fill(-1);
+  let m = 0;
+  for (let i = 0; i < n; i++) if (!gone[i]) remap[i] = m++;
+  /** The kept node a dropped one's clumps go to: the nearer of the kept ones either side of it on its run. */
+  const keptFor = (i: number, x: number, y: number, z: number): number => {
+    let up = i;
+    while (gone[up]) up = parent[up];
+    let down = i;
+    while (gone[down]) down = kids[down][0];
+    const du = Math.hypot(w.x[up] - x, w.y[up] - y, w.z[up] - z);
+    const dd = Math.hypot(w.x[down] - x, w.y[down] - y, w.z[down] - z);
+    return dd < du ? down : up;
+  };
+  for (let c = 0; c < h.node.length; c++) {
+    const i = h.node[c];
+    h.node[c] = remap[gone[i] ? keptFor(i, h.x[c], h.y[c], h.z[c]) : i];
+  }
+  const out = newWood();
+  const outShed: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (gone[i]) continue;
+    const j = addNode(out, w.x[i], w.y[i], w.z[i], parent[i] < 0 ? -1 : remap[parent[i]], cont[i]);
+    out.stem[j] = w.stem[i];
+    outShed.push(shed[i]);
+  }
+  w.x = out.x;
+  w.y = out.y;
+  w.z = out.z;
+  w.parent = out.parent;
+  w.cont = out.cont;
+  w.kids = out.kids;
+  w.stem = out.stem;
+  w.shed = outShed;
+  return true;
 }
 
 /**
@@ -750,16 +1305,16 @@ function colonize(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR:
  * short), kept inside the crown's outline, and leaved along all its length. Two whips do not hang where
  * their leaves would crowd each other. Returns the twigs they hang from and their clumps.
  */
-function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, growable: boolean[], clumpR: number, weep: number, rng: Random): { bears: Set<number>; h: Hung } {
+function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, weep: number, rng: Random): { bears: Set<number>; h: Hung } {
   const { crownBase: base, crownRadius: R, height: H } = size;
   const depth = Math.max(0.01, H - base);
   const rW = WHIP_CLUMP * clumpR;
   const thinK = thinGap(sp);
   const piece = 2.3 * thinK * rW;
   const gap = 2 * thinK * rW;
-  const inner = new Envelope(sp.shape, size, rW, 0.7 * rW, rW);
+  const inner = new Envelope(sp, size, rW, 0.7 * rW, rW);
   const ends: number[] = [];
-  for (let i = 0; i < w.x.length; i++) if (growable[i] && w.kids[i].length === 0 && w.parent[i] >= 0) ends.push(i);
+  for (let i = 0; i < w.x.length; i++) if (w.kids[i].length === 0 && w.parent[i] >= 0 && w.y[i] > base) ends.push(i);
   const score = (i: number) => Math.hypot(w.x[i], w.z[i]) / R + (0.5 * (w.y[i] - base)) / depth;
   const order = ends.map((i) => ({ i, s: score(i) })).sort((a, b) => b.s - a.s || a.i - b.i);
   const chosen = order.slice(0, Math.round(weep * order.length));
@@ -867,11 +1422,14 @@ function boughLine(rise: number, curve: number, n: number): { h: number[]; v: nu
 function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
-  const profileAt = (y: number) => crownProfile(sp.shape, (y - base) / depth) * R;
+  const profile = profileOf(sp);
+  const profileAt = (y: number) => profile((y - base) / depth) * R;
   const spacing = 1 / Math.max(0.05, sp.whorlsPerMetre);
   const top = H - 1.1 * clumpR;
   const segLen = Math.max(0.05, BOUGH_STEP * R);
   const h = newHung();
+  const shed: number[] = [];
+  w.shed = shed;
   const shell = Math.max(MIN_SHELL, Math.min(1, sp.foliageDepth));
   /** How far a bough's tip may reach from the axis at a height, its clump inside the crown. */
   const reachAt = (y: number) => Math.max(0.15 * clumpR, profileAt(Math.min(H, Math.max(base, y))) - 0.9 * clumpR);
@@ -941,26 +1499,37 @@ function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     const per = Math.max(1, Math.round(sp.whorl));
     for (let b = 0; b < per; b++) {
       // An open tree has lost boughs from its whorls.
-      if (!rng.chance(sp.branchiness) || w.x.length >= MAX_NODES - 40) continue;
-      const az = turn + (2 * Math.PI * b) / per + rng.range(-0.25, 0.25) * (2 * Math.PI) / per;
+      if (!rng.chance(sp.branchiness) || w.x.length >= MAX_NODES - 40) {
+        shed[i] += 1;
+        continue;
+      }
+      const az = turn + (2 * Math.PI * b) / per + rng.range(-0.4, 0.4) * (2 * Math.PI) / per;
       const angle = branchAngle(sp, rng);
-      const { line, n, len } = plan(lv.y, angle);
+      const planned = plan(lv.y, angle);
+      const { line, n } = planned;
+      // Not every bough is whole: some were broken or shaded back, and stop short.
+      const len = planned.len * (rng.chance(BOUGH_BROKEN) ? rng.range(0.45, 0.8) : rng.range(0.85, 1));
       // A bough whose leaves would hang below the crown's base is in the shade of those above: it has
-      // died and fallen, as a forest tree's lower boughs do.
+      // died and fallen, as a forest tree's lower boughs do (the trunk keeps its wood).
       const leafFrom = Math.min(n, Math.max(1, Math.ceil(n * (1 - shell))));
-      if (lv.y + Math.min(line.v[leafFrom], line.v[n]) * len - 1.25 * clumpR < base - 0.25 * clumpR) continue;
+      if (lv.y + Math.min(line.v[leafFrom], line.v[n]) * len - 1.25 * clumpR < base - 0.25 * clumpR) {
+        shed[i] += 0.5 * n;
+        continue;
+      }
       const ca = Math.cos(az);
       const sa = Math.sin(az);
-      // Along the bough, a wander square to it, by how crooked the species is.
+      // Along the bough, a wander square to it, side to side and up and down, by how crooked the species is.
       let jitter = 0;
+      let heave = 0;
       let prev = i;
       const bough: number[] = [];
       for (let k = 1; k <= n; k++) {
         jitter += (0.15 * sp.crooked * len * rng.gauss()) / n;
+        heave += (0.1 * sp.crooked * len * rng.gauss()) / n;
         const hh = line.h[k] * len;
         const x = w.x[i] + hh * ca - jitter * sa;
         const z = w.z[i] + hh * sa + jitter * ca;
-        prev = addNode(w, x, lv.y + line.v[k] * len, z, prev, k > 1);
+        prev = addNode(w, x, lv.y + line.v[k] * len + heave, z, prev, k > 1);
         bough.push(prev);
       }
       // Side shoots, left and right, longest near the bough's foot, on the part of it that is in leaf (as
@@ -1000,6 +1569,10 @@ function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   }
   // And a tuft at the leader's top.
   hangNeedles(h, w, i, sp, size, clumpR, rng);
+  // Smoothed, bowed a little by its weight (its boughs' droop is grown already), and its straight runs joined.
+  smoothWood(w, h);
+  sagWood(w, h, CONIFER_SAG * sagOf(sp), segLen);
+  simplifyWood(w, h, 4 * segLen, MAX_NODES);
   return h;
 }
 
@@ -1032,7 +1605,7 @@ function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: num
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
   // Where a clump's centre may be: in the crown, with room for the clump (and for a big one under it).
-  const inner = new Envelope(sp.shape, size, clumpR, 1.2 * clumpR, clumpR);
+  const inner = new Envelope(sp, size, clumpR, 1.2 * clumpR, clumpR);
   const heart = Math.min(inner.hi - 0.05 * depth, Math.max(inner.lo + 0.05 * depth, base + PALM_HEART * depth));
   const knob = Math.min(PALM_KNOB_MAX, PALM_KNOB * depth, 0.5 * (heart - inner.lo));
   const arch = Math.min(1, Math.max(0, 0.5 * (1 - sp.bend)));
@@ -1133,9 +1706,10 @@ function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: num
 // For every tree: thin the clumps, fit to size, the radii, and the arrays.
 
 function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree {
-  const env = new Envelope(sp.shape, size);
+  const env = new Envelope(sp, size);
   const keep = thin(sp, env, hung);
   fit(size, w, hung, keep);
+  if (sp.architecture !== "palm") keepToOutline(env, w, hung);
 
   // A clump keeps to its twig: its centre within its radius of the node it hangs on.
   for (const c of keep) {
@@ -1244,10 +1818,12 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
   const count = h.node.length;
   const outer = new Float64Array(count);
   for (let c = 0; c < count; c++) outer[c] = env.place(h.x[c], h.y[c], h.z[c], h.r[c]).depth;
-  // A clump whose centre is out of the crown's outline, or that hangs half out of its base, is out of the
-  // light the crown grows to: dropped.
+  // A clump whose centre is out of the crown's outline, or that hangs half out of its base (or by more than
+  // a twentieth of the crown's depth), is out of the light the crown grows to: dropped.
   const within = (c: number) =>
-    Math.hypot(h.x[c], h.z[c]) <= env.width(Math.min(env.hi, Math.max(env.lo, h.y[c]))) && h.y[c] - 0.5 * h.r[c] >= env.lo;
+    Math.hypot(h.x[c], h.z[c]) <= env.width(Math.min(env.hi, Math.max(env.lo, h.y[c]))) &&
+    h.y[c] - 0.5 * h.r[c] >= env.lo &&
+    h.y[c] - h.r[c] >= env.lo - 0.05 * (env.hi - env.lo);
   // (A whip's leaves first: a weeping tree is its curtain.)
   const byOuter = Array.from({ length: count }, (_, c) => c)
     .filter(within)
@@ -1256,7 +1832,11 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
   for (let c = 0; c < count; c++) rMax = Math.max(rMax, h.r[c]);
   const pass = (k: number): number[] => {
     const cell = Math.max(1e-3, 2 * rMax * k);
-    const grid = new Map<string, number[]>();
+    // A hashed grid: each cell's clumps chained through `next`, its first in `head`.
+    const size = 4096;
+    const head = new Int32Array(size).fill(-1);
+    const next = new Int32Array(count).fill(-1);
+    const key = (ix: number, iy: number, iz: number) => (Math.imul(ix, 73856093) ^ Math.imul(iy, 19349663) ^ Math.imul(iz, 83492791)) & (size - 1);
     const kept: number[] = [];
     for (const c of byOuter) {
       const ix = Math.floor(h.x[c] / cell);
@@ -1266,9 +1846,7 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
       for (let a = -1; a <= 1 && free; a++)
         for (let b = -1; b <= 1 && free; b++)
           for (let d = -1; d <= 1 && free; d++) {
-            const list = grid.get(`${ix + a},${iy + b},${iz + d}`);
-            if (!list) continue;
-            for (const o of list) {
+            for (let o = head[key(ix + a, iy + b, iz + d)]; o >= 0; o = next[o]) {
               const gap = k * (h.r[c] + h.r[o]);
               const dx = h.x[c] - h.x[o];
               const dy = h.y[c] - h.y[o];
@@ -1281,10 +1859,9 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
           }
       if (!free) continue;
       kept.push(c);
-      const key = `${ix},${iy},${iz}`;
-      const list = grid.get(key);
-      if (list) list.push(c);
-      else grid.set(key, [c]);
+      const kc = key(ix, iy, iz);
+      next[c] = head[kc];
+      head[kc] = c;
     }
     return kept;
   };
@@ -1303,22 +1880,64 @@ function thin(sp: TreeSpecies, env: Envelope, h: Hung): number[] {
 }
 
 /**
+ * What the fit and the wood's sag pushed out of the crown's outline is drawn back in to it, square to the
+ * trunk, its clumps with it (and any clump still out, after it): a twig the shears would have taken.
+ */
+function keepToOutline(env: Envelope, w: Wood, h: Hung): void {
+  const n = w.x.length;
+  const dx = new Float64Array(n);
+  const dz = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (w.parent[i] < 0) continue;
+    const wd = env.width(Math.min(env.hi, Math.max(env.lo, w.y[i])));
+    const d = Math.hypot(w.x[i], w.z[i]);
+    if (wd <= 0 || d <= wd) continue;
+    const k = wd / d;
+    dx[i] = w.x[i] * (k - 1);
+    dz[i] = w.z[i] * (k - 1);
+    w.x[i] += dx[i];
+    w.z[i] += dz[i];
+  }
+  for (let c = 0; c < h.node.length; c++) {
+    h.x[c] += dx[h.node[c]];
+    h.z[c] += dz[h.node[c]];
+    const wd = env.width(Math.min(env.hi, Math.max(env.lo, h.y[c])));
+    const d = Math.hypot(h.x[c], h.z[c]);
+    if (wd > 0 && d > wd) {
+      h.x[c] *= wd / d;
+      h.z[c] *= wd / d;
+    }
+  }
+}
+
+/**
  * Fit the grown tree to its size: across, about its axis, so its outermost clump reaches the crown
- * radius; and up, stretching what is above the crown's base, so its highest leaf is at its height. The
- * growing aims at both already; this takes up what it misses by.
+ * radius; and up, so its highest leaf is at its height and (when the growing missed it by more than a
+ * little) its lowest at its crown's base, stretching the crown and the trunk under it apart. The growing
+ * aims at all three already; this takes up what it misses by.
  */
 function fit(size: TreeSize, w: Wood, h: Hung, keep: number[]): void {
   let reach = 0;
   let topY = 0;
+  let lowY = Infinity;
   for (const c of keep) {
     reach = Math.max(reach, Math.hypot(h.x[c], h.z[c]) + h.r[c]);
     topY = Math.max(topY, h.y[c] + h.r[c]);
+    lowY = Math.min(lowY, h.y[c] - h.r[c]);
   }
   for (let i = 0; i < w.y.length; i++) topY = Math.max(topY, w.y[i]);
   const across = reach > 0 ? (FIT_REACH * size.crownRadius) / reach : 1;
-  const pivot = size.crownBase;
-  const upward = topY > pivot ? (FIT_TOP * size.height - pivot) / (topY - pivot) : 1;
-  const stretch = (y: number) => (y > pivot ? pivot + (y - pivot) * upward : y);
+  const depth = Math.max(0.01, size.height - size.crownBase);
+  // The pivot: the crown's base, or its lowest leaf if that is off the base and there is trunk under it to stretch.
+  let from = size.crownBase;
+  let to = size.crownBase;
+  const off = lowY - size.crownBase;
+  if (Number.isFinite(lowY) && (off > FIT_LOW * depth || off < -FIT_HANG * depth) && lowY > 0.01 * size.height && size.crownBase > 0.03 * size.height) {
+    from = lowY;
+    to = size.crownBase + 0.5 * FIT_LOW * depth;
+  }
+  const upward = topY > from ? (FIT_TOP * size.height - to) / (topY - from) : 1;
+  const stretch = (y: number) => (y > from ? to + (y - from) * upward : from > 0 ? (y * to) / from : y);
   for (let i = 0; i < w.x.length; i++) {
     w.x[i] *= across;
     w.z[i] *= across;
@@ -1332,28 +1951,40 @@ function fit(size: TreeSize, w: Wood, h: Hung, keep: number[]): void {
 }
 
 /**
- * The pipe model (Shinozaki et al. 1964, after da Vinci): a branch's cross-section carries all the twigs
- * beyond it, r^PIPE = Σ r_child^PIPE, with a little taper along wood that does not divide. Each stem is
- * then scaled so its radius at breast height is the size's trunk radius (a shrub's stems all have it).
+ * The pipe model (Shinozaki et al. 1964, after da Vinci), with a twig's end 1: a branch's cross-section,
+ * r^PIPE, carries all the twigs beyond it, the pipes of the branches it has shed, and the disused pipes
+ * its own length has gathered. `unit` is an internode's length.
+ */
+function pipeUnits(w: Wood, unit: number): Float64Array {
+  const n = w.x.length;
+  const pipes = new Float64Array(n);
+  const r = new Float64Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    let a = w.shed ? w.shed[i] : 0;
+    const kids = w.kids[i];
+    if (kids.length === 0) a += 1;
+    for (const c of kids) {
+      const len = Math.hypot(w.x[c] - w.x[i], w.y[c] - w.y[i], w.z[c] - w.z[i]);
+      a += pipes[c] * (1 + (DISUSED * len) / unit);
+    }
+    pipes[i] = a;
+    r[i] = a ** (1 / PIPE);
+  }
+  return r;
+}
+
+/** An internode's length on a tree of a size: the crown's size over INTERNODES. */
+function unitOf(size: TreeSize): number {
+  return Math.cbrt(size.crownRadius * size.crownRadius * Math.max(0.01, size.height - size.crownBase)) / INTERNODES;
+}
+
+/**
+ * The radii (m): the pipe model's, each stem then scaled so its radius at breast height is the size's
+ * trunk radius (a shrub's stems all have it).
  */
 function pipeRadii(size: TreeSize, w: Wood): Float64Array {
   const n = w.x.length;
-  const r = new Float64Array(n);
-  for (let i = n - 1; i >= 0; i--) {
-    const kids = w.kids[i];
-    if (kids.length === 0) {
-      r[i] = 1;
-      continue;
-    }
-    let sum = 0;
-    let tapered = 0;
-    for (const c of kids) {
-      sum += r[c] ** PIPE;
-      const len = Math.hypot(w.x[c] - w.x[i], w.y[c] - w.y[i], w.z[c] - w.z[i]);
-      tapered = Math.max(tapered, r[c] * (1 + TAPER * len));
-    }
-    r[i] = Math.max(sum ** (1 / PIPE), tapered);
-  }
+  const r = pipeUnits(w, unitOf(size));
   // Each stem's radius at breast height, along its axis from its foot.
   const bh = breastHeight(size);
   const scale = new Float64Array(w.stems).fill(1);

@@ -69,7 +69,7 @@ export function outlineError(grown: number[], photo: Outline): number {
 }
 
 /** How far each species' outline may be from its photograph's, for now: tightened as the grower gets better. */
-const ALLOWED = 0.45;
+const ALLOWED = 0.12;
 
 for (const photo of outlines) {
   const species = ALL_SPECIES.find((s) => s.name === photo.name);

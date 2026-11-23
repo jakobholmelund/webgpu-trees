@@ -18,30 +18,62 @@ export interface TreeSize {
 }
 
 /**
- * How wide a crown of a shape is at a height within it, as a share of its widest: `t` is 0 at the crown's
- * base and 1 at its top. Weber and Penn's shape ratios (1995), turned the way up a crown is read, and scaled
- * so each reaches 1 at its widest.
+ * A crown shape's outline, as Weber and Penn's pruning envelope (1995) made round: how high in the crown
+ * it is widest (`peak`, 0 its base, 1 its top), how round it is above that (`round`: the exponent of a
+ * superellipse, Lamé's curve, which Rautiainen et al. (2008) fitted to measured crowns: 1 a cone, 2 an
+ * ellipse, higher a flatter top), how round below (`roundLow`), and how wide it still is at its base, where
+ * its lowest live branches are (`base`, a share of its widest). Its side is upright where it is widest, so
+ * no crown has a waist or a corner there; only a cone (round near 1) comes to a point at its top.
  */
-export function crownProfile(shape: CrownShape, t: number): number {
-  const r = 1 - Math.min(1, Math.max(0, t)); // (Weber and Penn's ratio: 1 at the crown's base, 0 at its top.)
-  switch (shape) {
-    case "conical":
-      return 0.2 + 0.8 * r;
-    case "spherical":
-      return 0.2 + 0.8 * Math.sin(Math.PI * r);
-    case "hemispherical":
-      return 0.2 + 0.8 * Math.sin(0.5 * Math.PI * r);
-    case "cylindrical":
-      return 1;
-    case "taperedCylindrical":
-      return 0.5 + 0.5 * r;
-    case "flame":
-      return Math.max(0.05, r <= 0.7 ? r / 0.7 : (1 - r) / 0.3);
-    case "inverseConical":
-      return 1 - 0.8 * r;
-    case "tendFlame":
-      return r <= 0.7 ? 0.5 + (0.5 * r) / 0.7 : 0.5 + (0.5 * (1 - r)) / 0.3;
+export interface CrownOutline {
+  peak: number;
+  round: number;
+  roundLow: number;
+  base: number;
+}
+
+/** Each shape's outline. Rautiainen et al. (2008) measured round 1.35 for Scots pine and 1.42 for Norway spruce. */
+export const CROWN_OUTLINES: Readonly<Record<CrownShape, CrownOutline>> = {
+  conical: { peak: 0.2, round: 1.35, roundLow: 2, base: 0.6 },
+  spherical: { peak: 0.45, round: 2, roundLow: 2, base: 0.3 },
+  hemispherical: { peak: 0.2, round: 2, roundLow: 1.6, base: 0.55 },
+  cylindrical: { peak: 0.5, round: 4, roundLow: 4, base: 0.85 },
+  taperedCylindrical: { peak: 0.2, round: 1.5, roundLow: 2.5, base: 0.75 },
+  flame: { peak: 0.3, round: 1.2, roundLow: 1.5, base: 0.25 },
+  inverseConical: { peak: 0.7, round: 2.6, roundLow: 1.3, base: 0.25 },
+  tendFlame: { peak: 0.4, round: 1.6, roundLow: 2, base: 0.5 },
+};
+
+/** What a species may say of its crown's outline over its shape's (`TreeSpecies` has both). */
+export interface CrownOverride {
+  crownPeak?: number;
+  crownRound?: number;
+}
+
+/** A shape's outline, with what a species says over it. */
+export function crownOutline(shape: CrownShape, over?: CrownOverride): CrownOutline {
+  const o = CROWN_OUTLINES[shape];
+  return {
+    peak: Math.min(0.95, Math.max(0, over?.crownPeak ?? o.peak)),
+    round: Math.max(0.8, over?.crownRound ?? o.round),
+    roundLow: o.roundLow,
+    base: o.base,
+  };
+}
+
+/**
+ * How wide a crown of a shape is at a height within it, as a share of its widest: `t` is 0 at the crown's
+ * base and 1 at its top. Give the species (or its `crownPeak` and `crownRound`) to have its own outline.
+ */
+export function crownProfile(shape: CrownShape, t: number, over?: CrownOverride): number {
+  const o = crownOutline(shape, over);
+  const s = Math.min(1, Math.max(0, t));
+  if (s >= o.peak) {
+    const u = o.peak >= 1 ? 1 : (s - o.peak) / (1 - o.peak);
+    return u >= 1 ? 0 : (1 - u ** o.round) ** (1 / o.round);
   }
+  const u = (o.peak - s) / o.peak;
+  return o.base + (1 - o.base) * (1 - u ** o.roundLow) ** (1 / o.roundLow);
 }
 
 /**

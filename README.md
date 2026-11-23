@@ -71,8 +71,8 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Oak | *Quercus robur* | a broad dome, wider than tall, on crooked limbs | great-britain, france, netherlands, denmark | 17 | 11 | 2.5 |
 | Plane | *Platanus × hispanica* | a big full oval, pale mottled bark | france, great-britain, netherlands, california | 22 | 10 | 3 |
 | Eucalyptus | *Eucalyptus globulus* | a high open vase of pale limbs, grey-green sprays | california | 26 | 8.5 | 7.5 |
-| Spruce | *Picea abies* | a dark cone, boughs hanging to the ground | denmark, netherlands, ontario | 20 | 3.4 | 1.5 |
-| Scots pine | *Pinus sylvestris* | a flat lopsided top on a tall orange trunk | great-britain, denmark, netherlands | 19 | 6.5 | 11.5 |
+| Spruce | *Picea abies* | a dark cone, boughs hanging to the ground | denmark, netherlands, ontario | 20 | 5.8 | 1 |
+| Scots pine | *Pinus sylvestris* | a flat lopsided top on a tall orange trunk | great-britain, denmark, netherlands | 19 | 8 | 9 |
 | Shrub | (generic) | a dense mound of small leaves | california, pacific-northwest, great-britain, france, ontario, netherlands, denmark | 2.4 | 1.6 | 0.1 |
 | Beech | *Fagus sylvatica* | a dense dome, smooth grey bark | denmark, great-britain, netherlands, france | 20 | 8 | 2.5 |
 | Silver birch | *Betula pendula* | a narrow open oval of drooping tresses, white bark | great-britain, denmark, netherlands | 15 | 3.5 | 3 |
@@ -88,8 +88,8 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Monterey cypress | *Hesperocyparis macrocarpa* | a wind-shaped flat top on a few great limbs | california | 18 | 7 | 3 |
 | Monterey pine | *Pinus radiata* | an irregular rounded crown, grass-green | california | 20 | 6.5 | 5 |
 | Torrey pine | *Pinus torreyana* | an open crooked crown, long grey-green needles | california | 15 | 5.5 | 4 |
-| Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 5.5 | 4 |
-| Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 9.5 | 6 |
+| Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 6.5 | 3 |
+| Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 10.5 | 5 |
 | Canary date palm | *Phoenix canariensis* | a big round head of arching fronds on a thick trunk | california | 15 | 5 | 7 |
 | Mexican fan palm | *Washingtonia robusta* | a tall thin pole with a small tight head of fan leaves | california | 22 | 2.2 | 18 |
 | Coast live oak | *Quercus agrifolia* | a low, broad, dark evergreen dome | california | 11 | 8.5 | 1.8 |
@@ -98,6 +98,24 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Red oak | *Quercus rubra* | a rounded crown on a few big limbs | ontario, denmark, netherlands | 20 | 8 | 3 |
 | Eastern white pine | *Pinus strobus* | tiers of level boughs, soft blue-green | ontario | 22 | 5.5 | 3 |
 | White spruce | *Picea glauca* | a narrow blue-green cone | ontario | 16 | 2.8 | 0.8 |
+
+The oak's, the Scots pine's, the spruce's, the Aleppo pine's and the stone
+pine's proportions (crown reach and base for height) and outlines are
+measured from photographs of open-grown trees (`test/outlines.json`; each
+grows within 12% of its photograph's outline, `test/outline.test.ts`). An
+old pine has given up its leader: the Scots, Torrey, Aleppo, Monterey and
+stone pines are grown as broadleaves, with needles.
+
+A crown's outline is its `shape`'s, made round (`CROWN_OUTLINES`): widest
+some way up, upright there, curving in above and below. `crownPeak` (0..1)
+says how far up the crown it is widest and `crownRound` how round it is
+above that (the exponent of a superellipse: 1 a cone, 2 an ellipse, 3 or
+more a flat top; Rautiainen et al. 2008 measured 1.35 for Scots pine and
+1.42 for Norway spruce), over the shape's own; `lobes` (0..1) makes it
+lumpy, bulging out in a few directions and falling back between. A
+broadleaf's `scaffolds` are its great limbs (4, and one more for every
+third of `leader`, if left out), and `shed` (0..1) how readily it drops its
+shaded branches (from `openness` and `branchiness` if left out).
 
 A palm (`architecture: "palm"`) is one stem, as thick at its top as at
 breast height and swollen at its foot, with a head of `whorl` fronds round
@@ -134,15 +152,68 @@ times the graphics card over fixed views. H puts the panels away, `[` and
 `]` step the scenes. `?scene=`, `?species=`, `?hour=`, `?wind=`, `?eye=`
 and `?fresh` (ignore what the lab kept) set it from the address.
 
+## How a tree grows
+
+`growTree(species, size, seed)` grows one tree, the same every time for the
+same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
+
+1. **The crown's outline**: the shape's profile (above), turned round the
+   trunk, `size.crownRadius` round, from `size.crownBase` to
+   `size.height`. Nothing grows out of it.
+2. **The trunk and its great limbs** (a broadleaf or a shrub). The trunk
+   rises bare to the crown's base. Its scaffolds leave it one to each slot
+   up the top part of it (a longer part the more it keeps its leader),
+   round it by the golden angle, the lowest leaving widest and the highest
+   steepest (as Weber and Penn set a tree's first branches): each turns up
+   or down by `bend`, arches over by its weight, wanders by `crooked`, and
+   reaches out to the outline. The trunk goes on up the crown as its leader,
+   all the way if `leader` is 1. A shrub's stems, leaning out from feet
+   spread within a third of the crown, are its scaffolds.
+3. **Growing from buds, in the light** (Palubicki et al. 2009, made light),
+   eleven cycles of: every bud's light, from how much wood above shades its
+   voxel (each node shades a pyramid under it); that light gathered down to
+   the foot and handed back up as what to grow with, at each fork more to
+   the main axis than to the lateral (Borchert and Honda's model, its
+   leaning from `leader`), a scaffold as much as its trunk; each bud growing
+   as many internodes as it is given, turned towards the least shadow it
+   sees and up or down by `bend`, with a lateral bud at every internode by
+   the golden angle at `branchAngle`; and every branch that gathers too
+   little light for its wood shed (`shed`). So the crown is a shell of lit
+   shoots on bare, branching limbs, its inside shed as it shades.
+4. **Leaves** hang in clumps on the lit shoots near their twigs' ends (the
+   deeper the species keeps its leaves, `foliageDepth`, the further back),
+   bigger the more light they have.
+5. **The wood made good**: smoothed (twice, forks held), bowed by its
+   weight (thin wood more, `bend` down more), and its straight runs joined
+   into single pieces. A tree that weeps then hangs its whips.
+6. **Conifers** grow whorl by whorl instead: a leader to the top and
+   `whorl` boughs to each of `whorlsPerMetre`, each as long as the outline
+   lets it be (some missing, some broken short), with side shoots along
+   their leafy parts; then smoothed and bowed. **Palms** grow a head of
+   fronds on one stem.
+7. **Fitted to its size**: across so its leaves reach the crown radius, up
+   so they reach its height and come down to its crown's base, and drawn in
+   to the outline where that moved them out of it. The growing aims at all
+   of it, so this is a few percent: up to a tenth across, and more up only
+   for a tall narrow crown that did not grow to its top.
+8. **The wood's thickness** from the pipe model (Shinozaki et al. 1964): a
+   branch's cross-section to the 2.4 carries all the twigs beyond it, the
+   branches it has shed and the pipes its own length has outlived, so at a
+   fork d^Δ = Σ dᵢ^Δ with Δ near 2.1 (measured trees: 1.8 to 2.3, Eloy
+   2011); scaled so the trunk has its measured radius at breast height.
+
+`test/structure.test.ts` holds the wood to what measured trees are: every
+species' forks to Leonardo's rule, a broadleaf's great limbs straight
+enough (path over chord) and few, and the Scots pine's and the spruce's
+upper crowns to Rautiainen's exponents.
+
 ## How a course's trees are drawn
 
 - **A few are grown.** Each species' trees are sorted into shapes by how
   wide their crowns are for their height and how high the crown starts;
   each shape is grown once a seed (two by default), at the shape's typical
-  size. Growing is space colonization into the crown's outline for a
-  broadleaf or a shrub (Runions et al. 2007), whorl by whorl for a conifer,
-  with the wood's thickness from the pipe model, scaled to the trunk's
-  measured radius. Leaves hang in clumps at the twigs, never in the air.
+  size (see *How a tree grows*). Leaves hang in clumps at the twigs, never
+  in the air.
 - **Every tree is fitted to its own numbers.** Up the tree in two
   stretches (the trunk to its crown's base, the crown to its top), across
   to its crown radius, and the wood thickened to its trunk radius apart

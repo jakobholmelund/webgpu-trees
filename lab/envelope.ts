@@ -9,7 +9,7 @@
 // A tree's lean (a few degrees at most) is left out: the lines stand upright.
 
 import * as THREE from "three/webgpu";
-import { type CrownShape, type TreeSize, crownEllipsoid, crownProfile } from "../src/index";
+import { type CrownOverride, type CrownShape, type TreeSize, crownEllipsoid, crownProfile } from "../src/index";
 
 /** One tree as the envelope needs it: where its foot is, its own size, and its species' crown shape. */
 export interface Standing {
@@ -18,6 +18,8 @@ export interface Standing {
   z: number;
   size: TreeSize;
   shape: CrownShape;
+  /** The species' own changes to its shape's outline (`crownPeak`, `crownRound`, `lobes`). */
+  over?: CrownOverride;
 }
 
 const ROUND = 48;
@@ -56,7 +58,7 @@ function profile(out: number[], t: Standing) {
   const { height, crownBase, crownRadius } = t.size;
   const depth = Math.max(0.01, height - crownBase);
   const steps = 40;
-  const at = (k: number) => [crownRadius * crownProfile(t.shape, k / steps), crownBase + (k / steps) * depth] as const;
+  const at = (k: number) => [crownRadius * crownProfile(t.shape, k / steps, t.over), crownBase + (k / steps) * depth] as const;
   for (let m = 0; m < MERIDIANS; m++) {
     const lon = (m / MERIDIANS) * Math.PI * 2;
     const c = Math.cos(lon);

@@ -10,7 +10,8 @@
  * How the tree is put together (Hallé and Oldeman's models, by the handful that matter on a course):
  *
  * - `broadleaf`: a short trunk that soon divides into a few great limbs, which divide again (oak, maple,
- *   plane, eucalyptus). Grown by space colonization into the crown.
+ *   plane, eucalyptus; an old pine, whose leader has given up the lead). Grown from its buds, in the light,
+ *   inside its crown's outline.
  * - `conifer`: one leader to the top, with branches in whorls along it, longest low down (spruce, fir,
  *   most pines when young). Grown whorl by whorl.
  * - `shrub`: several stems from the ground, no trunk to speak of (holly, gorse, broom, rhododendron).
@@ -21,10 +22,6 @@
 export type Architecture = "broadleaf" | "conifer" | "shrub" | "palm";
 
 /**
- * The outline of the crown seen from the side: how wide it is at each height, from its base to its top.
- * Weber and Penn's shapes (1995), less the ones that serve only a tree's first branches.
- */
-/**
  * What its leaves are like, for the realistic look's sprays of them: broad (oak, maple, plane), narrow
  * (eucalyptus, willow), needle (spruce, pine), small (box, holly, a shrub's), frond (a palm's: a pinnate
  * frond or a fan).
@@ -32,6 +29,12 @@ export type Architecture = "broadleaf" | "conifer" | "shrub" | "palm";
 export type LeafKind = "broad" | "narrow" | "needle" | "small" | "frond";
 export const LEAF_KIND_ROWS: readonly LeafKind[] = ["broad", "narrow", "needle", "small", "frond"];
 
+/**
+ * The outline of the crown seen from the side: how wide it is at each height, from its base to its top.
+ * Weber and Penn's shapes (1995), less the ones that serve only a tree's first branches, made round
+ * (`CROWN_OUTLINES` in tree.ts): each is widest somewhere up the crown, upright there, and curves in above
+ * and below. A row's `crownPeak` and `crownRound` say where and how, over its shape's own.
+ */
 export type CrownShape = "conical" | "spherical" | "hemispherical" | "cylindrical" | "taperedCylindrical" | "flame" | "inverseConical" | "tendFlame";
 
 /**
@@ -70,6 +73,18 @@ export interface TreeSpecies {
   foliageDepth: number;
   /** How see-through the crown is, 0 (solid) to 1 (sky through it everywhere): a pine's open crown, a birch's. */
   openness: number;
+  /**
+   * Where the crown is widest, as a share of the way up it (0 its base, 1 its top), over its shape's own: an
+   * open-grown oak is widest a sixth of the way up, an old Scots pine's top nearly a third.
+   */
+  crownPeak?: number;
+  /**
+   * How round the crown is above its widest, over its shape's own: the exponent of the superellipse its
+   * outline follows there (Rautiainen et al. 2008), 1 a cone, 2 an ellipse, 3 or more a flat top.
+   */
+  crownRound?: number;
+  /** How lumpy the crown's outline is, 0..1: 0 smooth all round, 1 bulging out and falling back by nearly a third between. */
+  lobes?: number;
 
   // The branches.
   /** How many stems rise from the ground: 1 for a tree, several for a shrub or a coppiced stool. */
@@ -94,6 +109,17 @@ export interface TreeSpecies {
   whorlsPerMetre: number;
   /** How many branches it carries, as a share of what fills its crown: 0.3, a sparse old pine; 1, full. */
   branchiness: number;
+  /**
+   * How many great limbs (scaffolds) a broadleaf's trunk carries into its crown, below its leader. Left out:
+   * 4, and one more for every third of `leader` (an oak's few, a birch's many along its leader); a shrub's
+   * stems are its scaffolds, and it has none besides.
+   */
+  scaffolds?: number;
+  /**
+   * How readily a broadleaf or a shrub sheds its shaded branches, 0..1: the light a branch must gather for
+   * each of its pieces of wood to be kept (Takenaka 1994). Left out: from `openness` and `branchiness`.
+   */
+  shed?: number;
 
   // The leaves, gathered into clumps: a twig's spray, a branchlet's.
   leafKind: LeafKind;
@@ -135,7 +161,10 @@ export interface TreeSpecies {
  * The trees a course in a temperate place is likely to have, at the sizes they reach there. By eye: the oak,
  * the plane, the eucalyptus and the Scots pine set against photographs of open-grown trees (an oak's crown
  * wider than it is tall, a plane's full oval, a park eucalyptus between its vase and Riviera's tall blue
- * gums, a Scots pine's flat lopsided top on a thin trunk).
+ * gums, a Scots pine's flat lopsided top on a thin trunk). The oak's, the Scots pine's and the spruce's
+ * outlines and proportions (crown reach and base for height) are measured from photographs of open-grown
+ * trees (test/outlines.json): an open-grown spruce is much wider than a forest one. An old Scots pine has
+ * given up its leader, and is grown as a broadleaf, with needles.
  */
 export const STARTER_SPECIES: readonly TreeSpecies[] = [
   {
@@ -147,18 +176,21 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     crownRadius: 11,
     crownBase: 2.5,
     trunkRadius: 0.45,
-    shape: "spherical",
+    shape: "hemispherical",
+    crownPeak: 0.15,
+    crownRound: 1.8,
     foliageDepth: 0.35,
     openness: 0.35,
     stems: 1,
     branchAngle: 60,
     branchAngleSpread: 15,
-    bend: -0.1,
+    bend: -0.2,
     crooked: 0.7,
     leader: 0.15,
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.8,
+    scaffolds: 8,
     leafKind: "broad",
     clumpSize: 1.6,
     clumpSpread: 0.35,
@@ -240,8 +272,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     regions: ["denmark", "netherlands", "ontario"],
     architecture: "conifer",
     height: 20,
-    crownRadius: 3.4,
-    crownBase: 1.5,
+    crownRadius: 5.8,
+    crownBase: 1,
     trunkRadius: 0.35,
     shape: "conical",
     foliageDepth: 0.6,
@@ -270,12 +302,14 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Scots pine",
     latin: "Pinus sylvestris",
     regions: ["great-britain", "denmark", "netherlands"],
-    architecture: "conifer",
+    architecture: "broadleaf",
     height: 19,
-    crownRadius: 6.5,
-    crownBase: 11.5,
+    crownRadius: 8,
+    crownBase: 9,
     trunkRadius: 0.35,
     shape: "hemispherical",
+    crownPeak: 0.3,
+    crownRound: 1.4,
     foliageDepth: 0.3,
     openness: 0.4,
     stems: 1,
@@ -284,8 +318,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     bend: -0.1,
     crooked: 0.7,
     leader: 0.2,
-    whorl: 4,
-    whorlsPerMetre: 1.6,
+    whorl: 0,
+    whorlsPerMetre: 0,
     branchiness: 0.85,
     leafKind: "needle",
     clumpSize: 1.7,
@@ -729,6 +763,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     crownBase: 3,
     trunkRadius: 0.6,
     shape: "inverseConical",
+    lobes: 0.4,
     foliageDepth: 0.35,
     openness: 0.15,
     stems: 1,
@@ -764,6 +799,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     crownBase: 5,
     trunkRadius: 0.45,
     shape: "spherical",
+    lobes: 0.25,
     foliageDepth: 0.35,
     openness: 0.35,
     stems: 1,
@@ -787,18 +823,19 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stiffness: 0.8,
   },
   // California Native Plant Society, San Diego (Pinus torreyana): 40–70 ft tall, 35 ft spread, an open
-  // picturesque form. Few crooked limbs, long grey-green needles in tufts. Wild ones lean; the grower stands
-  // every tree upright (a host leans it at most 3 degrees).
+  // picturesque form. Few crooked limbs, long grey-green needles in tufts, so grown as a broadleaf, with
+  // needles. Wild ones lean; the grower stands every tree upright (a host leans it at most 3 degrees).
   torreyPine: {
     name: "Torrey pine",
     latin: "Pinus torreyana",
     regions: ["california"],
-    architecture: "conifer",
+    architecture: "broadleaf",
     height: 15,
     crownRadius: 5.5,
     crownBase: 4,
     trunkRadius: 0.4,
     shape: "hemispherical",
+    lobes: 0.35,
     foliageDepth: 0.25,
     openness: 0.5,
     stems: 1,
@@ -807,8 +844,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     bend: 0.35,
     crooked: 0.85,
     leader: 0.2,
-    whorl: 3,
-    whorlsPerMetre: 1.3,
+    whorl: 0,
+    whorlsPerMetre: 0,
     branchiness: 1,
     leafKind: "needle",
     clumpSize: 1.8,
@@ -823,15 +860,16 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // CSU Stanislaus campus tree map, after Cal Poly's SelecTree (Pinus halepensis): 30–60 ft tall, 20–40 ft
   // wide. The high-crowned pine of Los Angeles' parks and courses: an irregular open crown of crooked
-  // boughs, grey-green; grey bark. It leans in the wild; the grower stands it upright.
+  // boughs, grey-green, grown as a broadleaf with needles; grey bark. It leans in the wild; the grower
+  // stands it upright. Its crown's reach and base are a photographed open-grown tree's (test/outlines.json).
   aleppoPine: {
     name: "Aleppo pine",
     latin: "Pinus halepensis",
     regions: ["california", "france"],
-    architecture: "conifer",
+    architecture: "broadleaf",
     height: 15,
-    crownRadius: 5.5,
-    crownBase: 4,
+    crownRadius: 6.5,
+    crownBase: 3,
     trunkRadius: 0.35,
     shape: "hemispherical",
     foliageDepth: 0.3,
@@ -842,9 +880,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     bend: 0.2,
     crooked: 0.6,
     leader: 0.35,
-    whorl: 4,
-    whorlsPerMetre: 1.6,
+    whorl: 0,
+    whorlsPerMetre: 0,
     branchiness: 1,
+    scaffolds: 7,
     leafKind: "needle",
     clumpSize: 1.6,
     clumpSpread: 0.4,
@@ -858,28 +897,29 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // UF/IFAS ST-472 (Pinus pinea): 35–60 ft tall, 35–45 ft spread. The umbrella pine: a tall clear trunk that
   // divides into rising limbs under a flat wide crown, so grown as a broadleaf, with needles; orange-brown
-  // plated bark.
+  // plated bark. Its crown's reach is a photographed open-grown tree's (test/outlines.json).
   stonePine: {
     name: "Stone pine",
     latin: "Pinus pinea",
     regions: ["california", "france"],
     architecture: "broadleaf",
     height: 15,
-    crownRadius: 9.5,
-    crownBase: 6,
+    crownRadius: 10.5,
+    crownBase: 5,
     trunkRadius: 0.45,
     shape: "hemispherical",
     foliageDepth: 0.2,
     openness: 0.25,
     stems: 1,
-    branchAngle: 40,
+    branchAngle: 45,
     branchAngleSpread: 10,
-    bend: 0.3,
+    bend: 0.05,
     crooked: 0.35,
     leader: 0.4,
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.8,
+    scaffolds: 6,
     leafKind: "needle",
     clumpSize: 1.8,
     clumpSpread: 0.35,
@@ -974,6 +1014,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     crownBase: 1.8,
     trunkRadius: 0.5,
     shape: "hemispherical",
+    lobes: 0.25,
     foliageDepth: 0.3,
     openness: 0.2,
     stems: 1,
@@ -1009,6 +1050,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     crownBase: 3.5,
     trunkRadius: 0.5,
     shape: "tendFlame",
+    lobes: 0.3,
     foliageDepth: 0.25,
     openness: 0.55,
     stems: 1,
@@ -1192,6 +1234,11 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.architecture === "conifer" && !(s.whorl >= 1 && s.whorlsPerMetre > 0)) out.push("a conifer needs whorl and whorlsPerMetre");
   if (s.architecture === "palm" && !(s.whorl >= 3)) out.push("a palm needs whorl (its fronds) of 3 or more");
   if (s.weep !== undefined && !(s.weep >= 0 && s.weep <= 1)) out.push("weep must be 0..1");
+  if (s.crownPeak !== undefined && !(s.crownPeak >= 0 && s.crownPeak <= 0.95)) out.push("crownPeak must be 0..0.95");
+  if (s.crownRound !== undefined && !(s.crownRound >= 0.8 && s.crownRound <= 8)) out.push("crownRound must be 0.8..8");
+  if (s.lobes !== undefined && !(s.lobes >= 0 && s.lobes <= 1)) out.push("lobes must be 0..1");
+  if (s.scaffolds !== undefined && !(Number.isInteger(s.scaffolds) && s.scaffolds >= 0 && s.scaffolds <= 12)) out.push("scaffolds must be a whole number 0..12");
+  if (s.shed !== undefined && !(s.shed >= 0 && s.shed <= 1)) out.push("shed must be 0..1");
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
   if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {
