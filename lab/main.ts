@@ -636,6 +636,7 @@ async function start() {
   stylePanel.add(style, "through", 0, 1, 0.01).name("sun through").onChange(save);
   stylePanel.add(style, "wrap", 0, 1, 0.01).name("light wraps").onChange(save);
   stylePanel.add(style, "strokes", 0, 1, 0.01).name("brush strokes").onChange(save);
+  stylePanel.add(style, "selfShade", 0, 1, 0.01).name("crown shades itself").onChange(save);
   const detailPanel = sceneGui.addFolder("Detail");
   detailPanel.add(detail, "nearPx", 20, 1200, 1).name("near above (px)").onChange(save);
   detailPanel.add(detail, "farPx", 5, 600, 1).name("far below (px)").onChange(save);

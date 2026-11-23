@@ -53,9 +53,15 @@ export interface TreeStyle {
   wrap: number;
   /** How strongly the brush's strokes show in a dab, 0..1. */
   strokes: number;
+  /**
+   * How far a crown shades itself, 0..1: 1, as much as the light lost through its leaves makes it (Monsi and
+   * Saeki); 0, not at all, every leaf facing the sun as lit as the crown's outside. A painter keeps less of it
+   * than there is.
+   */
+  selfShade: number;
 }
 
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.4, strokes: 0.6 };
+export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5 };
 
 /** At what size in the picture each tier takes over, and how far trees are drawn at all. Read each frame. */
 export interface TreeDetail {
@@ -223,6 +229,7 @@ export function createTrees(options: TreesOptions): Trees {
   const uDetail = uniform(new THREE.Vector4(DEFAULT_DETAIL.nearPx, DEFAULT_DETAIL.farPx, DEFAULT_DETAIL.band, DEFAULT_DETAIL.range));
   const uStyle = uniform(new THREE.Vector4());
   const uStyle2 = uniform(new THREE.Vector4());
+  const uSelfShade = uniform(0.5);
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -377,7 +384,7 @@ export function createTrees(options: TreesOptions): Trees {
    * crown taken as its ellipsoid), and the sky, as much as the crown above lets through.
    */
   const crownAt = (T: TreeRows, at: Vec3) => {
-    const k = T.srow(3).x;
+    const k = T.srow(3).x.mul(uSelfShade);
     const ry = max(T.r1.x.sub(T.r1.y).mul(0.5), float(0.05));
     const rx = max(T.r1.z, float(0.05));
     const centre = vec3(T.r0.x, T.r0.y.add(T.r1.y).add(ry), T.r0.z);
@@ -405,8 +412,11 @@ export function createTrees(options: TreesOptions): Trees {
     return { sunIn, sky, form, cloud };
   };
   type Crown = ReturnType<typeof crownAt>;
-  /** How much sun a piece facing `n` gets, the light wrapped past its side by `wrap`. */
-  const sunOn = (C: Crown, n: Vec3, wrap: Float): Float => clamp(dot(n, uSun).add(wrap).div(float(1).add(wrap)), 0, 1).mul(C.sunIn).mul(C.cloud);
+  /**
+   * How much sun a piece facing `n` gets: all of it from well short of square-on, none from `wrap` past its
+   * side (as a painter lights a form, and Couch Golf Club's own trees: smoothstep(-wrap, 0.65, n . sun)).
+   */
+  const sunOn = (C: Crown, n: Vec3, wrap: Float): Float => smoothstep(wrap.negate(), float(0.65), dot(n, uSun)).mul(C.sunIn).mul(C.cloud);
 
   /** Into the air between it and the eye. */
   const intoAir = (col: Vec3, at: Vec3): Vec3 => (world.air ? world.air(col, at) : col);
@@ -647,6 +657,7 @@ export function createTrees(options: TreesOptions): Trees {
       uDetail.value.set(detail.nearPx, detail.farPx, detail.band, detail.range);
       uStyle.value.set(style.steps, style.bands, style.round, style.jitter);
       uStyle2.value.set(style.dabScale, style.through, style.wrap, style.strokes);
+      uSelfShade.value = style.selfShade;
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);
