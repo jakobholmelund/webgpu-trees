@@ -1,5 +1,6 @@
-// The realistic look's scanned pictures: every set the manifest names is in the repository, none too big,
-// all of them together kept modest, and every source credited in SOURCES.md, with its licence (CC0).
+// The realistic look's photographs: every set the manifest names is in the repository, none too big, all of
+// them together kept modest, and every source credited in SOURCES.md, with its licence (CC0 for a scan; an
+// AI-generated picture said to be one, and not CC0).
 //
 //   node --test test/scans.test.mjs
 
@@ -34,15 +35,16 @@ test("every picture is there, an AVIF, under 1 MB; all of them under 15 MB", () 
   assert.ok(total < 15e6, `${(total / 1e6).toFixed(1)} MB`);
 });
 
-test("bark tiles are a sensible size of bark (cm), leaves a sensible length", () => {
+test("bark tiles are a sensible size of bark (cm), leaves a sensible length (a palm frond's whole)", () => {
   for (const b of manifest.bark.sets) {
     assert.equal(b.tileCm.length, 2);
     for (const c of b.tileCm) assert.ok(c >= 20 && c <= 250, `${b.id}: ${c} cm`);
     assert.ok(b.seams.albedo < 2 && b.seams.normal < 2, `${b.id} does not tile: ${JSON.stringify(b.seams)}`);
   }
   for (const l of manifest.leaves.sets) {
-    assert.ok(l.lengthCm >= 3 && l.lengthCm <= 60, `${l.id}: ${l.lengthCm} cm`);
-    assert.ok(l.sprites.length >= 2, `${l.id}: ${l.sprites.length} leaves`);
+    assert.ok(l.lengthCm >= 3 && l.lengthCm <= 600, `${l.id}: ${l.lengthCm} cm`);
+    // (A sheet of leaves holds a few, to vary; a whole palm frond may be one.)
+    assert.ok(l.sprites.length >= (l.lengthCm > 100 ? 1 : 2), `${l.id}: ${l.sprites.length} leaves`);
     for (const s of l.sprites) {
       assert.ok(s.x >= 0 && s.y >= 0 && s.x + s.w <= l.size[0] && s.y + s.h <= l.size[1], `${l.id}: a leaf off its sheet`);
       // Stood up: its stalk's end below its tip.
@@ -59,7 +61,21 @@ test("SOURCES.md credits every source used, with its page, author and CC0 licenc
     const s = SOURCES[key];
     assert.ok(md.includes(`(\`${s.id}\`)`), `${s.id} not credited`);
     for (const a of s.authors ?? []) assert.ok(md.includes(a), `${a} not credited`);
-    assert.ok(["ambientcg", "polyhaven"].includes(s.site));
+    assert.ok(["ambientcg", "polyhaven", "generated"].includes(s.site));
+    // (A generated picture's row says so, and does not say CC0.)
+    const row = md.split("\n").find((l) => l.startsWith("|") && l.includes(`(\`${s.id}\`)`));
+    assert.ok(row, `${s.id} has no row`);
+    if (s.site === "generated") {
+      assert.match(row, /AI-generated/);
+      assert.doesNotMatch(row, /CC0 1\.0/);
+      assert.ok(md.includes(s.prompt), `${s.id}'s prompt not listed`);
+    } else assert.match(row, /CC0 1\.0 Universal/);
   }
-  assert.ok(md.includes("CC0 1.0 Universal"));
+});
+
+test("the manifest says which sets are generated, as the recipe does", () => {
+  for (const set of [...manifest.bark.sets, ...manifest.leaves.sets]) {
+    const site = SOURCES[set.source].site;
+    assert.equal(set.origin, site === "generated" ? "generated" : "scan", set.id);
+  }
 });

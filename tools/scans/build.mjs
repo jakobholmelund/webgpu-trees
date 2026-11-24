@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BARK, LEAVES, SITES, SOURCES } from "./recipe.mjs";
-import { Img, avifVersion, blur, hex, luminance, magickVersion, quantile, read, seamRatio, toLinear, toSrgb, writeAvif, writePng } from "./image.mjs";
+import { Img, avifVersion, blur, luminance, magickVersion, quantile, read, seamRatio, size as sizeOf, toLinear, toSrgb, writeAvif, writePng } from "./image.mjs";
 
 const args = process.argv.slice(2);
 const raw = args[0];
@@ -42,9 +42,13 @@ const BARK_N = 1024;
 const TONE_MEAN = 0.18;
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
-/** The file holding map `m` of a source (its own names for them). */
+/** The file holding map `m` of a source (its own names for them; a generated picture's, as prepared). */
 function mapFile(key, m) {
   const s = SOURCES[key];
+  if (s.site === "generated") {
+    const f = join(prepareGenerated(key), `${m}.png`);
+    return existsSync(f) ? f : null;
+  }
   const names = s.site === "ambientcg" ? { diff: "Color", nor_gl: "NormalGL", rough: "Roughness", disp: "Displacement", alpha: "Opacity", scatter: "Scattering" } : {};
   const f = join(raw, key, s.map(names[m] ?? m));
   return existsSync(f) ? f : null;
@@ -55,6 +59,130 @@ function encode(img, name, opts) {
   writePng(img, png);
   writeAvif(png, join(OUT, `${name}.avif`), opts);
   return png;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Generated pictures: one colour picture each, from which the maps a scan comes with are made.
+
+const prepared = new Map();
+/** The magenta generated leaves lie on (as sampled from their backgrounds). */
+const KEY = [0.98, 0.27, 0.96];
+
+/**
+ * A generated picture's maps, as a scan's are, in a folder of their own: a bark's colour cut square and made
+ * to tile (its edges cross-faded with itself moved half a tile, so it wraps without a seam), its relief from
+ * its lightness (the furrows and lenticels darker than round about), its roughness; a sheet of leaves on
+ * magenta keyed out (its coverage where it is not magenta, the magenta's spill taken off its edges), its
+ * relief from its lightness. The folder.
+ */
+function prepareGenerated(key) {
+  if (prepared.has(key)) return prepared.get(key);
+  const s = SOURCES[key];
+  const dir = join(TMP, "generated", key);
+  mkdirSync(dir, { recursive: true });
+  const src = join(raw, key, s.file);
+  if (s.crop) {
+    const { w, h } = sizeOf(src);
+    const n = Math.round(Math.min(w, h) * s.crop.size);
+    const x0 = Math.round((w - n) * s.crop.x);
+    const y0 = Math.round((h - n) / 2);
+    const N = BARK_N;
+    const img = read(src, { channels: 3 });
+    const sq = new Img(N, N, 3);
+    // (Cut square and resampled to the tile's size: box-filtered, in linear light.)
+    const k = n / N;
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++)
+        for (let c = 0; c < 3; c++) {
+          let sum = 0;
+          let cnt = 0;
+          for (let yy = Math.floor(y0 + y * k); yy < Math.ceil(y0 + (y + 1) * k); yy++)
+            for (let xx = Math.floor(x0 + x * k); xx < Math.ceil(x0 + (x + 1) * k); xx++) {
+              sum += toLinear(img.get(Math.min(w - 1, xx), Math.min(h - 1, yy), c));
+              cnt++;
+            }
+          sq.set(x, y, c, sum / cnt);
+        }
+    // (Made to tile: near its edges it is itself moved half a tile, whose middle runs on across them.)
+    const tiled = new Img(N, N, 3);
+    const band = N * 0.22;
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        const edge = Math.min(x, N - 1 - x, y, N - 1 - y);
+        const t = Math.min(1, edge / band);
+        const wgt = t * t * (3 - 2 * t);
+        for (let c = 0; c < 3; c++) tiled.set(x, y, c, toSrgb(sq.get(x, y, c) * wgt + sq.get((x + N / 2) % N, (y + N / 2) % N, c) * (1 - wgt)));
+      }
+    writePng(tiled, join(dir, "diff.png"));
+    // Its relief from its lightness: lightly smoothed, its long-range light taken off.
+    const L = new Img(N, N, 1);
+    for (let i = 0; i < N * N; i++) L.data[i] = luminance(toLinear(tiled.data[i * 3]), toLinear(tiled.data[i * 3 + 1]), toLinear(tiled.data[i * 3 + 2]));
+    const fine = blur(L, 1, { passes: 2 });
+    const broad = blur(L, Math.round(N / 16));
+    const hRaw = fine.data.map((v, i) => Math.log(v + 0.01) - Math.log(broad.data[i] + 0.01));
+    const lo = quantile(hRaw, 0.01);
+    const hi = quantile(hRaw, 0.99);
+    const H = new Img(N, N, 1, hRaw.map((v) => Math.min(1, Math.max(0, (v - lo) / (hi - lo)))));
+    writePng(H, join(dir, "disp.png"));
+    writePng(normalsFrom(H, 5), join(dir, "nor_gl.png"));
+    // (Rougher in its furrows.)
+    writePng(new Img(N, N, 1, H.data.map((v) => 0.95 - 0.25 * v)), join(dir, "rough.png"));
+  } else if (s.key === "magenta") {
+    const img = read(src, { channels: 3 });
+    const { w, h } = img;
+    const rgb = new Img(w, h, 3);
+    const alpha = new Img(w, h, 1);
+    const L = new Img(w, h, 1);
+    for (let i = 0; i < w * h; i++) {
+      const r = img.data[i * 3];
+      const g = img.data[i * 3 + 1];
+      const b = img.data[i * 3 + 2];
+      // (How magenta: red and blue both well over green.)
+      const m = Math.min(r, b) - g;
+      const a = Math.min(1, Math.max(0, (0.3 - m) / 0.25));
+      alpha.data[i] = a;
+      // (An edge texel is part leaf, part magenta: the magenta's share taken out of its colour, as it was mixed
+      // in, and any magenta left (red and blue both over green) taken off both, so no pink rim is left.)
+      const un = (o, bg) => Math.min(1, Math.max(0, (o - (1 - a) * bg) / Math.max(a, 0.05)));
+      let rr = a < 1 ? un(r, KEY[0]) : r;
+      const gg = a < 1 ? un(g, KEY[1]) : g;
+      let bb = a < 1 ? un(b, KEY[2]) : b;
+      const spill = Math.max(0, Math.min(rr, bb) - gg);
+      rr -= spill;
+      bb -= spill;
+      rgb.data[i * 3] = rr;
+      rgb.data[i * 3 + 1] = gg;
+      rgb.data[i * 3 + 2] = bb;
+      L.data[i] = luminance(toLinear(rr), toLinear(gg), toLinear(bb));
+    }
+    writePng(rgb, join(dir, "diff.png"));
+    writePng(alpha, join(dir, "alpha.png"));
+    // (Its relief: the midrib and veins lighter, and so proud.)
+    const fine = blur(L, 1, { passes: 2, wrap: false });
+    const H = new Img(w, h, 1, fine.data.map((v, i) => (alpha.data[i] > 0 ? Math.sqrt(v) : 0)));
+    writePng(H, join(dir, "disp.png"));
+    writePng(normalsFrom(H, 3), join(dir, "nor_gl.png"));
+  }
+  prepared.set(key, dir);
+  return dir;
+}
+
+/** Normals (OpenGL: y up the picture) from a height picture, `k` its relief's strength, wrapping round. */
+function normalsFrom(H, k) {
+  const { w, h } = H;
+  const out = new Img(w, h, 3);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = H.get((x + 1) % w, y, 0) - H.get((x - 1 + w) % w, y, 0);
+      const dy = H.get(x, (y + 1) % h, 0) - H.get(x, (y - 1 + h) % h, 0);
+      let nx = -dx * k;
+      let ny = dy * k;
+      const l = Math.hypot(nx, ny, 1);
+      out.set(x, y, 0, (nx / l) * 0.5 + 0.5);
+      out.set(x, y, 1, (ny / l) * 0.5 + 0.5);
+      out.set(x, y, 2, (1 / l) * 0.5 + 0.5);
+    }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -85,7 +213,6 @@ function buildBark(set, layer) {
     for (let k = 0; k < 3; k++) lin.data[i * 3 + k] = Math.min(1, lin.data[i * 3 + k] * f);
   }
 
-  if (set.birch) birchFrom(lin, disp, set.birch);
 
   // Height: stretched so its 0.5 % and 99.5 % points are 0 and 1.
   const h0 = quantile(disp.data, 0.005);
@@ -127,49 +254,11 @@ function buildBark(set, layer) {
     meanColor: "#" + mean.map((v) => Math.round(toSrgb(v) * 255).toString(16).padStart(2, "0")).join(""),
     roughness: r3(roughMean),
     seams,
+    origin: s.site === "generated" ? "generated" : "scan",
     look: set.look,
     for: set.for,
     source: set.source,
   };
-}
-
-/**
- * A birch's bark from a cherry's: the cherry's lenticels and cracks (where it is darker than round about,
- * and long across the stem) laid dark on white, a little peach where the outer layer stands proud.
- */
-function birchFrom(lin, disp, c) {
-  const N = lin.w;
-  const white = hex(c.white).map(toLinear);
-  const dark = hex(c.dark).map(toLinear);
-  const peach = hex(c.peach).map(toLinear);
-  const logL = new Img(N, N, 1);
-  for (let i = 0; i < N * N; i++) logL.data[i] = Math.log(luminance(lin.data[i * 3], lin.data[i * 3 + 1], lin.data[i * 3 + 2]) + 0.005);
-  const local = blur(logL, 20);
-  // Darker than round about, smeared along the lenticels' length (across the stem: the picture's rows).
-  const dk = new Img(N, N, 1);
-  for (let i = 0; i < N * N; i++) dk.data[i] = Math.max(0, local.data[i] - logL.data[i]);
-  const along = new Img(N, N, 1);
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      let s = 0;
-      for (let k = -4; k <= 4; k++) s += dk.data[y * N + ((x + k + N) % N)];
-      along.data[y * N + x] = s / 9;
-    }
-  const lo = quantile(along.data, 0.8);
-  const hi = quantile(along.data, 0.985);
-  const dh = blur(disp, 12);
-  const p0 = quantile(disp.data.map((v, i) => v - dh.data[i]), 0.9);
-  for (let i = 0; i < N * N; i++) {
-    const t = Math.min(1, Math.max(0, (along.data[i] - lo) / Math.max(1e-6, hi - lo)));
-    const mark = t * t * (3 - 2 * t);
-    const proud = Math.min(1, Math.max(0, (disp.data[i] - dh.data[i] - p0) * 30)) * 0.35;
-    // A faint mottle of the cherry's own lightness, so the white is not flat paint.
-    const mottle = Math.exp((logL.data[i] - local.data[i]) * 0.25);
-    for (let k = 0; k < 3; k++) {
-      const base = (white[k] * (1 - proud) + peach[k] * proud) * mottle;
-      lin.data[i * 3 + k] = Math.min(1, base * (1 - mark) + dark[k] * mark);
-    }
-  }
 }
 
 /** A preview of a bark set: its colour tiled two by two, and its surface lit from the upper left. */
@@ -323,6 +412,7 @@ function buildLeaves(set) {
     else rowsOf.push([c]);
   }
   leaves = rowsOf.flatMap((r) => r.sort((p, q) => p.x0 - q.x0));
+  if (set.bases) leaves.forEach((c, i) => (c.base = set.bases[i] ?? c.base));
   if (process.env.DEBUG) leaves.forEach((c, i) => console.log(`  ${i}: x ${c.x0}..${c.x1} y ${c.y0}..${c.y1} n ${c.n}`));
   leaves = leaves.filter((_, i) => !(set.skip ?? []).includes(i)).slice(0, set.max ?? 8);
   const grown = growLabels(lab, w, h, 3);
@@ -539,6 +629,7 @@ function buildLeaves(set) {
     tone: !!set.tone,
     meanLinear: m.map(r3),
     meanColor: "#" + m.map((v) => Math.round(toSrgb(v) * 255).toString(16).padStart(2, "0")).join(""),
+    origin: SOURCES[set.source].site === "generated" ? "generated" : "scan",
     sprites: sprites.map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h, base: s.base.map((v) => Math.round(v * 10) / 10), tip: s.tip.map((v) => Math.round(v * 10) / 10), size: r3(s.size) })),
     look: set.look,
     for: set.for,
@@ -619,9 +710,11 @@ function sourcesMd() {
   const lines = [
     "# Scanned sources",
     "",
-    "The realistic look's bark and leaf pictures (this folder) are made from these scans. Every one is **CC0 1.0 Universal**",
-    "(public domain dedication) as its publisher states for everything it publishes: ambientCG (" + SITES.ambientcg.licenceUrl + ")",
-    "and Poly Haven (" + SITES.polyhaven.licenceUrl + "). Credit is not required; it is given here anyway, with thanks.",
+    "The realistic look's bark and leaf pictures (this folder) are made from these scans, and, where no scan exists, from a few",
+    "AI-generated pictures. Every scan is **CC0 1.0 Universal** (public domain dedication) as its publisher states for everything",
+    "it publishes: ambientCG (" + SITES.ambientcg.licenceUrl + ") and Poly Haven (" + SITES.polyhaven.licenceUrl + "). Credit is not",
+    "required; it is given here anyway, with thanks. The **AI-generated** pictures (marked so below) are not CC0 scans: they were",
+    "made for this project with Nano Banana (gemini-nano-banana-2.1), with the owner's approval; their prompts are listed below.",
     "",
     "They are cut, cleaned, resampled and packed by `tools/scans/build.mjs` from the files `tools/scans/fetch.mjs` downloads",
     "(the list is `tools/scans/recipe.mjs`). This file is written by the build.",
@@ -635,6 +728,7 @@ function sourcesMd() {
     const s = SOURCES[key];
     const site = SITES[s.site];
     const page = site.page(s.id);
+    if (s.site === "generated") return { src: `${s.title} (\`${s.id}\`)`, author: `AI-generated (${s.tool}, ${s.date}; prompt below)`, licence: "AI-generated, **not CC0**: made for this project, owner-approved" };
     return { src: `[${site.name}: ${s.title ?? s.id}](${page}) (\`${s.id}\`)`, author: s.authors ? s.authors.join(", ") : site.author, licence: `[${site.licence}](${site.licenceUrl})` };
   };
   for (const b of bark) {
@@ -646,10 +740,17 @@ function sourcesMd() {
     const c = credit(l.source);
     lines.push(`| ${l.id} | ${l.look} | ${l.for.join(", ")} | ${c.src} | ${c.author} | ${c.licence} |`);
   }
-  lines.push("", "## Downloaded files", "");
   const used = [...new Set([...BARK, ...LEAVES].map((s) => s.source))];
+  lines.push("", "## AI-generated pictures", "");
   for (const key of used) {
     const s = SOURCES[key];
+    if (s.site !== "generated") continue;
+    lines.push(`- \`${s.file}\` (${s.title}): ${s.tool}, ${s.date}. Prompt: "${s.prompt}"`);
+  }
+  lines.push("", "## Downloaded files", "");
+  for (const key of used) {
+    const s = SOURCES[key];
+    if (s.site === "generated") continue;
     const urls = s.zip ? [s.zip] : Object.values(s.files);
     lines.push(`- \`${s.id}\`: ${urls.map((u) => `<${u}>`).join(", ")}`);
   }

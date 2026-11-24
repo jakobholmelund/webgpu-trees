@@ -1,5 +1,6 @@
 // Download the scans recipe.mjs lists, each into its own folder under <raw>, ready for build.mjs. Files
-// already there are kept. Only the CC0 publishers' own download links are used.
+// already there are kept. Only the CC0 publishers' own download links are used. A generated picture is not
+// downloaded: copy it into its folder by hand.
 //
 //   node tools/scans/fetch.mjs <raw>
 
@@ -28,7 +29,10 @@ for (const key of used) {
   const dir = join(raw, key);
   mkdirSync(dir, { recursive: true });
   console.log(`${key}: ${s.site} ${s.id}`);
-  if (s.zip) {
+  if (s.site === "generated") {
+    // (Not on the web: copied in by hand.)
+    if (!existsSync(join(dir, s.file))) console.log(`  copy the generated picture ${s.file} into ${dir}`);
+  } else if (s.zip) {
     const zip = join(dir, `${s.id}_${s.res}-JPG.zip`);
     await get(s.zip, zip);
     execFileSync("unzip", ["-q", "-o", zip, "*.jpg", "-d", dir]);

@@ -6,8 +6,15 @@
 // fetch.mjs downloads exactly these files into a folder of your choosing; build.mjs turns them into
 // assets/. Nothing here is fetched while the library runs.
 
-/** The two publishers, and the licence each states for everything it publishes. */
+/** The two publishers, and the licence each states for everything it publishes; and pictures generated for this project. */
 export const SITES = {
+  generated: {
+    name: "AI-generated",
+    licence: "AI-generated, not CC0: made for this project (owner-approved)",
+    licenceUrl: null,
+    page: () => null,
+    author: "AI-generated (Nano Banana, gemini-nano-banana-2.1)",
+  },
   ambientcg: {
     name: "ambientCG",
     licence: "CC0 1.0 Universal",
@@ -57,13 +64,28 @@ const phModel = (id, part, title, authors, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * A picture generated where no scan exists: one PNG, copied by hand into <raw>/<key>/ (fetch.mjs does not
+ * fetch it). Not CC0: generated for this project with the owner's approval; SOURCES.md says so.
+ */
+const generated = (id, file, title, prompt, extra = {}) => ({
+  site: "generated",
+  id,
+  file,
+  title,
+  tool: "Nano Banana (gemini-nano-banana-2.1)",
+  date: "2026-11-24",
+  prompt,
+  map: () => file,
+  ...extra,
+});
+
 export const SOURCES = {
   // Barks.
   bark_bluegum: phTex("bark_bluegum", "Bark Blue gum", ["Dimitrios Savva"], { sizeMm: [1820, 1820] }),
   plane: acg("Bark009", "1K", { title: "Bark 009", sizeMm: null }),
   // (A scan twice as long as it is wide, for which Poly Haven states one size: taken as its length.)
   chinese_hackberry_bark: phTex("chinese_hackberry_bark", "Chinese Hackberry Bark", ["Charlotte Baglioni"], { sizeMm: [900, 1800], sizeFrom: "measured: Poly Haven's stated 1.8 m, taken as the length of this 1:2 scan" }),
-  sakura_bark: phTex("sakura_bark", "Sakura Bark", ["Charlotte Baglioni"], { sizeMm: [1600, 1600] }),
   oak: acg("Bark001", "2K", { title: "Bark 001", sizeMm: null }),
   bark_willow_02: phTex("bark_willow_02", "Bark Willow 02", ["Charlotte Baglioni"], { sizeMm: [2150, 2150] }),
   pine_bark: phTex("pine_bark", "Pine Bark", ["Dimitrios Savva"], { sizeMm: [2000, 2000] }),
@@ -72,7 +94,11 @@ export const SOURCES = {
   douglas: acg("Bark014", "1K", { title: "Bark 014", sizeMm: [1200, 1200] }),
   metasequoia_bark: phTex("metasequoia_bark", "Metasequoia Bark", ["Charlotte Baglioni"], { sizeMm: [1940, 1940] }),
   palm_tree_bark: phTex("palm_tree_bark", "Palm Tree Bark", ["Dimitrios Savva", "Rico Cilliers"], { sizeMm: [650, 1300], sizeFrom: "measured: Poly Haven's stated 1.3 m, taken as the length of this 1:2 scan" }),
-  palm_bark: phTex("palm_bark", "Palm Bark", ["Charlotte Baglioni"], { sizeMm: [1860, 1860] }),
+  // Generated, where no scan exists (prompts as given, abbreviated where they were).
+  ai_birch_bark: generated("birch-bark-4", "birch-bark-4.png", "Silver birch bark", "Silver birch (Betula pendula) bark… seamless tileable…", { crop: { x: 0.5, size: 1 } }),
+  ai_canary_trunk: generated("canary-trunk-3", "canary-trunk-3.png", "Canary Island date palm trunk", "Canary Island date palm trunk surface… diamond-shaped leaf-base scars… seamless tileable", { crop: { x: 0.5, size: 1 } }),
+  ai_eucalyptus_leaves: generated("eucalyptus-leaves-2", "eucalyptus-leaves-2.png", "Tasmanian blue gum adult leaves", "Six adult Tasmanian blue gum leaves laid flat on pure flat magenta…", { key: "magenta" }),
+  ai_canary_frond: generated("canary-frond-2", "canary-frond-2.png", "Canary Island date palm frond", "One complete Canary Island date palm frond… on magenta…", { key: "magenta" }),
   // Leaves.
   LeafSet016: acg("LeafSet016", "2K", { title: "Leaf Set 016" }),
   LeafSet030: acg("LeafSet030", "2K", { title: "Leaf Set 030" }),
@@ -125,12 +151,13 @@ export const BARK = [
   },
   {
     id: "birch",
-    source: "sakura_bark",
-    look: "white, with dark horizontal lenticels (recoloured from a cherry's lenticelled bark)",
+    source: "ai_birch_bark",
+    look: "white papery bark, dark horizontal lenticels, curling strips, a dark branch-scar eye",
     for: ["Silver birch"],
-    delight: 0.8,
-    // A birch's: base white #EDEBE6, lenticels #2A2725, peach underbark #D9B9A0 (MORPHOLOGY.md).
-    birch: { white: "#ece9e2", dark: "#2c2926", peach: "#d6b7a0" },
+    // Lenticels 0.5–3 cm long (MORPHOLOGY.md), longer on old stems: some 40–80 texels of the 768 it is cut from.
+    tileCm: [70, 70],
+    tileFrom: "estimated: lenticels 2.5–5 cm, a birch's 0.5–3 cm on a young stem, longer on an old",
+    delight: 0.6,
   },
   {
     id: "oak",
@@ -195,11 +222,14 @@ export const BARK = [
     delight: 0.5,
   },
   {
-    id: "palmFibre",
-    source: "palm_bark",
-    look: "dark fibrous stem, horizontal leaf-base ridges",
+    id: "palmLattice",
+    source: "ai_canary_trunk",
+    look: "diamond lattice of cut leaf bases among fibres",
     for: ["Canary date palm"],
-    delight: 0.9,
+    // Leaf-base scars 10–15 cm wide (MORPHOLOGY.md): about six across the tile.
+    tileCm: [75, 75],
+    tileFrom: "estimated: ~6 leaf bases across, a Canary palm's 10–15 cm",
+    delight: 0.8,
   },
 ];
 
@@ -215,7 +245,7 @@ export const BARK = [
  * each leaf straight along its own long axis (not for sprays). `px`: how long (texels) a leaf is packed.
  * `tone`: keep only its lightness (the scan is an autumn leaf; the species gives the colour).
  * `lengthCm`: how long such a leaf is, stalk to tip, on the species it was scanned from (a typical one; the
- * species set their own sizes).
+ * species set their own sizes). `bases`: the way each leaf's stalk points, by its order, where they differ.
  */
 export const LEAVES = [
   { id: "oak", source: "LeafSet016", look: "lobed oak leaves", for: ["Oak", "Hawthorn"], base: "down", px: 320, lengthCm: 11 },
@@ -226,7 +256,7 @@ export const LEAVES = [
   { id: "serrate", source: "LeafSet014", look: "ovate leaves, finely toothed, straight veins", for: ["Silver birch"], base: "down", px: 320, lengthCm: 9 },
   { id: "beech", source: "LeafSet024", look: "oval leaves with wavy margins and straight veins", for: ["Beech"], base: "down", px: 288, lengthCm: 9 },
   { id: "elliptic", source: "LeafSet003", look: "elliptic leaves, toothed", for: ["Coast live oak", "Shrub"], base: "down", px: 320, lengthCm: 7 },
-  { id: "lance", source: "LeafSet013", look: "narrow lanceolate leaves", for: ["Weeping willow", "Eucalyptus"], base: "down", px: 384, lengthCm: 12, skip: [2, 4, 5] },
+  { id: "lance", source: "LeafSet013", look: "narrow lanceolate leaves", for: ["Weeping willow"], base: "down", px: 384, lengthCm: 12, skip: [2, 4, 5] },
   { id: "scale", source: "LeafSet019", look: "sprays of scale leaves", for: ["Western red cedar", "Monterey cypress"], base: "left", px: 448, lengthCm: 18, deskew: false },
   {
     id: "pine",
@@ -254,5 +284,17 @@ export const LEAVES = [
     deskew: false,
     rects: [{ x0: 0.17, y0: 0.03, x1: 0.955, y1: 0.84, base: "down" }],
   },
-  { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Canary date palm", "Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
+  {
+    id: "eucalyptus",
+    source: "ai_eucalyptus_leaves",
+    look: "sickle-shaped adult blue gum leaves",
+    for: ["Eucalyptus"],
+    base: "down",
+    // (Two of the six lie with their stalks up.)
+    bases: ["down", "up", "down", "down", "up", "down"],
+    px: 448,
+    lengthCm: 24,
+  },
+  { id: "frond", source: "ai_canary_frond", look: "a whole feather-shaped palm frond", for: ["Canary date palm"], base: "down", px: 640, lengthCm: 450, deskew: false },
+  { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
 ];
