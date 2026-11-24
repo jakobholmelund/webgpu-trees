@@ -731,12 +731,13 @@ spoil).
   stem; a Canary palm's card a two-metre stretch of its frond, a fan palm's
   its whole fan. The near cards are many small ones (as many to a clump as
   cover it, at most 36), spread through the clump about its shoots, over two
-  big cards a clump set into it, its mass. The card keeps the drawn sprays' channels (a grey tone
+  big cards a clump set into it, its mass (three under needles and scales).
+  The card keeps the drawn sprays' channels (a grey tone
   from the scan's lightness, lit a little by its own relief; each leaf's own
   thinness, from the scan's translucency; coverage), so the shaders read
   either alike and the species' colour still tints them.
 - **Cost**: in the lab's grove, 1552 x 1868, the frame took 1.80 to 1.92 ms
-  in the clearing and 2.45 from outside, against 1.35 to 1.58 and 1.75 to
+  in the clearing and 2.40 to 2.45 from outside, against 1.35 to 1.58 and 1.75 to
   1.83 without the photographs (`scans: false`): the near cards about twice
   as many (four light steps each instead of six), the near wood's bark
   sampled four times a pixel. On the graphics card: the bark set's layers
