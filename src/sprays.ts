@@ -25,6 +25,22 @@ const LEAF = 0.6;
 const TWIG = 0.33;
 /** Where a near card's twig comes in: this share of the cell from its first row (geometry.ts `SPRAY_FOOT`: 0.8 of the half below the middle). */
 const FOOT = 0.1;
+/** A big card's leaves behind its own: from how dense a species (1 - openness), and how dark, in their shade. */
+const DENSE_FROM = 0.6;
+/** A pine's tuft: how many brushes burst from a shoot's tip, how far round from on along it (rad), each how narrow beside its picture. */
+const TUFT_BRUSHES = 3;
+const TUFT_SPREAD = 0.45;
+const TUFT_WIDTH = 0.7;
+/** A tuft drawn needle by needle: needles to a texel of its length, fewest and most; how far out from on along the shoot they stand (rad). */
+const NEEDLES_PER_TEXEL = 0.5;
+const NEEDLES_LEAST = 10;
+const NEEDLES_MOST = 70;
+const NEEDLE_SPREAD = 0.75;
+/** How much of a brush's length its needles leave its shoot along, from its foot. */
+const NEEDLE_SHOOT = 0.55;
+/** Where along a shoot a big card's pine tufts start: its outer part only. */
+const TUFTS_FROM = 0.55;
+const UNDER_TONE = 0.55;
 /** Texels kept clear round a cell's edge, so its mips do not bleed into the next. */
 const MARGIN = 6;
 
@@ -55,7 +71,7 @@ function rng(seed: number): () => number {
 // ---------------------------------------------------------------------------------------------------------------------
 // Drawing: a twig as a tapered stroke, a leaf as its photograph, turned, scaled and bent onto the card.
 
-function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: number, rb: number, tone: number): void {
+function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: number, rb: number, tone: number, own = 0.2): void {
   const n = L.n;
   const r = Math.max(ra, rb) + 1.5;
   const i0 = Math.max(MARGIN, Math.floor(Math.min(ax, bx) - r));
@@ -82,9 +98,35 @@ function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: nu
       const t1 = tone * (1 + 0.18 * Math.max(-1, Math.min(1, side)));
       const o = j * n + i;
       L.tone[o] = L.tone[o] * (1 - c) + t1 * c;
-      L.own[o] = L.own[o] * (1 - c) + 0.2 * c;
+      L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
     }
+  }
+}
+
+/**
+ * A pine's tuft drawn needle by needle, `len` texels long from (x, y) along `ang`: needles leave the last
+ * stretch of the shoot and run on forward and out to either side, as a pine's bundles stand round its shoot,
+ * longest along it; a bottle brush seen side-on, whose ragged needle tips make a pine's crown spiky where a
+ * picture of a brush, laid flat, made it a fan. Each needle its own tone, lighter to its tip.
+ */
+function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rnd: () => number, tone: number, own: number): void {
+  const n = Math.round(Math.min(NEEDLES_MOST, Math.max(NEEDLES_LEAST, len * NEEDLES_PER_TEXEL)));
+  const shoot = len * NEEDLE_SHOOT;
+  const w = Math.max(0.6, len * 0.011);
+  for (let q = 0; q < n; q++) {
+    const s = rnd() * shoot;
+    const bx = x + Math.cos(ang) * s;
+    const by = y + Math.sin(ang) * s;
+    const off = (rnd() < 0.5 ? -1 : 1) * (0.35 + 0.65 * rnd()) * NEEDLE_SPREAD;
+    const a = ang + off + (rnd() - 0.5) * 0.08;
+    // (As long as reaches the brush's end, or nearly: a bottle brush, not a burst.)
+    const nl = Math.max(len * 0.3, (len - s) * (0.75 + 0.3 * rnd())) * (0.8 + 0.2 * Math.cos(off));
+    const t = LEAF * tone * (0.7 + 0.55 * rnd());
+    const mx = bx + Math.cos(a) * nl * 0.5;
+    const my = by + Math.sin(a) * nl * 0.5;
+    stroke(L, bx, by, mx, my, w, w * 0.9, t * 0.85, own);
+    stroke(L, mx, my, bx + Math.cos(a) * nl, by + Math.sin(a) * nl, w * 0.9, w * 0.5, t * 1.1, own);
   }
 }
 
@@ -232,6 +274,8 @@ interface LeafAt {
   y: number;
   ang: number;
   len: number;
+  /** Drawn needle by needle (a pine's tuft, `needleTuft`), not as its picture. */
+  needles?: boolean;
 }
 
 function grow(x: number, y: number, a: number, len: number, curl: number, rnd: () => number, n = 8, wobble = 0.08): Twig["pts"] {
@@ -262,8 +306,34 @@ function nearSpray(look: ScanLook, extent: number, rnd: () => number): { twigs: 
   const size = () => L * (0.82 + rnd() * 0.3);
   const thick = Math.max(0.0012, L * 0.025);
   const kind = look.spray;
-  if (kind === "sprays" || kind === "tufts") {
-    // (A short bare stem, and off it the sprays (or shoots) fanning out, the middle one last, on top.)
+  if (kind === "tufts") {
+    // (A pine's: two or three short shoots off a bare stem, each a bottle brush of needles over its last
+    // stretch, standing forward round it. Its pictures are whole brushes; laid as one fan to a shoot, a pine's
+    // spray was a fan, and a crown of them a broad leaf's.)
+    const stem = extent * 0.14;
+    twigs.push({ pts: grow(0, 0, UP, stem, 0, rnd, 2, 0.02), r0: thick * 1.8, r1: thick * 1.4 });
+    const shoots = 2 + Math.floor(rnd() * 2);
+    for (let q = 0; q < shoots; q++) {
+      const a = UP + (q - (shoots - 1) / 2) * 0.55 + (rnd() - 0.5) * 0.2;
+      const reach = extent * (0.16 + 0.08 * rnd());
+      const pts = grow(0, stem * (0.6 + 0.4 * rnd()), a, reach, (rnd() - 0.5) * 0.3, rnd, 4, 0.05);
+      twigs.push({ pts, r0: thick * 1.3, r1: thick });
+      const tip = pts[pts.length - 1];
+      const n = TUFT_BRUSHES + Math.floor(rnd() * 2);
+      // (Back ones first: the forward brush lies on top.)
+      for (let b = n - 1; b >= 0; b--) {
+        const side = b % 2 ? 1 : -1;
+        const off = side * Math.ceil(b / 2) * (TUFT_SPREAD / Math.ceil((n - 1) / 2)) + (rnd() - 0.5) * 0.25;
+        const fwd = Math.cos(Math.min(Math.PI / 2, Math.abs(off)));
+        // (The brush on along the shoot its picture, those round it needles: the side brushes, as pictures, were
+        // leaflets of a palmate leaf.)
+        leaves.push({ x: tip.x, y: tip.y, ang: tip.a + off, len: Math.min(extent * 0.6, size() * (0.6 + 0.45 * fwd)), needles: b > 0 });
+      }
+    }
+    return { twigs, leaves };
+  }
+  if (kind === "sprays") {
+    // (A short bare stem, and off it the sprays fanning out, the middle one last, on top.)
     const stem = extent * 0.12;
     twigs.push({ pts: grow(0, 0, UP, stem, 0, rnd, 2, 0.02), r0: thick * 1.6, r1: thick * 1.2 });
     const n = 4 + Math.floor(rnd() * 2);
@@ -360,18 +430,23 @@ function bigSpray(look: ScanLook, extent: number, near: number, rnd: () => numbe
   for (const pts of shoots) {
     const len = pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
     // (A conifer's sprays and shoots closer: a bough's needles are a dense comb.)
-    const gap = (near * (kind === "sprays" || kind === "tufts" ? 0.17 : 0.3)) / Math.max(len, 1e-3);
+    // (A pine's are brushes at its shoots' ends, the wood behind them bare, a few to a shoot, turned out and up
+    // from it: a branch of them is a candelabrum of tufts with air between, not a mat of needles, which read
+    // as a broad leaf's mass.)
+    const tufts = kind === "tufts";
+    const gap = (near * (kind === "sprays" ? 0.17 : tufts ? 0.32 : 0.3)) / Math.max(len, 1e-3);
     let sd = rnd() < 0.5 ? 1 : -1;
-    for (let s = 0.12 + rnd() * 0.08; s <= 1.001; s += gap * (0.75 + rnd() * 0.5)) {
+    for (let s = (tufts ? TUFTS_FROM : 0.12) + rnd() * 0.08; s <= 1.001; s += gap * (0.75 + rnd() * 0.5)) {
       const p = along(pts, Math.min(1, s));
       sd = -sd;
-      const turn = p.a - UP + (s > 0.97 ? (rnd() - 0.5) * 0.3 : sd * (hangs ? 0.15 + rnd() * 0.3 : 0.5 + rnd() * 0.5));
-      const k = 0.75 + rnd() * 0.35;
+      const turn = p.a - UP + (s > 0.97 ? (rnd() - 0.5) * 0.3 : sd * (hangs ? 0.15 + rnd() * 0.3 : tufts ? 0.25 + rnd() * 0.35 : 0.5 + rnd() * 0.5));
+      const k = (0.75 + rnd() * 0.35) * (tufts ? 1.25 : 1);
       const c = Math.cos(turn);
       const sn = Math.sin(turn);
       const one = nearSpray(look, near, rnd);
       for (const t of one.twigs) twigs.push({ pts: t.pts.map((q) => ({ x: p.x + (q.x * c - q.y * sn) * k, y: p.y + (q.x * sn + q.y * c) * k, a: q.a + turn })), r0: t.r0 * k, r1: t.r1 * k });
-      for (const l of one.leaves) leaves.push({ x: p.x + (l.x * c - l.y * sn) * k, y: p.y + (l.x * sn + l.y * c) * k, ang: l.ang + turn, len: l.len * k });
+      // (A pine's, there all needles: a brush's picture is under a texel or two here.)
+      for (const l of one.leaves) leaves.push({ x: p.x + (l.x * c - l.y * sn) * k, y: p.y + (l.x * sn + l.y * c) * k, ang: l.ang + turn, len: l.len * k, needles: tufts || l.needles });
     }
   }
   return { twigs, leaves };
@@ -414,7 +489,7 @@ function frond(look: ScanLook, rnd: () => number): { twigs: Twig[]; leaves: Leaf
  * (ox, oy): a near card (`big` false, `extent` its width in metres, its twig coming in near its first row),
  * or its big card. `seed` makes each card its own.
  */
-export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sheet: Sheet, look: ScanLook, extent: number, big: boolean, seed: number): void {
+export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sheet: Sheet, look: ScanLook, extent: number, big: boolean, seed: number, density = 0): void {
   const rnd = rng(seed);
   const whole = look.spray === "whole";
   const palm = look.spray === "pinnate" || look.spray === "fan" || whole;
@@ -422,6 +497,15 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
   // the stretch of it the card covers, a third to two thirds of the way out.)
   const section = whole ? 0.3 + rnd() * 0.35 : 0;
   const { twigs, leaves } = whole ? { twigs: [] as Twig[], leaves: [{ x: 0, y: -section * (look.leafCm / 100), ang: UP + (rnd() - 0.5) * 0.06, len: look.leafCm / 100 }] } : palm ? frond(look, rnd) : big ? bigSpray(look, extent, 2 * nearCardHalf(look), rnd) : nearSpray(look, extent, rnd);
+  // (A dense species' big card has a second branch's leaves behind its own, in their shade: the leaves deeper
+  // in a clump, which close the gaps a single layer of sprays leaves, as a dense crown is closed. As many of
+  // them as it is dense past DENSE_FROM.)
+  const under: LeafAt[] = [];
+  const thick = big && !palm ? Math.min(1, Math.max(0, (density - DENSE_FROM) / (1 - DENSE_FROM))) : 0;
+  if (thick > 0) {
+    const more = bigSpray(look, extent, 2 * nearCardHalf(look), rnd);
+    for (const l of more.leaves) if (rnd() < thick) under.push(l);
+  }
   const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
   // (Metres to texels: a near card at its real size, its foot near its first row; a big card or a palm's
   // leaf fitted inside its cell.)
@@ -445,6 +529,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       add(l.x, l.y);
       add(l.x + Math.cos(l.ang) * l.len, l.y + Math.sin(l.ang) * l.len);
     }
+    // (The leaves behind lie within the branch's own reach: they do not widen the card.)
     const pad = palm ? 0.04 : (look.leafCm / 100) * 0.3;
     const room = n - 2 * MARGIN - 4;
     const fit = Math.min(room / (x1 - x0 + 2 * pad), room / (y1 - y0 + 2 * pad));
@@ -472,8 +557,10 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     }
   }
   const shadow = Math.max(1, Math.min(4, n / 160));
-  for (const i of order) {
-    const l = leaves[i];
+  const all = [...under, ...leaves];
+  const deep = under.length;
+  for (const i of [...under.map((_, j) => j), ...order.map((j) => j + deep)]) {
+    const l = all[i];
     const sprite = sprites[Math.floor(rnd() * sprites.length) % sprites.length];
     const lay: Lay = {
       x: X(l.x),
@@ -481,10 +568,10 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       ang: l.ang,
       len: l.len * k * (0.75 + 0.25 * sprite.size),
       sprite,
-      width: look.leafWidth ?? 1,
+      width: look.leafWidth ?? (look.spray === "tufts" ? TUFT_WIDTH : 1),
       bend: (look.leafBend ?? 0) * (rnd() < 0.5 ? 1 : -1) * (0.6 + rnd() * 0.6) + (rnd() - 0.5) * 0.04,
       flip: rnd() < 0.5,
-      tone: 0.9 + rnd() * 0.2,
+      tone: (0.9 + rnd() * 0.2) * (i < deep ? UNDER_TONE : 1),
       own: rnd(),
     };
     // (A leaf that would reach past the card's edge is made smaller, or left off: cut by the edge, it shows a
@@ -495,7 +582,8 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       fits = footprint(L, lay).inside;
     }
     if (!fits) continue;
-    leaf(L, sheet, lay, palm ? shadow * 0.5 : shadow);
+    if (l.needles) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own);
+    else leaf(L, sheet, lay, palm ? shadow * 0.5 : shadow);
   }
   // (Where nothing is drawn, the card's mean tone, so its mips' edges do not darken.)
   let sum = 0;
@@ -525,12 +613,12 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
 }
 
 /** A species' row: its three near cards and its big card. `bigExtent`: how wide its big card is (m). */
-export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number): void {
+export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0): void {
   // (A palm's near cards are the drawn ones' size: a clump's radius and a little less (geometry.ts `cardPieces`),
   // a big card's 0.8 / 1.45 of it.)
   const near = 2 * nearCardHalf(look) || bigExtent * (0.8 / 1.45);
   for (let c = 0; c < SPRAY_COLS; c++) {
     const big = c === BIG_CARD;
-    drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3);
+    drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
   }
 }

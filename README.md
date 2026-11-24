@@ -235,7 +235,7 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | Oak | *Quercus robur* | a broad dome, wider than tall, on crooked limbs | great-britain, france, netherlands, denmark | 17 | 11 | 2.5 |
 | Plane | *Platanus × hispanica* | a big full oval, pale mottled bark | france, great-britain, netherlands, california | 22 | 10 | 3 |
-| Eucalyptus | *Eucalyptus globulus* | a high open vase of pale limbs, grey-green sprays | california | 26 | 8.5 | 7.5 |
+| Eucalyptus | *Eucalyptus globulus* | an upright, open, irregular crown of hanging bunches on a few ascending pale limbs | california | 26 | 8.5 | 7.5 |
 | Spruce | *Picea abies* | a dark cone, boughs hanging to the ground | denmark, netherlands, ontario | 20 | 5.8 | 1 |
 | Scots pine | *Pinus sylvestris* | a flat lopsided top on a tall orange trunk | great-britain, denmark, netherlands | 19 | 8 | 9 |
 | Shrub | (generic) | a dense mound of small leaves | california, pacific-northwest, great-britain, france, ontario, netherlands, denmark | 2.4 | 1.6 | 0.1 |
@@ -247,7 +247,7 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Hawthorn | *Crataegus monogyna* | a small crooked tree, dense and dark | great-britain, denmark, netherlands, france | 6 | 3 | 1.2 |
 | Gorse | *Ulex europaeus* | a dense dark spiny heath shrub | great-britain, denmark, netherlands | 1.6 | 1 | 0.15 |
 | Sitka spruce | *Picea sitchensis* | a big blue-green cone | denmark, pacific-northwest | 28 | 4.5 | 1.5 |
-| Corsican pine | *Pinus nigra* | a dark dense oval pine | netherlands, denmark, france, great-britain | 18 | 4.5 | 5 |
+| Corsican pine | *Pinus nigra* | a dark pine of level whorls, its top blunt | netherlands, denmark, france, great-britain | 18 | 4.5 | 5 |
 | Douglas fir | *Pseudotsuga menziesii* | a tall, somewhat open cone | pacific-northwest, denmark | 30 | 5 | 3 |
 | Western red cedar | *Thuja plicata* | a cone of drooping sprays, red bark | pacific-northwest | 20 | 4.5 | 1 |
 | Monterey cypress | *Hesperocyparis macrocarpa* | a wind-shaped flat top on a few great limbs | california | 18 | 7 | 3 |
@@ -390,7 +390,9 @@ grows as it did):
   angle (most trees), opposite and crossed (a maple's: one of each pair
   grown), or in two ranks in the shoot's plane (a beech's flat fans).
 - **`sprayHang`**: how far a conifer's side shoots hang from their bough, from
-  a fir's flat spray to a Norway spruce's comb or a cedar's hanging sprays.
+  a fir's flat spray to a Norway spruce's comb or a cedar's hanging sprays;
+  drawn as sheets, its boughs' edges fall in curtains as far again, more low
+  down, so a Norway spruce is a closed dark cone and not tiers of lace.
 - **`canopyLift`**: how much of the crown's underside is cleared of leaves,
   a bowl from its rim up into its middle, so its limbs show beneath it: a
   stone pine's umbrella on its bare vase of limbs.
@@ -398,6 +400,12 @@ grows as it did):
   off a great limb keeping only the leaves near its top, with air and bare
   wood under each: a Monterey cypress on a headland, an old Scots pine's
   plates, a Torrey pine's tufts on bare limbs.
+- **`clusters`**: how far its leaves gather into a few bunches hanging at its
+  branches' ends, with sky between them: each branch off a great limb keeps
+  its leaves only on its last shoots, the bunch bigger and hanging a little
+  under them, and a share of its branches bear none, their wood shed back to
+  the limb (a blue gum's pendulous clumps of sickle leaves). A small or narrow
+  crown, grown in a wood, has none: it is many sprays all through.
 - **`buttress`**: how far its foot spreads into buttresses and flutes, more
   of them and higher (a western red cedar's, a Sitka spruce's).
 
@@ -781,8 +789,15 @@ spoil).
   the furrows: a Scots pine's plates to its copper flakes (which take a colour
   of their own, not its bark's paled), a blue gum's rough stocking to its
   smooth streaks, a birch's black
-  foot to its white. Twigs stay a twig's dark grey-brown. Only the near tier's
-  wood wears them; further off the bark is drawn as before.
+  foot to its white. The edge runs up and down the furrows in streaks, ragged
+  at two sizes, and a foot's own colour lightens up the stem as it gives way,
+  so a birch's foot is black and rough at the ground and greys into white
+  plates, not a black sock. A birch's white tile has black diamond fissures
+  laid into it by the build (`fissures`), where the picture had none. Twigs
+  stay a twig's dark grey-brown. Only the near tier's wood wears the
+  photographs; further off the bark is drawn as before, in the colours they
+  have close to (a foot's, an upper bark's), so a pine's copper does not go
+  grey-brown as it passes from near to mid.
 - **Leaves** are a sheet of single leaves a species wears, cut from a scan
   and stood upright, laid on the species' own twigs at their real size
   (`sprays.ts`): a row of cards for each species in the trees: three near
@@ -790,17 +805,39 @@ spoil).
   (a branch's end, a clump wide, for the mid tier, a conifer's sheets and the
   far dabs). An oak's leaves one to a node with a cluster at the tip, a
   maple's in pairs, a blue gum's few long sickles hanging from the twig's end
-  (its cards hang too), a willow's and a birch's along hanging whips; a fir's
-  and a cedar's whole scanned sprays, a pine's whole shoots fanning from a bare
-  stem; a Canary palm's card a two-metre stretch of its frond, a fan palm's
-  its whole fan. The near cards are many small ones (as many to a clump as
+  (its cards hang too, standing upright, their leaves edge to the sky, as a
+  blue gum's do: a card that faced up had no way down along it, and its
+  leaves lay flat), a willow's and a birch's along hanging whips; a fir's
+  and a cedar's whole scanned sprays; a pine's shoots each a bottle brush, its
+  picture's brush on along the shoot and needles drawn one by one standing
+  forward round it (a brush's picture laid as a fan to a shoot made a pine's
+  spray a palmate leaf, and its crown a broad leaf's), its shoots turned up
+  along their twigs, its big card tufts at its branches' ends with air
+  between; a Canary palm's card a two-metre stretch of its frond, a fan
+  palm's its whole fan. A crown in pads (`pads`) lays its sprays level and
+  facing the sky, in shelves wider than high, so a Monterey cypress is
+  flat-topped tiers and not a heap of balls. The near cards are many small ones (as many to a clump as
   cover it, at most 36), spread through the clump about its shoots, over two
-  big cards a clump set into it, its mass (three under needles and scales).
+  big cards a clump set into it, its mass (three under needles and scales,
+  one under a pine's tufts). A dense species' big card (`openness` under 0.4)
+  has a second branch's leaves behind its own, darker, in their shade: one
+  layer of sprays left gaps a dense crown does not have. Close to, a big card
+  is turned to the eye at least two thirds of the way (seen near edge on, a
+  picture a clump wide was a smear through the crown, its mip chosen by the
+  way it is squeezed most), and it gives way to the small sprays over it from
+  five of its half widths off, gone by two and a half, where its texels would
+  be larger than a pixel.
   The card keeps the drawn sprays' channels (a grey tone
   from the scan's lightness, lit a little by its own relief; each leaf's own
   thinness, from the scan's translucency; coverage), so the shaders read
   either alike and the species' colour still tints them.
-- **Cost**: in the lab's grove, 1552 x 1868, the frame took 1.80 to 1.92 ms
+- **Cost** of the polish above (bunches, pads, curtains, closed big cards,
+  needles, big cards giving way close to): in the lab's grove, 1104 x 1868,
+  the frame took 1.37 to 1.57 ms in the clearing and 1.92 to 2.32 from
+  outside before, 1.25 to 1.28 and 1.70 to 1.72 after (two runs each,
+  interleaved; this Mac is shared): fewer near cards on a pine and on a blue
+  gum's bunches pay for the rest.
+- **Cost** when the photographs came: in the lab's grove, 1552 x 1868, the frame took 1.80 to 1.92 ms
   in the clearing and 2.40 to 2.45 from outside, against 1.35 to 1.58 and 1.75 to
   1.83 without the photographs (`scans: false`): the near cards about twice
   as many (four light steps each instead of six), the near wood's bark

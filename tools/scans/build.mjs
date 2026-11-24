@@ -125,6 +125,7 @@ function prepareGenerated(key) {
           for (let c = 0; c < 3; c++) tiled.set(x, y, c, toSrgb(sq.get(x, y, c) * wgt + sq.get((x + N / 2) % N, (y + N / 2) % N, c) * (1 - wgt)));
         }
     }
+    if (s.fissures) fissure(tiled, s.fissures);
     writePng(tiled, join(dir, "diff.png"));
     // Its relief from its lightness: lightly smoothed, its long-range light taken off.
     const T = tiled.w;
@@ -465,6 +466,73 @@ function keyMagenta(img, { unmix = false } = {}) {
  * texel's lightness (`saturation`, 1 as it is), then each channel scaled so its mean is `toward` (sRGB 0..1)
  * as far as `amount` says (1 all the way); its lightness's pattern kept.
  */
+/**
+ * Dark diamond-shaped fissures laid into a tile of pale bark (a silver birch's, where its white skin splits
+ * into black rhombs): `count` of them, each `w` and `h` (shares of the tile: ranges) across and along, their
+ * edges ragged and their insides cracked, darker towards their middles, wrapping round the tile's edges so it
+ * still tiles. Placed by `seed`, kept apart. In place, on an sRGB picture.
+ */
+function fissure(img, { count, w: wr, h: hr, seed = 1, dark = 0.025 }) {
+  const { w: N, h: M } = img;
+  let k = seed * 9973 + 17;
+  const rnd = () => {
+    k = (Math.imul(k, 1103515245) + 12345) >>> 0;
+    return ((k >>> 8) & 0xffffff) / 0x1000000;
+  };
+  // (A value noise over the tile, wrapping, for the ragged edges and the cracks.)
+  const noise = (x, y, f) => {
+    const h2 = (i, j) => {
+      let q = Math.imul(((i % f) + f) % f, 374761393) + Math.imul(((j % f) + f) % f, 668265263) + seed * 31;
+      q = Math.imul(q ^ (q >>> 13), 1274126177);
+      return ((q ^ (q >>> 16)) >>> 0) / 4294967296;
+    };
+    const fx = (x / N) * f;
+    const fy = (y / M) * f;
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const u = fx - i;
+    const v = fy - j;
+    const su = u * u * (3 - 2 * u);
+    const sv = v * v * (3 - 2 * v);
+    return (h2(i, j) * (1 - su) + h2(i + 1, j) * su) * (1 - sv) + (h2(i, j + 1) * (1 - su) + h2(i + 1, j + 1) * su) * sv;
+  };
+  const marks = [];
+  for (let t = 0; t < count * 40 && marks.length < count; t++) {
+    const m = { x: rnd() * N, y: rnd() * M, hw: (wr[0] + (wr[1] - wr[0]) * rnd()) * N * 0.5, hh: (hr[0] + (hr[1] - hr[0]) * rnd()) * M * 0.5, tilt: (rnd() - 0.5) * 0.25 };
+    // (Apart: no two closer than their reaches.)
+    const apart = marks.every((o) => {
+      const dx = Math.abs(o.x - m.x);
+      const dy = Math.abs(o.y - m.y);
+      return Math.min(dx, N - dx) > (o.hw + m.hw) * 1.2 || Math.min(dy, M - dy) > (o.hh + m.hh) * 1.2;
+    });
+    if (apart) marks.push(m);
+  }
+  for (const m of marks) {
+    const rx = Math.ceil(m.hw * 1.5);
+    const ry = Math.ceil(m.hh * 1.5);
+    for (let dy = -ry; dy <= ry; dy++)
+      for (let dx = -rx; dx <= rx; dx++) {
+        const x = (((Math.round(m.x) + dx) % N) + N) % N;
+        const y = (((Math.round(m.y) + dy) % M) + M) % M;
+        // (A rhomb, a little leant, its edge wandering.)
+        const ax = dx + dy * m.tilt;
+        const d = Math.abs(ax) / m.hw + Math.abs(dy) / m.hh;
+        const edge = 1 + (noise(x, y, 20) - 0.5) * 0.8 + (noise(x, y, 64) - 0.5) * 0.45 + (noise(x, y, 160) - 0.5) * 0.2;
+        if (d > edge * 1.15) continue;
+        // (Inside: dark, its cracks running along the stem a little lighter; a soft grey rim where the skin lifts.)
+        const inside = Math.min(1, Math.max(0, (edge - d) / 0.12));
+        const crack = Math.abs(noise(x, y, 110) - 0.5) < 0.05 ? 0.45 : Math.abs(noise(x * 0.5, y, 60) - 0.5) < 0.04 ? 2.2 : 1;
+        const shade = dark * (0.6 + 0.8 * noise(x, y, 140)) * crack * (1 + 0.6 * Math.min(1, d));
+        const rim = d > edge ? Math.min(1, (d - edge) / (0.15 * edge)) : 0;
+        for (let c = 0; c < 3; c++) {
+          const lin = toLinear(img.data[(y * N + x) * 3 + c]);
+          const toward = d > edge ? lin * (0.7 + 0.3 * rim) : lin * (1 - inside) + shade * inside;
+          img.data[(y * N + x) * 3 + c] = toSrgb(toward);
+        }
+      }
+  }
+}
+
 function grade(img, { saturation = 1, toward = null, amount = 1 }) {
   const n = img.w * img.h;
   for (let i = 0; i < n; i++) {

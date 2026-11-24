@@ -60,6 +60,10 @@ const STAND_SKY = 0.22;
 const TREE_ROWS = 5;
 /** Rows (vec4) a species has in the shaders' list of species. */
 const SPECIES_ROWS = 8;
+/** A near tree's big cards: how far they turn to the eye at least (as `faceEye`), and from how many of their half widths off they start to give way to the small sprays over them, gone by the second. */
+const BIG_CARD_FACE_EYE = 0.65;
+const BIG_CARD_FULL = 5;
+const BIG_CARD_GONE = 2.5;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -377,7 +381,11 @@ export function createTrees(options: TreesOptions): Trees {
     const half = scanned ? nearCardHalf(l) : 0;
     if (half <= 0) return null;
     // (A palm's: two of its leaves (or long stretches of one) a clump, and no big cards under them.)
-    return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "sprays" || l.spray === "tufts"
+    return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "tufts"
+        ? // (A pine's tufts, each a burst of needles, fill more of their card, and its clumps keep air between
+          // their tufts: one big card under them, a clump's own size; three made a pine's clumps solid balls.)
+          { half, fill: 0.35, most: 24, big: 1, bigSize: 1, hang: 0, rise: 0.8 }
+        : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
@@ -952,7 +960,11 @@ export function createTrees(options: TreesOptions): Trees {
       // (A card: its own face, turned towards the eye as far as `faceEye` says, and lit from the side the eye
       // sees, as a leaf is: the other side's light is what comes through it.)
       const face0 = dirToWorld(T, fit.normal(aOffset.xyz));
-      const face = normalize(mix(face0, toEye, uStyle3.w));
+      // (A near tree's big cards, the clump's mass under its small sprays (`aOffset.w`), are turned further to the
+      // eye: a picture a clump wide seen near edge on is smeared along it, its mip chosen by the way it is
+      // squeezed most, a streak through the crown from under it.)
+      const big = scanned && card && t === 0 ? step(float(0.5), aOffset.w) : float(0);
+      const face = normalize(mix(face0, toEye, mix(uStyle3.w, max(uStyle3.w, float(BIG_CARD_FACE_EYE)), big)));
       const seen = face.mul(select(dot(face, toEye).lessThan(0), float(-1), float(1)));
       // (A sheet's own facing, its top's side, as fitted; and its clump's, which its light is laid over.)
       const sheetN = face0;
@@ -1044,7 +1056,11 @@ export function createTrees(options: TreesOptions): Trees {
       const ca = cos(ang);
       const sa = sin(ang);
       const corner = vec2(ca.mul(aDab.x).sub(sa.mul(aDab.y)), sa.mul(aDab.x).add(ca.mul(aDab.y)));
-      const size = aDab.z.mul(fit.size).mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig));
+      // (And close to, where a big card's texels would be larger than a pixel and it blurs, it gives way to the
+      // small sprays over it: drawn in to nothing from BIG_CARD_GONE of its half widths off to BIG_CARD_FULL.)
+      const half = aDab.z.mul(fit.size);
+      const bigNear = mix(float(1), smoothstep(half.mul(BIG_CARD_GONE), half.mul(BIG_CARD_FULL), length(cameraPosition.sub(at))), big);
+      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear);
       if (sheet) {
         // (A sheet's point is where it is: nothing turns it to the eye.)
         position = at;
@@ -1388,7 +1404,26 @@ export function createTrees(options: TreesOptions): Trees {
     const boots = step(float(2.5), aWood.w);
     // (Fresh trimmed bases #b8a27a, old boots #8a6f52: MORPHOLOGY.md.)
     const basesCol = mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), boots);
-    const albedo = mix(mix(mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)), vec3(0.055, 0.047, 0.038), twig.mul(0.85)), basesCol, special).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
+    // (Realistic, its foot's own colour and, up the stem, its upper bark's, where it has them, as its photographs
+    // are close to: a Scots pine's copper does not turn grey-brown when it passes from near to mid, nor a birch's
+    // black foot white.)
+    let barkCol: Vec3 = mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7));
+    if (real) {
+      const S4w = T.srow(4);
+      const code = T.srow(5).w;
+      const c = code.sub(1);
+      const r = floor(c.div(65536));
+      const g = floor(c.sub(r.mul(65536)).div(256));
+      const b = c.sub(r.mul(65536)).sub(g.mul(256));
+      const along = smoothstep(S4w.z, S4w.w, surface.y.div(max(T.r1.x, float(0.01))));
+      // (And its foot's own colour below, as close to: a birch's black, a Scots pine's grey-brown plates.)
+      const S6w = T.srow(6);
+      const footed = mix(S6w.xyz, mix(S6w.xyz, barkCol, 0.45), along);
+      // (Chosen, not mixed: a species with no upper colour has a code of 0, which decodes to nonsense.)
+      const footOrBark = select(S6w.w.greaterThan(0.5), footed, barkCol);
+      barkCol = select(code.greaterThan(0.5), mix(footOrBark, pow(max(vec3(r, g, b), vec3(0)).div(255), vec3(2.2)), along), footOrBark);
+    }
+    const albedo = mix(mix(barkCol, vec3(0.055, 0.047, 0.038), twig.mul(0.85)), basesCol, special).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
     // (Darker at its foot, in the grass and its own shade.)
     const foot = mix(float(0.6), float(1), smoothstep(float(0), float(1.2), surface.y));
     const light = mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2))).mul(foot);
@@ -1446,7 +1481,9 @@ export function createTrees(options: TreesOptions): Trees {
         const alongW = vGeo.y;
         const round = atan(cw, cu);
         // (Where the upper bark takes over, in tongues up and down the furrows, not in a line round the stem.)
-        const tongue = sin(alongW.mul(5.3).add(round.mul(3))).mul(0.22).add(sin(alongW.mul(13.1).sub(round.mul(7))).mul(0.16)).add(sin(alongW.mul(2.3).add(round.mul(11))).mul(0.12)).add(0.5);
+        // (Its edge ragged at two sizes, and drawn out up and down in streaks, as bark gives way along its furrows.)
+        const streaks = sin(round.mul(23).add(sin(alongW.mul(2.1).add(round.mul(5))).mul(2.2))).mul(0.12).add(sin(round.mul(41).sub(alongW.mul(1.3))).mul(0.06));
+        const tongue = sin(alongW.mul(5.3).add(round.mul(3))).mul(0.18).add(sin(alongW.mul(13.1).sub(round.mul(7))).mul(0.12)).add(sin(alongW.mul(2.3).add(round.mul(11))).mul(0.1)).add(streaks).add(0.5);
         const up = step(tongue, vGeo.z);
         const sp = uint(vInfo.x).mul(SPECIES_ROWS);
         const S4f = speciesR.element(sp.add(4));
@@ -1479,7 +1516,9 @@ export function createTrees(options: TreesOptions): Trees {
         const upG = floor(upCode.sub(upR.mul(65536)).div(256));
         const upB = upCode.sub(upR.mul(65536)).sub(upG.mul(256));
         const upperCol = select(S5.w.greaterThan(0.5), pow(vec3(upR, upG, upB).div(255), vec3(2.2)), paled);
-        const target = mix(mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), upperCol, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
+        // (A foot's own colour lightens up the stem as it gives way: a birch's black, deepest at the ground.)
+        const footCol = mix(S6.xyz, mix(S6.xyz, paled, 0.45), vGeo.z);
+        const target = mix(mix(select(S6.w.greaterThan(0.5), footCol, paled), upperCol, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
         const tinted = mix(albedo.mul(target).div(max(L0.xyz, vec3(0.005))), target, float(1).sub(uBarkOn)).mul(vInfo.y);
         // (Its relief: each side's normal from its picture, round the wood (across the picture) and along it
         // (up the picture), as far as the style's `bark` takes it.)
@@ -1789,7 +1828,7 @@ export function createTrees(options: TreesOptions): Trees {
             const sheet = await loadLeaves(set.id);
             if (disposed) return false;
             // (Its big card a mid card's width: a clump's, half again.)
-            drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7);
+            drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7, 1 - species[sp].openness);
             // (A row at a time, so a page keeps drawing between them.)
             await new Promise((done) => setTimeout(done, 0));
           }

@@ -153,6 +153,12 @@ export interface GrownTree {
   clumps: Clumps;
   /** How much its trunk's foot spreads into buttresses, 0..1 (its species' `buttress`; left out, 0). */
   buttress?: number;
+  /**
+   * How its leaves are carried, for drawing them (its species' own, each 0..1; left out, 0): how far a
+   * conifer's side shoots hang from their boughs in curtains (`sprayHang`), how far its leaves lie in
+   * flat-topped pads (`pads`), how far they gather in hanging bunches (`clusters`).
+   */
+  habit?: { sprayHang?: number; pads?: number; clusters?: number };
   /** A palm's crown (palm.ts): its fronds, its stem and how it is kept, which its drawing reads in place of its clumps. */
   palm?: PalmCrown;
   /** Its leaves' area, one side (m²), where it is known (a palm's, frond by frond); else its species' leaf area index makes it. */

@@ -158,6 +158,17 @@ const LEAF_REACH_DEPTH = 5;
 /** A pad's leaves are those within this many clump radii of its top, at pads 1, and this many more at pads 0. */
 const PAD_THIN = 0.9;
 const PAD_THICK = 7;
+/**
+ * Bunches (`clusters` 1): a branch's leaves only this share of its foliage depth's reach from its twigs' ends;
+ * this share of branches bare; each bunch's clump this much bigger, and hanging this many of its radii under
+ * its twig.
+ */
+const CLUSTER_REACH = 0.8;
+const CLUSTER_BARE = 0.3;
+const CLUSTER_GROW = 0.6;
+const CLUSTER_HANG = 0.15;
+/** How far a small or narrow crown's leaves still gather into bunches, beside an open-grown one's. */
+const CLUSTER_NARROW = 0;
 // The wood, smoothed and simplified, then bowed by its weight.
 /** Laplacian passes over the wood, forks held, each moving a node this share of the way to its neighbours' middle. */
 const SMOOTH_PASSES = 2;
@@ -381,7 +392,9 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
       return growPalm(species, sz, seed);
   }
   const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined), rng.fork(), st);
-  return species.buttress ? { ...tree, buttress: species.buttress } : tree;
+  const habit = { sprayHang: species.sprayHang, pads: species.pads, clusters: species.clusters };
+  const said = Object.values(habit).some((v) => v !== undefined && v > 0);
+  return species.buttress || said ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}) } : tree;
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */
@@ -1342,7 +1355,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const padTop = new Map<number, number>();
   const padOf = new Int32Array(count).fill(-1);
   const padding = sp.pads ?? 0;
-  if (padding > 0) {
+  // (Bunches only where the crown has room for them: a small or narrow crown, a tree grown in a wood, is many
+  // sprays all through it, as below.)
+  const clustering = Math.min(1, Math.max(0, sp.clusters ?? 0)) * (R / depth < NARROW || R < SMALL_CROWN ? CLUSTER_NARROW : 1);
+  if (padding > 0 || clustering > 0) {
     for (let i = 0; i < count; i++) {
       if (!alive[i]) continue;
       const p = par[i];
@@ -1354,14 +1370,26 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     }
   }
   const padDepth = clumpR * (PAD_THIN + PAD_THICK * (1 - padding));
+  // (Bunches, `clusters`: a branch bears only at its shoots' ends, or, a share of branches, not at all; which
+  // is decided once a branch, in the order they are met.)
+  const clusterReach = Math.max(1, Math.round(reach * (1 - CLUSTER_REACH * clustering)));
+  const bareBranch = new Map<number, boolean>();
   for (let i = 0; i < count; i++) {
     if (!bears(i)) continue;
     if (padding > 0 && padOf[i] >= 0 && py[i] < (padTop.get(padOf[i]) ?? -Infinity) - padDepth) continue;
+    if (clustering > 0 && padOf[i] >= 0) {
+      if (fromTip[i] > clusterReach) continue;
+      let bare = bareBranch.get(padOf[i]);
+      if (bare === undefined) bareBranch.set(padOf[i], (bare = rng.chance(CLUSTER_BARE * clustering)));
+      if (bare) continue;
+    }
     const end = main[i] < 0 && lat[i] < 0;
     const t: V3 = end ? dirOf(i) : [0, 0, 0];
     const o = norm([px[i], py[i] - heart, pz[i]]);
-    const r = clumpRadius(sp, clumpR, rng) * (0.8 + 0.3 * light[i]);
-    hang(h, index[i], px[i] + (t[0] * HANG + o[0] * HANG_OUT) * r, py[i] + (t[1] * HANG + o[1] * HANG_OUT) * r, pz[i] + (t[2] * HANG + o[2] * HANG_OUT) * r, r);
+    const r = clumpRadius(sp, clumpR, rng) * (0.8 + 0.3 * light[i]) * (1 + CLUSTER_GROW * clustering);
+    // (A bunch hangs a little under its twig.)
+    const drop = CLUSTER_HANG * clustering * r;
+    hang(h, index[i], px[i] + (t[0] * HANG + o[0] * HANG_OUT) * r, py[i] + (t[1] * HANG + o[1] * HANG_OUT) * r - drop, pz[i] + (t[2] * HANG + o[2] * HANG_OUT) * r, r);
   }
 
   // Smoothed, bowed by its weight, and its straight runs joined; then a tree that weeps hangs its whips.

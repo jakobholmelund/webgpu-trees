@@ -73,7 +73,8 @@ const phModel = (id, part, title, authors, extra = {}) => ({
  * nearer a real bark's before (`saturation` scaled, its mean moved `toward` an sRGB colour); `overlap`: made to
  * tile from that share of itself, pieced (else cross-faded with itself moved half a tile); `streaks`: its
  * streaks lined up before. `key: "magenta"`: leaves on magenta, keyed out; `unmix`: each edge unmixed from the
- * magenta against the leaf beside it.
+ * magenta against the leaf beside it. `fissures`: dark diamond-shaped fissures laid into a pale bark (build.mjs
+ * `fissure`), where the picture has none.
  */
 const generated = (id, file, title, prompt, extra = {}) => ({
   site: "generated",
@@ -100,7 +101,7 @@ export const SOURCES = {
   metasequoia_bark: phTex("metasequoia_bark", "Metasequoia Bark", ["Charlotte Baglioni"], { sizeMm: [1940, 1940] }),
   palm_tree_bark: phTex("palm_tree_bark", "Palm Tree Bark", ["Dimitrios Savva", "Rico Cilliers"], { sizeMm: [650, 1300], sizeFrom: "measured: Poly Haven's stated 1.3 m, taken as the length of this 1:2 scan" }),
   // Generated, where no scan exists (prompts as given, abbreviated where they were).
-  ai_birch_bark: generated("birch-bark-4", "birch-bark-4.png", "Silver birch bark", "Silver birch (Betula pendula) bark… seamless tileable…", { crop: { x: 0.5, size: 1 } }),
+  ai_birch_bark: generated("birch-bark-4", "birch-bark-4.png", "Silver birch bark", "Silver birch (Betula pendula) bark… seamless tileable…", { crop: { x: 0.5, size: 1 }, fissures: { count: 4, w: [0.05, 0.14], h: [0.08, 0.24], seed: 5 } }),
   ai_canary_trunk: generated("canary-trunk-3", "canary-trunk-3.png", "Canary Island date palm trunk", "Canary Island date palm trunk surface… diamond-shaped leaf-base scars… seamless tileable", { crop: { x: 0.5, size: 1 } }),
   ai_eucalyptus_leaves: generated("eucalyptus-leaves-2", "eucalyptus-leaves-2.png", "Tasmanian blue gum adult leaves", "Six adult Tasmanian blue gum leaves laid flat on pure flat magenta…", { key: "magenta" }),
   ai_canary_frond: generated("canary-frond-2", "canary-frond-2.png", "Canary Island date palm frond", "One complete Canary Island date palm frond… on magenta…", { key: "magenta" }),
@@ -195,7 +196,7 @@ export const BARK = [
   {
     id: "birch",
     source: "ai_birch_bark",
-    look: "white papery bark, dark horizontal lenticels, curling strips, a dark branch-scar eye",
+    look: "white papery bark, dark horizontal lenticels, curling strips, a dark branch-scar eye, black diamond fissures (laid in by the build)",
     for: ["Silver birch"],
     // Lenticels 0.5–3 cm long (MORPHOLOGY.md), longer on old stems: some 40–80 texels of the 768 it is cut from.
     tileCm: [70, 70],
@@ -326,7 +327,7 @@ export const LEAVES = [
     id: "pine",
     source: "pine_tree_01",
     look: "pine shoots with their needles",
-    for: ["Scots pine", "Corsican pine", "Monterey pine", "Aleppo pine", "Stone pine", "Eastern white pine", "Gorse"],
+    for: ["Scots pine", "Monterey pine", "Aleppo pine", "Stone pine", "Eastern white pine", "Gorse"],
     base: "down",
     px: 448,
     lengthCm: 22,
@@ -360,7 +361,7 @@ export const LEAVES = [
     lengthCm: 24,
   },
   // (Each picture one shoot, its needles apart: one to a sprite. Needles 20–30 cm, about half the shoot.)
-  { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
+  { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine", "Corsican pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
   { id: "frond", source: "ai_canary_frond", look: "a whole feather-shaped palm frond", for: ["Canary date palm"], base: "down", px: 640, lengthCm: 450, deskew: false },
   { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
   // The palms' whole leaves, each one to a picture (palm.ts lays them on its own fronds).

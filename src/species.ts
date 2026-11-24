@@ -178,6 +178,13 @@ export interface TreeSpecies {
    */
   pads?: number;
   /**
+   * How far its leaves gather into a few separate bunches hanging at its branches' ends, with sky between
+   * them, 0..1 (a blue gum's pendulous clumps of sickle leaves): each branch off a great limb keeps its leaves
+   * only on its last shoots, the bunch hanging under them, bigger the more it gathers, and a share of its
+   * branches bear none, their wood shed back to the limb. 0 or left out: an even skin.
+   */
+  clusters?: number;
+  /**
    * How much its trunk's foot spreads into buttresses and flutes, 0..1 (a western red cedar's, a Sitka
    * spruce's): the root flare wider and higher. Left out: 0, an ordinary flare.
    */
@@ -269,6 +276,7 @@ export const OPTIONAL_SPECIES_FIELDS = {
   sprayHang: "number",
   canopyLift: "number",
   pads: "number",
+  clusters: "number",
   buttress: "number",
   leafColors: "strings",
   weep: "number",
@@ -386,25 +394,27 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     crownRadius: 8.5,
     crownBase: 7.5,
     trunkRadius: 0.4,
-    shape: "spherical",
-    foliageDepth: 0.25,
-    openness: 0.65,
+    shape: "tendFlame",
+    lobes: 0.65,
+    foliageDepth: 0.3,
+    openness: 0.75,
     stems: 1,
     branchAngle: 32,
     branchAngleSpread: 14,
     bend: -0.15,
-    crooked: 0.55,
+    crooked: 0.4,
     leader: 0.4,
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.55,
-    limbAngle: [25, 45],
-    limbCurve: 8,
-    limbCurveBack: -10,
+    scaffolds: 4,
+    limbAngle: [26, 48],
+    limbCurve: 6,
+    limbCurveBack: -12,
     zigzag: 5,
-    pads: 0.3,
+    clusters: 0.85,
     leafKind: "narrow",
-    clumpSize: 1.4,
+    clumpSize: 1.6,
     clumpSpread: 0.45,
     leafColor: "#7d8c62",
     leafVariation: 0.3,
@@ -425,7 +435,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     trunkRadius: 0.35,
     shape: "conical",
     foliageDepth: 0.6,
-    openness: 0.15,
+    openness: 0.1,
     stems: 1,
     branchAngle: 80,
     branchAngleSpread: 8,
@@ -438,11 +448,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     limbAngle: [45, 115],
     limbCurve: -30,
     limbCurveBack: 50,
-    sprayHang: 0.3,
+    sprayHang: 0.5,
     leafKind: "needle",
     clumpSize: 1.0,
     clumpSpread: 0.25,
-    leafColor: "#34553a",
+    leafColor: "#2f4d35",
     leafVariation: 0.2,
     treeVariation: 0.15,
     throughTint: [0.7, 0.9, 0.5],
@@ -810,7 +820,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     trunkRadius: 0.5,
     shape: "conical",
     foliageDepth: 0.5,
-    openness: 0.25,
+    openness: 0.15,
     stems: 1,
     branchAngle: 80,
     branchAngleSpread: 8,
@@ -823,7 +833,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbAngle: [75, 100],
     limbCurve: -10,
     limbCurveBack: 20,
-    sprayHang: 0.2,
+    sprayHang: 0.45,
     buttress: 0.5,
     leafKind: "needle",
     clumpSize: 1.1,
@@ -849,14 +859,15 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     crownBase: 5,
     trunkRadius: 0.35,
     shape: "conical",
+    crownPeak: 0.3,
     foliageDepth: 0.4,
-    openness: 0.35,
+    openness: 0.4,
     stems: 1,
     branchAngle: 70,
     branchAngleSpread: 15,
     bend: 0.25,
     crooked: 0.1,
-    leader: 0.85,
+    leader: 0.8,
     whorl: 4,
     whorlsPerMetre: 1.0,
     branchiness: 0.95,
@@ -864,7 +875,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbCurve: 0,
     limbCurveBack: 15,
     sprayHang: 0,
-    crownRound: 1.8,
+    crownRound: 2.2,
     leafKind: "pine",
     clumpSize: 1.6,
     clumpSpread: 0.35,
@@ -985,7 +996,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     pads: 0.9,
     canopyLift: 0.3,
     leafKind: "small",
-    clumpSize: 2.2,
+    clumpSize: 1.5,
     clumpSpread: 0.35,
     leafColor: "#2f4a2c",
     leafVariation: 0.2,
@@ -1531,7 +1542,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     trunkRadius: 0.25,
     shape: "conical",
     foliageDepth: 0.6,
-    openness: 0.15,
+    openness: 0.1,
     stems: 1,
     branchAngle: 75,
     branchAngleSpread: 8,
@@ -1544,7 +1555,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbAngle: [70, 110],
     limbCurve: -10,
     limbCurveBack: 20,
-    sprayHang: 0.1,
+    sprayHang: 0.3,
     leafKind: "needle",
     clumpSize: 0.9,
     clumpSpread: 0.25,
@@ -1598,7 +1609,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   for (const k of ["limbCurve", "limbCurveBack"] as const) if (s[k] !== undefined && !(Math.abs(s[k] as number) <= 180)) out.push(`${k} must be -180..180 degrees`);
   if (s.zigzag !== undefined && !(s.zigzag >= 0 && s.zigzag <= 60)) out.push("zigzag must be 0..60 degrees");
   if (s.phyllotaxis !== undefined && !["spiral", "opposite", "distichous"].includes(s.phyllotaxis)) out.push("phyllotaxis must be spiral, opposite or distichous");
-  for (const k of ["sprayHang", "canopyLift", "pads", "buttress"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
+  for (const k of ["sprayHang", "canopyLift", "pads", "clusters", "buttress"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
   if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {

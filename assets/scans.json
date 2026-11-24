@@ -123,18 +123,18 @@
         ],
         "tileFrom": "estimated: lenticels 2.5–5 cm, a birch's 0.5–3 cm on a young stem, longer on an old",
         "meanLinear": [
-          0.685,
-          0.672,
-          0.633
+          0.662,
+          0.65,
+          0.612
         ],
-        "meanColor": "#d8d6d0",
-        "roughness": 0.748,
+        "meanColor": "#d4d3cd",
+        "roughness": 0.733,
         "seams": {
-          "albedo": 0.894,
-          "normal": 0.866
+          "albedo": 0.953,
+          "normal": 0.922
         },
         "origin": "generated",
-        "look": "white papery bark, dark horizontal lenticels, curling strips, a dark branch-scar eye",
+        "look": "white papery bark, dark horizontal lenticels, curling strips, a dark branch-scar eye, black diamond fissures (laid in by the build)",
         "for": [
           "Silver birch"
         ],
@@ -1856,7 +1856,6 @@
         "look": "pine shoots with their needles",
         "for": [
           "Scots pine",
-          "Corsican pine",
           "Monterey pine",
           "Aleppo pine",
           "Stone pine",
@@ -2128,7 +2127,8 @@
         ],
         "look": "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles",
         "for": [
-          "Torrey pine"
+          "Torrey pine",
+          "Corsican pine"
         ],
         "source": "ai_torrey_shoot"
       },

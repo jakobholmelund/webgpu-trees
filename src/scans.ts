@@ -112,18 +112,20 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   // (Its rough stocking, a few metres, giving way to the smooth streaked stem.)
   Eucalyptus: { bark: "eucalyptus", upper: { set: "eucalyptusUpper", from: 0.04, to: 0.12 }, leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafBend: 0.03, hang: 0.85, perSpray: 10 },
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
-  // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes.)
-  "Scots pine": { bark: "pine", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts" },
+  // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes: the plates
+  // its own grey-brown, not the orange its species is known by from afar.)
+  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts" },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
-  "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.02, to: 0.09 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
+  "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
   "Black alder": { bark: "oak", barkScale: 0.7, leaves: "round", leafCm: 8, spray: "alternate" },
   "Lombardy poplar": { bark: "ridged", barkScale: 0.8, leaves: "deltoid", leafCm: 8, spray: "alternate" },
   "Weeping willow": { bark: "ridged", leaves: "lance", leafCm: 10, spray: "weeping", leafWidth: 0.75, hang: 0.95 },
   Hawthorn: { bark: "oak", barkScale: 0.45, leaves: "oak", leafCm: 4, spray: "alternate", perSpray: 14 },
   Gorse: { bark: "ridged", barkScale: 0.35, leaves: "pine", leafCm: 12, spray: "tufts" },
   "Sitka spruce": { bark: "spruce", barkScale: 1.6, leaves: "fir", leafCm: 30, spray: "sprays" },
-  "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "pine", leafCm: 32, spray: "tufts" },
+  // (Its long dark needles, 8–16 cm, in brushes at its shoots' ends: the Torrey pine's shoots, tinted dark.)
+  "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts" },
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
   "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays" },

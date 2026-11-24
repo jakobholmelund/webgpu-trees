@@ -876,6 +876,26 @@ const SPIRE_SHEETS = 3;
 const SPIRE_SHEET_LENGTH = 2.2;
 const SPIRE_SHEET_HALF = 0.95;
 const SHEET_BACK = 0.75;
+/**
+ * How far a sheet's edges fall away for a species whose side shoots hang in curtains (`habit.sprayHang` 1),
+ * over its own arch, in its half widths: a Norway spruce's low boughs hang their combs of shoots, so from the
+ * side a bough is a fringe the depth of the gap to the next, and the crown is closed. The highest boughs hang
+ * this share of it.
+ */
+const CURTAIN = 1.4;
+/** The most a sheet's edges fall for curtains, over its own arch (half widths): its top still faces up. */
+const CURTAIN_MOST = 0.6;
+const CURTAIN_TOP = 0.35;
+
+/** How much a sheet's edges fall, over its own arch, for a tree's habit, its foot at height `y`. */
+function curtainOf(tree: GrownTree, y: number): number {
+  const hang = tree.habit?.sprayHang ?? 0;
+  if (hang <= 0) return 0;
+  const { crownBase, height } = tree.size;
+  const up = Math.min(1, Math.max(0, (y - crownBase) / Math.max(0.01, height - crownBase)));
+  return Math.min(CURTAIN_MOST, CURTAIN * hang * (CURTAIN_TOP + (1 - CURTAIN_TOP) * (1 - up)));
+}
+
 /** A bough's sheets: each this many of its clumps' radii long, the next starting this share of it on. */
 const BOUGH_PIECE = 3.2;
 const BOUGH_STEP = 0.62;
@@ -961,7 +981,7 @@ export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[
           const half = r * SHEET_HALF * (0.85 + 0.3 * hash01(k, 13)) * (coarse ? 1.15 : 1) * (sk.order[t] === 0 ? 0.3 : 1);
           laid.push({ foot, dir, length });
           const a = hash01(k, 14);
-          sheet(b, foot, dir, length, half, { lift: 0.1 + 0.08 * a, droop: 0.26 + 0.22 * a, arch: 0.55 + 0.35 * hash01(k, 15), twist: (hash01(k, 16) - 0.5) * 0.7 }, hash01(k, v * 389 + 11), n, cl.depth[c], kind, limbOf(sk, t), v, coarse ? 2 : SHEET_ALONG);
+          sheet(b, foot, dir, length, half, { lift: 0.1 + 0.08 * a, droop: 0.26 + 0.22 * a, arch: 0.55 + 0.35 * hash01(k, 15) + curtainOf(tree, foot[1]), twist: (hash01(k, 16) - 0.5) * 0.7 }, hash01(k, v * 389 + 11), n, cl.depth[c], kind, limbOf(sk, t), v, coarse ? 2 : SHEET_ALONG);
         }
       }
       // (Any twig's end the sheets leave out, a sheet of its own along that twig, over its end: a twig poking out
@@ -1081,7 +1101,7 @@ function boughSheets(b: Builder, tree: GrownTree, lines: WoodLines, kind: number
       // (The last of a bough's sheets hangs most, as its tip does; those along it lie as the wood does.)
       const tipward = sb >= s1 - 1e-6 ? 1 : 0.35;
       const h = piece * 31 + v * 7;
-      sheet(b, foot, dir, length * (0.95 + 0.1 * hash01(h, 21)), half, { lift: 0.06, droop: (0.12 + 0.12 * hash01(h, 22)) * (0.5 + tipward) * (coarse ? 0.7 : 1), arch: 0.55 + 0.3 * hash01(h, 23), twist: (hash01(h, 24) - 0.5) * 0.4 }, hash01(h, v * 389 + 11), nn, depth, kind, [sk.x[l], sk.y[l], sk.z[l]], v, coarse ? 2 : SHEET_ALONG);
+      sheet(b, foot, dir, length * (0.95 + 0.1 * hash01(h, 21)), half, { lift: 0.06, droop: (0.12 + 0.12 * hash01(h, 22)) * (0.5 + tipward) * (coarse ? 0.7 : 1), arch: 0.55 + 0.3 * hash01(h, 23) + curtainOf(tree, foot[1]), twist: (hash01(h, 24) - 0.5) * 0.4 }, hash01(h, v * 389 + 11), nn, depth, kind, [sk.x[l], sk.y[l], sk.z[l]], v, coarse ? 2 : SHEET_ALONG);
       piece++;
     }
   }
@@ -1263,6 +1283,16 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
  * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant. A variant
  * `skip` says is left without cards.
  */
+/**
+ * A tree whose leaves lie in pads (`habit.pads` 1): its near sprays spread this much wider about their shoots
+ * and this share less high, and lie this share nearer level, facing up by this much more, so a pad is a
+ * shelf, flat-topped and thin.
+ */
+const PAD_WIDE = 0.5;
+const PAD_FLAT = 0.75;
+const PAD_LEVEL = 0.8;
+const PAD_FACE_UP = 1.2;
+
 /** Near cards of a size of their own (m, half across), as many to a clump as cover it, hanging as much as `hang` (0..1). */
 export interface FixedCards {
   half: number;
@@ -1274,6 +1304,8 @@ export interface FixedCards {
   big: number;
   bigSize: number;
   hang: number;
+  /** How far its sprays turn up along their twigs, 0..1 (a pine's shoots turn up to the light, their tufts like brushes held up). */
+  rise?: number;
 }
 
 export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[]): Pieces {
@@ -1288,6 +1320,7 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
     const { clumps: cl, skeleton: sk } = tree;
     const twigs = clumpTwigs(tree);
     const lines = woodLines(tree, TIER_SHAPES[0]);
+    const pads = Math.min(1, Math.max(0, tree.habit?.pads ?? 0));
     for (let c = 0; c < cl.count; c++) {
       const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
       const r = cl.radius[c];
@@ -1323,20 +1356,30 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const at0 = shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
         // (Small cards spread through the clump about their shoots, as its side twigs carry them: else they
         // would crowd along a line or two.)
+        // (In a tree whose leaves lie in pads, `habit.pads`, flattened into a shelf: wider, and thin.)
         const spread = fix && !filler ? r * 0.55 * Math.sqrt(hash01(k, 26)) : 0;
-        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread, at0.p[1] + off[1] * spread, at0.p[2] + off[2] * spread], d: at0.d } : at0;
-        // (Its facing: out of the crown and up, turned its own way by as much again.)
-        const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
+        const wide = 1 + PAD_WIDE * pads;
+        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + off[1] * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : at0;
+        // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's;
+        // its big cards too, the clump's hanging mass.)
+        const hang = fix ? fix.hang * (filler ? 0.85 : 0.75 + 0.5 * hash01(k, 27)) : 0;
+        // (Its facing: out of the crown and up, turned its own way by as much again; a hanging spray's no
+        // more up than its leaves let it, as they hang edge to the sky: a card facing up has no way down
+        // along it, and its leaves would lie flat.)
+        // (So too a spray that rises along its twig, half as far.)
+        const rise = fix && !filler ? (fix.rise ?? 0) : 0;
+        // (A pad's sprays face the sky, as a shelf's top does.)
+        const face = norm([n[0] * 0.9 + off[0] * 0.8, (n[1] * 0.9 + off[1] * 0.8 + 0.5) * (1 - 0.85 * Math.min(1, hang)) * (1 - 0.5 * rise) + PAD_FACE_UP * pads, n[2] * 0.9 + off[2] * 0.8]);
         // (Its twig: on along the wood its foot is on, out of the crown a little, turned its own way (a
         // frond's leaves follow the frond, a whip's hang with the whip), and square to its facing.)
         const [e1, e2] = basis(face);
         const t = hash01(k, 23) * Math.PI * 2;
         const spin = [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
-        // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's.)
-        const hang = fix && !filler ? fix.hang * (0.75 + 0.5 * hash01(k, 27)) : 0;
-        const along0 = [from.d[0] + spin[0] * 0.6 + n[0] * 0.3, from.d[1] + spin[1] * 0.6 + n[1] * 0.3, from.d[2] + spin[2] * 0.6 + n[2] * 0.3];
+        const along0 = [from.d[0] + spin[0] * 0.6 * (1 - 0.5 * rise) + n[0] * 0.3, from.d[1] + spin[1] * 0.6 * (1 - 0.5 * rise) + n[1] * 0.3 + rise, from.d[2] + spin[2] * 0.6 * (1 - 0.5 * rise) + n[2] * 0.3];
         const l0 = Math.hypot(along0[0], along0[1], along0[2]) || 1;
-        const along = [(along0[0] / l0) * (1 - hang), (along0[1] / l0) * (1 - hang) - hang, (along0[2] / l0) * (1 - hang)];
+        // (A pad's sprays, its big cards too, lie level: from the side a pad is a band of them, not a ball.)
+        const level = 1 - PAD_LEVEL * pads;
+        const along = [(along0[0] / l0) * (1 - hang), ((along0[1] / l0) * (1 - hang) - hang) * level, (along0[2] / l0) * (1 - hang)];
         const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
         const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
         const tangent = Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
