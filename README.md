@@ -81,7 +81,8 @@ trees.update(renderer, camera, timeSeconds);
 - **Light and wind** (`trees.environment`) are the host's to set, as the
   grass takes them: the sun's direction, the colour of sunlight and of
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
-  at)` let a host's clouds and haze reach the trees.
+  at)` let a host's clouds and haze reach the trees. Without `world.air` the
+  trees take the scene's fog; with it, only the host's air.
 
 ## Styles
 

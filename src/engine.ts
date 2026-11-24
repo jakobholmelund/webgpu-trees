@@ -81,7 +81,10 @@ export const DEFAULT_DETAIL: TreeDetail = { nearPx: 260, farPx: 70, band: 0.2, r
 export interface TreeWorld {
   /** How much of the sun reaches a place on the ground below, 0..1 (a cloud's shadow), for the leaves above it. */
   sun?(xz: Vec2): Float;
-  /** The air between a tree and the eye: given its colour and where it is, the colour that reaches the eye. Called in a vertex shader. */
+  /**
+   * The air between a tree and the eye: given its colour and where it is, the colour that reaches the eye. A host
+   * with haze of its own (the scene's fog is applied without this, and not with it). Called in a vertex shader.
+   */
   air?(colour: Vec3, at: Vec3): Vec3;
 }
 
@@ -769,6 +772,9 @@ export function createTrees(options: TreesOptions): Trees {
 
   /** Into the air between it and the eye. */
   const intoAir = (col: Vec3, at: Vec3): Vec3 => (world.air ? world.air(col, at) : col);
+  // (The scene's fog only where the host gives no air of its own: its air is the whole of the haze, in the
+  // colour already, and the fog over it would put the haze on twice, the far trees pale where the ground is not.)
+  const sceneFog = !world.air;
 
   /** How much of a tree a tier draws, by its size in the picture: from and to, in the pattern's shares. */
   const sharesFor = (t: number, T: TreeRows): Vec2 => {
@@ -856,7 +862,7 @@ export function createTrees(options: TreesOptions): Trees {
    * `sheetPieces`): each vertex where it is, the sheet's top and underside lit and drawn each as itself.
    */
   const dabMaterial = (t: number, stroke: boolean, card = false, sheet = false) => {
-    const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: true });
+    const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: sceneFog });
     const marks = sheet && sheetAtlas ? sheetAtlas : atlas;
     m.alphaToCoverage = !stroke;
     const aDab = attribute<"vec4">("aDab", "vec4");
@@ -1244,7 +1250,7 @@ export function createTrees(options: TreesOptions): Trees {
    * behind; its picture's light and shade over its own colour.
    */
   const frondMaterial = (t: number) => {
-    const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: true });
+    const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: sceneFog });
     m.alphaToCoverage = true;
     const aNormal = attribute<"vec4">("aNormal", "vec4");
     const aUv = attribute<"vec4">("aUv", "vec4");
@@ -1397,7 +1403,7 @@ export function createTrees(options: TreesOptions): Trees {
   };
 
   const woodMaterial = (t: number) => {
-    const m = new THREE.MeshBasicNodeMaterial({ fog: true });
+    const m = new THREE.MeshBasicNodeMaterial({ fog: sceneFog });
     const aRadial = attribute<"vec4">("aRadial", "vec4");
     const aLimb = attribute<"vec4">("aLimb", "vec4");
     const aWood = attribute<"vec4">("aWood", "vec4");
