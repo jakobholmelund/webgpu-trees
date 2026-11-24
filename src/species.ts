@@ -257,7 +257,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     limbAngle: [45, 85],
     limbCurve: -15,
     limbCurveBack: 25,
-    zigzag: 20,
+    zigzag: 15,
     pads: 0.2,
     leafKind: "broad",
     clumpSize: 1.6,
