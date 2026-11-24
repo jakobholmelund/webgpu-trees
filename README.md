@@ -1101,7 +1101,10 @@ spoil). Where the owner gave a picture again at 2048 pixels, that one is used.
   by a third either way and they stand up to half a clump's radius up or down their twigs,
   so the crown seen from beneath is not rings of plates at one height; tipped over to an eye
   below, from 20 degrees up, they are drawn up to 1.6 times bigger, closing into a ceiling,
-  and darkened to their undersides. The stone pine wears its own bark too, thick reddish
+  and darkened to their undersides. Close overhead they give way to the pine's own tufts from
+  further off than other big cards do (`PINE_BENEATH_FAR`, 2.5 times as far): under a stone pine a
+  player sees its brushes on their reddish branches with sky between, as the owner's reference
+  picture has it, not the cushions' dark undersides, stacked plates. The stone pine wears its own bark too, thick reddish
   plates between deep fissures (`stonePine`, a tile 1.2 m square). The drawn cushions
   (`"drawn"`) remain for a pine with no pictures.
 - **A photograph's tone at the species' colour.** A species' leaf colour is its crown's as it is seen

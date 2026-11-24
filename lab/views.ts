@@ -217,12 +217,13 @@ export function shotFor(input: ShotInput): Shot {
     case "tee25": {
       // (From 25 m, the phone's field, pitched so the tree stands in the middle; further back only for a
       // tree too tall for it.)
-      const d = fitDistance(points, 1.6, aspect, PHONE_FOV.landscape, 25, 0.04);
-      const fit = fitFrom(points, 1.6, d, aspect, 0.04);
+      // (A margin of a fifth: a drawn crown's cards reach a little past its measured box.)
+      const d = fitDistance(points, 1.6, aspect, PHONE_FOV.landscape, 25, 0.2);
+      const fit = fitFrom(points, 1.6, d, aspect, 0.2);
       return { ...fit, fov: PHONE_FOV.landscape };
     }
     case "fairway60": {
-      const fit = fitFrom(points, 1.6, 60, aspect, 0.04);
+      const fit = fitFrom(points, 1.6, 60, aspect, 0.2);
       return { ...fit, fov: Math.max(PHONE_FOV.landscape, fit.fov) };
     }
     case "up": {

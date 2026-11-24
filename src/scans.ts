@@ -224,11 +224,11 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes: the plates
   // its own grey-brown, not the orange its species is known by from afar.)
-  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6, brush: 1.6, cushion: "scotsPineClump" },
+  "Scots pine": { bark: "pine", barkFoot: "#6a625a", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6, brush: 1.6, cushion: "scotsPineClump" },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
   // (Its own rugged blackish foot giving way to its white upper bark; its own leaves, 3–6 cm and a thin stalk.)
-  "Silver birch": { bark: "birchFoot", barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "birch", leafCm: 6, spray: "weeping", hang: 0.7 },
+  "Silver birch": { bark: "birchFoot", barkFoot: "#2f2c29", upper: { set: "birch", from: 0.06, to: 0.2 }, leaves: "birch", leafCm: 6, spray: "weeping", hang: 0.7 },
   // (Its own leaves, almost round, 5–9 cm and a short stalk; its own dark bark of small squarish plates.)
   "Black alder": { bark: "alder", leaves: "alder", leafCm: 9, spray: "alternate" },
   // (Its own leaves, 5–8 cm on a long flattened stalk.)
@@ -254,7 +254,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Monterey pine": { bark: "montereyPine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 1, cushionSize: 1.2 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long, grey-green and stiff: its tufts laid from its own
   // shoot pictures, `tuftPicture`, the brush two thirds of the picture.)
-  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25, tuftPicture: true, tuftShoot: 1.6, tuftFrom: 0.3, tuftFan: 3 },
+  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25, brush: 1.3, tuftPicture: true, tuftShoot: 1.6, tuftFrom: 0.3, tuftFan: 3 },
   // (Its own bark of broad flat plates.)
   "Aleppo pine": { bark: "aleppoPine", leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
   "Stone pine": { bark: "stonePine", barkScale: 1, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "stonePineCushion", cushionFar: "stonePineCanopy" },

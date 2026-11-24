@@ -144,6 +144,8 @@ const CUSHION_TIP = [0.35, 0.9] as const;
 const CANOPY_SIZE = 2.6;
 /** How much bigger a cushion card is drawn once tipped right over to the eye. */
 const CUSHION_TIP_GROW = 0.6;
+/** How many times further off a pine's cushion card seen from beneath gives way to its tufts than other big cards do. */
+const PINE_BENEATH_FAR = 2.5;
 /** How dark a cushion card is seen from beneath it (its underside, beside its picture's tone). */
 const CUSHION_BELOW = 0.45;
 /** A crown of thick pads (`ScanLook.padThick`): how far its sprays hang, and its mid cards' size beside its near pads' (two a clump, not four: as big again). */
@@ -1361,7 +1363,11 @@ export function createTrees(options: TreesOptions): Trees {
       // (And close to, where a big card's texels would be larger than a pixel and it blurs, it gives way to the
       // small sprays over it: drawn in to nothing from BIG_CARD_GONE of its half widths off to BIG_CARD_FULL.)
       const half = aDab.z.mul(fit.size);
-      const bigNear = mix(float(1), smoothstep(half.mul(BIG_CARD_GONE), half.mul(BIG_CARD_FULL), length(cameraPosition.sub(at))), big);
+      // (A pine's cushion seen from beneath gives way to its tufts from further off, PINE_BENEATH_FAR times as far:
+      // under a stone pine a player sees its brushes on their branches with sky between, not the cushions' dark
+      // undersides, stacked plates.)
+      const beneathFar = float(1).add(cushionBelow.mul(pineCard ?? float(0)).mul(PINE_BENEATH_FAR - 1));
+      const bigNear = mix(float(1), smoothstep(half.mul(BIG_CARD_GONE).mul(beneathFar), half.mul(BIG_CARD_FULL).mul(beneathFar), length(cameraPosition.sub(at))), big);
       // (Realistic and painterly: a tree passing between tiers hands its leaves over piece by piece, each card
       // or dab growing in or shrinking away by a share of its own, a sheet coming or going whole: `pieceShare`.
       // Handed over pixel by pixel, a painterly crown at the fairway was a speckle of sky and lone leaves.)

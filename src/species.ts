@@ -365,6 +365,8 @@ export function isSpeciesFieldKind(value: unknown, kind: SpeciesFieldKind): bool
  * given up its leader, and is grown as a broadleaf, with needles.
  */
 export const STARTER_SPECIES: readonly TreeSpecies[] = [
+  // Set against the owner's reference pictures: a parkland oak's broad dome on heavy limbs, the limbs seen
+  // through it (open 0.45), dark green; its bark grey-brown.
   {
     name: "Oak",
     latin: "Quercus robur",
@@ -378,7 +380,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     crownPeak: 0.15,
     crownRound: 1.8,
     foliageDepth: 0.35,
-    openness: 0.35,
+    openness: 0.45,
     stems: 1,
     branchAngle: 60,
     branchAngleSpread: 15,
@@ -395,7 +397,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     forkStems: 2,
     forkStemsMost: 3,
     boleStubs: 0.8,
-    limbAngle: [45, 85],
+    limbAngle: [55, 95],
     limbCurve: -15,
     limbCurveBack: 25,
     zigzag: 15,
@@ -403,11 +405,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     leafKind: "broad",
     clumpSize: 1.6,
     clumpSpread: 0.35,
-    leafColor: "#5b7f3a",
+    leafColor: "#4d6b33",
     leafVariation: 0.3,
     treeVariation: 0.25,
     throughTint: [0.85, 1.0, 0.45],
-    barkColor: "#5d5247",
+    barkColor: "#6b655c",
     barkPale: 0,
     stiffness: 0.75,
   },
@@ -447,21 +449,24 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     barkPale: 0.35,
     stiffness: 0.7,
   },
+  // Set against the owner's reference pictures: an open-grown blue gum, "broadly rounded" (secondary, in
+  // docs/MORPHOLOGY.md), 19 m across (10–20 m), its bole a metre and more through, half its crown's limbs
+  // from a fork.
   {
     name: "Eucalyptus",
     latin: "Eucalyptus globulus",
     regions: ["california"],
     architecture: "broadleaf",
     height: 26,
-    crownRadius: 8.5,
+    crownRadius: 9.5,
     crownBase: 7.5,
-    trunkRadius: 0.4,
-    shape: "tendFlame",
+    trunkRadius: 0.6,
+    shape: "spherical",
     lobes: 0.65,
     foliageDepth: 0.3,
-    openness: 0.75,
+    openness: 0.55,
     stems: 1,
-    forkShare: 0.2,
+    forkShare: 0.5,
     fork: 0.8,
     forkSpread: 0.2,
     forkStems: 2,
@@ -528,6 +533,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     barkPale: 0,
     stiffness: 0.85,
   },
+  // Set against the owner's reference pictures: its crown more open, its clumps apart with sky between (open
+  // 0.5; its outline stays the photographed tree's, test/outlines.json), grey-green rather than teal.
   {
     name: "Scots pine",
     latin: "Pinus sylvestris",
@@ -542,7 +549,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     crownRound: 2.4,
     lobes: 0.25,
     foliageDepth: 0.3,
-    openness: 0.4,
+    openness: 0.5,
     stems: 1,
     branchAngle: 65,
     branchAngleSpread: 20,
@@ -561,7 +568,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     leafKind: "pine",
     clumpSize: 2.0,
     clumpSpread: 0.4,
-    leafColor: "#4d6a52",
+    leafColor: "#5a6e56",
     leafVariation: 0.25,
     treeVariation: 0.2,
     throughTint: [0.8, 0.95, 0.5],
@@ -611,14 +618,16 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
 export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // UF/IFAS ST-244 (European beech): 50–75 ft tall, 40–60 ft spread. A dense dome, leaves only on its
   // outside, low-branched when open-grown; smooth grey bark.
+  // Set against the owner's reference pictures: an open-grown beech's broad dome, widest low (r/H 0.45, crown to
+  // 1.8 m, live crown 0.9), its low limbs sweeping out and down.
   beech: {
     name: "Beech",
     latin: "Fagus sylvatica",
     regions: ["denmark", "great-britain", "netherlands", "france"],
     architecture: "broadleaf",
     height: 20,
-    crownRadius: 8,
-    crownBase: 2.5,
+    crownRadius: 9,
+    crownBase: 1.8,
     trunkRadius: 0.45,
     shape: "spherical",
     foliageDepth: 0.15,
@@ -630,7 +639,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     forkStems: 2,
     branchAngle: 45,
     branchAngleSpread: 12,
-    bend: 0.05,
+    bend: -0.2,
     crooked: 0.3,
     leader: 0.3,
     whorl: 0,
@@ -648,17 +657,21 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkColor: "#8b8a82",
     barkPale: 0.1,
     stiffness: 0.8,
+    crownPeak: 0.35,
+    limbAngle: [35, 95],
   },
   // UF/IFAS ST-97 (European birch): 40–50 ft tall, 15–25 ft spread. A narrow open oval with a leader,
   // drooping twigs (some of them hang in tresses), light yellow-green; white bark, dark and fissured at its
   // foot.
+  // Set against the owner's reference pictures: 8–9 m across (6–12 m, MORPHOLOGY.md), its black rugged base up to
+  // 1–3 m (WT: the lowest 0.5–3 m; scans.ts).
   silverBirch: {
     name: "Silver birch",
     latin: "Betula pendula",
     regions: ["great-britain", "denmark", "netherlands"],
     architecture: "broadleaf",
     height: 15,
-    crownRadius: 3.5,
+    crownRadius: 4.2,
     crownBase: 3,
     trunkRadius: 0.2,
     shape: "spherical",
@@ -1141,41 +1154,44 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // California Native Plant Society, San Diego (Pinus torreyana): 40–70 ft tall, 35 ft spread, an open
   // picturesque form. Few crooked limbs, long grey-green needles in tufts, so grown as a broadleaf, with
-  // needles. Wild ones lean; the grower stands every tree upright (a host leans it at most 3 degrees).
+  // needles. Wild ones lean; the grower stands every tree upright (a host leans it at most 3 degrees). Set
+  // against the owner's reference pictures (lab/references): a crown wider than it is tall (r/H 0.67, the top
+  // of docs/MORPHOLOGY.md's 0.40–0.70), from low limbs that run out level and turn up at their ends, open,
+  // the sky between its brushes, which are grey-green.
   torreyPine: {
     name: "Torrey pine",
     latin: "Pinus torreyana",
     regions: ["california"],
     architecture: "broadleaf",
-    height: 15,
-    crownRadius: 5.5,
-    crownBase: 4,
-    trunkRadius: 0.4,
+    height: 12,
+    crownRadius: 8,
+    crownBase: 2.5,
+    trunkRadius: 0.38,
     shape: "hemispherical",
-    crownPeak: 0.4,
-    crownRound: 2,
+    crownPeak: 0.25,
+    crownRound: 3,
     lobes: 0.5,
     foliageDepth: 0.15,
-    openness: 0.6,
+    openness: 0.8,
     stems: 1,
     branchAngle: 55,
     branchAngleSpread: 20,
-    bend: 0.35,
-    crooked: 1,
+    bend: -0.2,
+    crooked: 0.7,
     leader: 0.05,
     whorl: 0,
     whorlsPerMetre: 0,
-    branchiness: 0.65,
+    branchiness: 0.5,
     scaffolds: 5,
-    limbAngle: [60, 100],
+    limbAngle: [75, 105],
     limbCurve: -10,
-    limbCurveBack: 30,
+    limbCurveBack: 35,
     zigzag: 10,
     pads: 0.85,
     leafKind: "pine",
-    clumpSize: 1.62,
+    clumpSize: 1.2,
     clumpSpread: 0.45,
-    leafColor: "#5c7350",
+    leafColor: "#728262",
     leafVariation: 0.25,
     treeVariation: 0.25,
     throughTint: [0.85, 0.95, 0.55],
@@ -1240,7 +1256,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     height: 15,
     crownRadius: 11.5,
     crownBase: 8,
-    trunkRadius: 0.55,
+    trunkRadius: 0.62,
     shape: "hemispherical",
     crownPeak: 0.45,
     crownRound: 4,
@@ -1280,16 +1296,17 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // UF/IFAS, Gilman and Watson's fact sheet (Phoenix canariensis): 40–60 ft tall, 20–40 ft spread, a trunk
   // to 3 ft across. California's grand avenue palm: a thick trunk patterned with old leaf bases, a big round
   // head of arching pinnate fronds 3–6 m long (UF: 130–150 on a healthy palm; a course's are cut back), the
-  // old ones hanging. On courses mostly pineapple cut (MORPHOLOGY.md).
+  // old ones hanging. On courses mostly pineapple cut (MORPHOLOGY.md). As the owner's reference pictures
+  // have a course's: 13 m, its head 11 m across (8–12 m), a trunk a metre through.
   canaryDatePalm: {
     name: "Canary date palm",
     latin: "Phoenix canariensis",
     regions: ["california"],
     architecture: "palm",
-    height: 15,
-    crownRadius: 5,
-    crownBase: 7,
-    trunkRadius: 0.45,
+    height: 13,
+    crownRadius: 5.5,
+    crownBase: 6,
+    trunkRadius: 0.5,
     shape: "spherical",
     foliageDepth: 0.5,
     openness: 0.3,
@@ -1321,15 +1338,17 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // UF/IFAS, Gilman and Watson's fact sheet (Washingtonia robusta): 80–100 ft tall, 10–15 ft spread, a trunk
   // about 1 ft across. The tall thin palm of Los Angeles' streets and courses: a pole flared at its foot with a
   // small tight head of 30 or so fan leaves on long stalks; skinned on courses, a straw skirt in the wild.
+  // As the owner's reference pictures have a course's: 18 m (SMM: under 16 m in the range, to 25 m), its head
+  // 5 m across (blades to 1.35 m on stalks longer than them).
   mexicanFanPalm: {
     name: "Mexican fan palm",
     latin: "Washingtonia robusta",
     regions: ["california"],
     architecture: "palm",
-    height: 22,
-    crownRadius: 2.2,
-    crownBase: 18,
-    trunkRadius: 0.2,
+    height: 18,
+    crownRadius: 2.6,
+    crownBase: 15,
+    trunkRadius: 0.22,
     shape: "spherical",
     foliageDepth: 0.5,
     openness: 0.25,
@@ -1361,19 +1380,22 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // University of Redlands tree species accounts (Quercus agrifolia): 25–80 ft tall in cultivation; UC Davis
   // Arboretum: 20–50 ft tall and wide. A broad spreading evergreen oak, low on crooked limbs, small dark
   // holly-like leaves.
+  // Set against the owner's reference pictures: a broad low dome (spread "often greater than height", VT),
+  // its limbs reclining at its rim (FEIS), dark glossy green (#2F4A2A at 50–150 m); its bark the grey of its
+  // broad ridges (VT: mature ridges #7E7A73), not near black.
   coastLiveOak: {
     name: "Coast live oak",
     latin: "Quercus agrifolia",
     regions: ["california"],
     architecture: "broadleaf",
-    height: 11,
+    height: 10,
     crownRadius: 8.5,
-    crownBase: 1.8,
+    crownBase: 1.5,
     trunkRadius: 0.5,
     shape: "hemispherical",
-    lobes: 0.1,
+    lobes: 0.3,
     foliageDepth: 0.55,
-    openness: 0.2,
+    openness: 0.3,
     stems: 1,
     forkShare: 0.45,
     fork: 0.45,
@@ -1384,13 +1406,13 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stemRange: [2, 3],
     branchAngle: 70,
     branchAngleSpread: 18,
-    bend: -0.1,
+    bend: -0.2,
     crooked: 0.85,
     leader: 0,
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.85,
-    limbAngle: [55, 95],
+    limbAngle: [65, 100],
     limbCurve: -10,
     limbCurveBack: 25,
     zigzag: 15,
@@ -1398,30 +1420,34 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     leafKind: "small",
     clumpSize: 1.9,
     clumpSpread: 0.35,
-    leafColor: "#3f5a2e",
+    leafColor: "#36502c",
     leafVariation: 0.2,
     treeVariation: 0.2,
     throughTint: [0.8, 0.95, 0.45],
-    barkColor: "#6a645c",
-    barkPale: 0,
+    barkColor: "#76726b",
+    barkPale: 0.15,
     stiffness: 0.8,
+    crownRound: 1.6,
   },
   // California Native Plant Society, San Diego (Platanus racemosa): 40+ ft tall, 30 ft spread, often several
   // trunks; Virginia Tech Dendrology: 40–100 ft. Crooked and open, pale mottled bark; Riviera has many. Its
   // lean and its several trunks are not grown: one upright trunk.
+  // Set against the owner's reference pictures and docs/MORPHOLOGY.md: open, rounded and irregular (VT), r/H
+  // 0.5 (the top of 0.30–0.50), its bone-white limbs showing between patchy light grey-green masses
+  // (#7A8A5A at 50–150 m): few branches, their leaves gathered apart.
   californiaSycamore: {
     name: "California sycamore",
     latin: "Platanus racemosa",
     regions: ["california"],
     architecture: "broadleaf",
-    height: 18,
-    crownRadius: 7,
-    crownBase: 3.5,
+    height: 15,
+    crownRadius: 8,
+    crownBase: 3,
     trunkRadius: 0.5,
-    shape: "tendFlame",
+    shape: "hemispherical",
     lobes: 0.3,
     foliageDepth: 0.25,
-    openness: 0.55,
+    openness: 0.7,
     stems: 1,
     forkShare: 0.45,
     fork: 0.35,
@@ -1437,23 +1463,24 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     leader: 0,
     whorl: 0,
     whorlsPerMetre: 0,
-    branchiness: 0.45,
-    limbAngle: [40, 80],
+    branchiness: 0.3,
+    limbAngle: [45, 85],
     limbCurve: 0,
     limbCurveBack: 5,
     zigzag: 25,
     zigzagRun: 1.1,
-    pads: 0.4,
+    pads: 0.55,
     leafKind: "broad",
-    clumpSize: 1.9,
+    clumpSize: 1.6,
     clumpSpread: 0.4,
-    leafColor: "#71904a",
+    leafColor: "#7a8f52",
     leafVariation: 0.3,
     treeVariation: 0.25,
     throughTint: [0.9, 1.0, 0.5],
     barkColor: "#c4bca9",
     barkPale: 0.6,
     stiffness: 0.65,
+    crownPeak: 0.35,
   },
   // Cornell Woody Plants Database (Acer saccharum): 60–75 ft tall; UF/IFAS ENH-210: 35–50 ft spread. A dense
   // oval crown, its leaves on its outside.
