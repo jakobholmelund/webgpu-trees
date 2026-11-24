@@ -5,9 +5,11 @@ each tree's own measured size, and drawn in their tens of thousands. It is the
 sibling of [webgpu-grass](https://github.com/jakobholmelund/webgpu-grass), and
 began as the trees of Couch Golf Club, a browser golf game.
 
-It is early. It has two looks from the same grown trees: `stylized`, crowns
-laid in dabs of paint, as the game draws them, and `real`, crowns of leaf
-cards, each a spray of the species' leaves, with furrowed bark.
+It is early. It has four looks from the same grown trees: `stylized`,
+crowns laid in dabs of paint, as the game draws them; `painterly`, crowns of
+small crisp leaves lit as a few big soft masses; `sculpted`, crowns of soft
+clay lobes; and `real`, crowns of leaf cards, each a spray of the species'
+leaves, with furrowed bark (see *Styles*).
 WebGPU only (three.js r187, `three/webgpu`).
 
 ```
@@ -54,9 +56,9 @@ trees.update(renderer, camera, timeSeconds);
   light in painted bands, how round each clump is lit, the dabs' size,
   light through the leaves. **Detail** (`trees.detail`) says at what size
   in the picture each tier takes over.
-- **Look** (`createTrees({ look: "real" })`) is chosen when the trees are
-  made, the pieces being different; `style` starts as the look's
-  (`DEFAULT_STYLE`, `REAL_STYLE`) and can be changed at any time.
+- **Look** (`createTrees({ look: "painterly" })`) is chosen when the trees
+  are made, the pieces being different; `style` starts as the look's
+  (`LOOK_STYLES[look]`) and can be changed at any time.
 - **Shade on the ground**: `trees.bakeShade(area)` works out how much sun
   reaches the ground past the crowns (as their leaves take it), and
   `trees.sunAt(xz)` hands it to a host's ground or grass as a TSL node (the
@@ -65,6 +67,58 @@ trees.update(renderer, camera, timeSeconds);
   grass takes them: the sun's direction, the colour of sunlight and of
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
   at)` let a host's clouds and haze reach the trees.
+
+## Styles
+
+A look is the pieces a crown is laid with, chosen when the trees are made; a
+style is a row of numbers (`TreeStyle`) saying how they are lit, read each
+frame. Each look starts from its own style (`LOOK_STYLES`: `DEFAULT_STYLE`,
+`PAINTERLY_STYLE`, `SCULPTED_STYLE`, `REAL_STYLE`), and every number keeps
+to a range (`STYLE_RANGES`, `checkStyle`). The host's sun, its tints and the
+wind stay the host's (`trees.environment`); a style turns them, never
+replaces them.
+
+| Look | Its crowns | Its light |
+| --- | --- | --- |
+| `stylized` (painted) | brush marks, a few dabs to a clump | the crown's form and each clump's, in flat bands |
+| `painterly` | clusters of 10 to 60 small crisp leaves of the species' kind (`marks.ts`): ovate fans for broadleaves, round leaves for small-leaved trees, level boughs with hanging needles for conifers, curved leaflets for palms | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
+| `sculpted` | soft lumpy clay discs, and sprigs of two or three leaves on the tops of its lobes | the lobes as clay balls, each dab a small ball on its lobe |
+| `real` | leaf cards set in the crown, each a spray of the species' leaves | as the sun gives it, with light through the leaves |
+
+**Lobes.** The painterly and sculpted looks light a crown as a painter does,
+as a handful of masses before any leaf. Each crown's clumps are gathered
+into lobes (`lobes.ts`: k-means, about half the crown's mean radius each,
+seeded from the clumps farthest apart), and every dab is lit, pixel by
+pixel, as the ball of the lobe the eye's ray through it meets first, so
+lobes hide one another as solid masses do and the light runs smoothly over
+all of a lobe's dabs. Lit each by its own lobe instead, the dabs of two
+overlapping lobes interleave into a patchwork. `lobe` says how far a crown
+is lit so (0: as the painted look, each dab one stroke), `bulge` how far
+each dab is its own small ball over it.
+
+**Colour.** `warm` turns the sunlit side towards a yellow-green and `cool`
+the shade towards a teal blue-green, each keeping its brightness (a green
+leaf multiplied by a blue light stays green; turned, it goes teal);
+`chroma` makes the colour richer than the species' and `bright` the sunlit
+side brighter beside the shade. `rim` lights a lobe's edge against the sun.
+Mid and far trees are lit the same way over the same lobes, with the
+look's own marks (a cluster of smaller leaves for a gathered dab), so a
+tree keeps its colours as it passes from tier to tier.
+
+**Marks.** All drawn by arithmetic, no picture loaded. A painterly leaf is
+an outline about its midrib, folded (one half a little darker), lighter
+to its tip, its own tone, casting a thin shadow on what it lies over;
+green carries a number of each leaf's own, so leaves in the light vary one
+by one. Close to, where a texel covers more than a pixel, a mark's edge is
+sharpened over one pixel, so leaves stay crisp at any distance.
+
+**Cost**, the grove (400 trees) on this Mac at 2800 x 1800, 4x MSAA, the
+least of four runs, graphics card's time for the whole frame: painted 1.8
+ms in the clearing and 1.3 ms from outside, painterly 3.4 and 2.1,
+sculpted 3.5 and 2.1, real 3.0 and 2.3. The same pieces in every look but
+the realistic one; the painterly and sculpted looks' dabs are larger
+(`dabScale` 1.4 and 1.5), which is most of their cost, and their lobe is
+found by a search over the crown's lobes in the vertex shader.
 
 ## Species
 
@@ -152,14 +206,15 @@ pnpm dev
 Then open the address it prints (the lab is at `/lab/`). Drag to turn,
 right-drag to move, the wheel to come nearer. The bar chooses what stands on
 the ground (*One tree*, *Specimen*: one of each, *Grove*: 400, *Course*:
-30,000 over 2.4 km), the eye, the hour and the wind; *Envelope* draws each
+30,000 over 2.4 km), the look (*Painted*, *Painterly*, *Sculpted*, *Real*,
+each with its own style), the eye, the hour and the wind; *Envelope* draws each
 tree's measured size over it (its crown's box, outline and ellipsoid, its
 trunk), which is how one sees a drawn tree fills the numbers it was given.
 The rail chooses a species; the inspector changes it (colours and light at
 once, its form by growing it again) or the scene (style, detail, which
 tiers show, how many variants). *Preset* is all of it as JSON; *Measure*
 times the graphics card over fixed views. H puts the panels away, `[` and
-`]` step the scenes. `?scene=`, `?species=`, `?hour=`, `?wind=`, `?eye=`
+`]` step the scenes. `?scene=`, `?look=`, `?species=`, `?hour=`, `?wind=`, `?eye=`
 and `?fresh` (ignore what the lab kept) set it from the address.
 
 ## How a tree grows

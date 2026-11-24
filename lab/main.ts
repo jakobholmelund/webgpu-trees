@@ -12,6 +12,7 @@
 //   ?wind=4          the wind's speed (m/s)
 //   ?eye=standing | tree | overhead | course   where the eye starts
 //   ?at=x,y,z,tx,ty,tz   exactly a view, as "Share view" writes it
+//   ?look=painterly  the look: stylized (painted), painterly, sculpted or real
 //   ?tier=0|1|2      draw one tier alone
 //   ?fresh           ignore what the lab kept from last time
 
@@ -27,8 +28,10 @@ import {
   DEFAULT_VARIANT_OPTIONS,
   ALL_SPECIES,
   LEAF_KIND_ROWS,
-  REAL_STYLE,
+  LOOK_STYLES,
   STARTER_SPECIES,
+  STYLE_RANGES,
+  TREE_LOOKS,
   type TreeLook,
   type TreeDetail,
   type TreeInstance,
@@ -43,13 +46,15 @@ import {
 import { course, grove, oneTree, specimenRow, specimens } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
 
-// (v2: the regional species joined the starters, and the style has fullLight, bark and faceEye.)
-const STORE_KEY = "tree-lab-preset-v2";
+// (v3: the styles: four looks, and the style has lobe, bulge, warm, cool, chroma, rim and sprigs.)
+const STORE_KEY = "tree-lab-preset-v3";
 const query = new URLSearchParams(location.search);
 
 /** What the lab keeps and hands out: everything set here that is not where the eye is. */
 interface Preset {
   version: 1;
+  /** The look the style is for (left out: the painted look). */
+  look?: TreeLook;
   species: TreeSpecies[];
   style: TreeStyle;
   detail: TreeDetail;
@@ -130,15 +135,19 @@ function readPreset(value: unknown): Preset | string {
     const bad = speciesProblem(p.species[i], i);
     if (bad) return bad;
   }
-  if (!numbersLike(p.style, DEFAULT_STYLE)) return "its style is missing a number";
+  // (A style from before a number was added takes the package's for it: only those it has must be numbers.)
+  if (typeof p.style !== "object" || p.style === null || !Object.entries(p.style).every(([k, v]) => !(k in DEFAULT_STYLE) || Number.isFinite(v))) return "its style has something not a number";
   if (!numbersLike(p.detail, DEFAULT_DETAIL)) return "its detail is missing a number";
   // (Variants came later than the rest: a preset without them takes the package's own.)
   const variants = p.variants === undefined ? { ...DEFAULT_VARIANT_OPTIONS } : p.variants;
   if (!numbersLike(variants, DEFAULT_VARIANT_OPTIONS)) return "its variants are missing a number";
+  const look = p.look === undefined ? "stylized" : p.look;
+  if (!TREE_LOOKS.includes(look)) return `its look must be one of ${TREE_LOOKS.join(", ")}`;
   return {
     version: 1,
+    look,
     species: p.species.map((s) => cloneSpecies(s)),
-    style: { ...DEFAULT_STYLE, ...p.style },
+    style: { ...LOOK_STYLES[look], ...p.style },
     detail: { ...DEFAULT_DETAIL, ...p.detail },
     variants: { ...DEFAULT_VARIANT_OPTIONS, ...variants },
   };
@@ -176,13 +185,15 @@ async function start() {
     scene: (SCENES.find(([, name]) => name === sceneAsked)?.[1] ?? "grove") as SceneName,
     fill: query.get("fill") === "1",
     envelope: false,
-    look: (query.get("look") === "real" ? "real" : "stylized") as TreeLook,
+    look: (TREE_LOOKS.find((l) => l === query.get("look")) ?? "stylized") as TreeLook,
   };
-  if (state.look === "real") Object.assign(style, REAL_STYLE);
+  Object.assign(style, LOOK_STYLES[state.look]);
 
   // What was kept from last time, unless asked not to.
   const applyPreset = (p: Preset) => {
     species = p.species;
+    // (The look from the address wins over the kept one, as the scene does.)
+    if (p.look && !query.has("look")) state.look = p.look;
     Object.assign(style, p.style);
     Object.assign(detail, p.detail);
     Object.assign(variants, p.variants);
@@ -363,7 +374,7 @@ async function start() {
     saidUntil = performance.now() + 6000;
   };
 
-  const preset = (): Preset => ({ version: 1, species: species.map((s) => cloneSpecies(s)), style: { ...style }, detail: { ...detail }, variants: { ...variants } });
+  const preset = (): Preset => ({ version: 1, look: state.look, species: species.map((s) => cloneSpecies(s)), style: { ...style }, detail: { ...detail }, variants: { ...variants } });
   const save = () => {
     // (Only a sound state is kept: one that will not grow would be thrown away on the next load, and all with it.)
     if (species.some((s) => checkSpecies(s).length > 0)) return;
@@ -467,14 +478,17 @@ async function start() {
     light.windSpeed = w;
     refreshNumbers();
   });
-  // The look: the pieces differ (dabs, or leaf cards), so the trees are made again, with the look's own style.
-  segment(el("look"), [["Painted", "stylized"], ["Real", "real"]] as [string, TreeLook][], () => state.look, (look) => {
+  // The look: the pieces differ (dabs, leaf clusters, lobes, or leaf cards), so the trees are made again, with
+  // the look's own style.
+  const refreshLook = segment(el("look"), [["Painted", "stylized"], ["Painterly", "painterly"], ["Sculpted", "sculpted"], ["Real", "real"]] as [string, TreeLook][], () => state.look, (look) => setLook(look));
+  const setLook = (look: TreeLook) => {
     state.look = look;
-    Object.assign(style, look === "real" ? REAL_STYLE : DEFAULT_STYLE);
+    Object.assign(style, LOOK_STYLES[look]);
     sceneGui.controllersRecursive().forEach((c) => c.updateDisplay());
+    refreshLook();
     save();
-    void regrow();
-  });
+    return regrow();
+  };
   el("envelope").addEventListener("click", () => {
     state.envelope = !state.envelope;
     refreshEnvelope();
@@ -505,7 +519,7 @@ async function start() {
   el("copy-view").addEventListener("click", () => {
     const q = new URLSearchParams();
     q.set("scene", state.scene);
-    if (state.look === "real") q.set("look", "real");
+    if (state.look !== "stylized") q.set("look", state.look);
     q.set("species", String(chosen.row));
     if (state.fill) q.set("fill", "1");
     q.set("hour", String(light.hour));
@@ -659,18 +673,33 @@ async function start() {
   lightPanel.add(light, "windSpeed", 0, 20, 0.5).name("wind (m/s)").onChange(() => refreshWind());
   lightPanel.add(light, "windHeading", 0, 360, 1).name("wind heading (°)");
   const stylePanel = sceneGui.addFolder("Style");
-  stylePanel.add(style, "steps", 0, 1, 0.01).name("flat bands").onChange(save);
-  stylePanel.add(style, "bands", 1, 8, 1).name("how many bands").onChange(save);
-  stylePanel.add(style, "round", 0, 1, 0.01).name("clumps lit round").onChange(save);
-  stylePanel.add(style, "jitter", 0, 1, 0.01).name("dab to dab").onChange(save);
-  stylePanel.add(style, "dabScale", 0.25, 2.5, 0.01).name("dab size").onChange(save);
-  stylePanel.add(style, "through", 0, 1, 0.01).name("sun through").onChange(save);
-  stylePanel.add(style, "wrap", 0, 1, 0.01).name("light wraps").onChange(save);
-  stylePanel.add(style, "strokes", 0, 1, 0.01).name("brush strokes").onChange(save);
-  stylePanel.add(style, "selfShade", 0, 1, 0.01).name("crown shades itself").onChange(save);
-  stylePanel.add(style, "fullLight", 0.2, 1, 0.01).name("full sun from").onChange(save);
-  stylePanel.add(style, "bark", 0, 1, 0.01).name("bark furrows").onChange(save);
-  stylePanel.add(style, "faceEye", 0, 1, 0.01).name("cards face the eye").onChange(save);
+  // (Every number of the style, in the package's own ranges; the button sets the look's own again.)
+  const STYLE_NAMES: Record<keyof TreeStyle, string> = {
+    steps: "flat bands",
+    bands: "how many bands",
+    round: "clumps lit round",
+    jitter: "dab to dab",
+    dabScale: "dab size",
+    through: "sun through",
+    wrap: "light wraps",
+    strokes: "brush strokes",
+    selfShade: "crown shades itself",
+    fullLight: "full sun from",
+    bark: "bark furrows",
+    faceEye: "cards face the eye",
+    lobe: "lit as big lobes",
+    bulge: "each dab a ball",
+    warm: "light warm",
+    cool: "shade cool",
+    chroma: "colour",
+    rim: "rim against the sun",
+    sprigs: "sprigs (sculpted)",
+    bright: "sunlit side's brightness",
+  };
+  for (const [key, r] of Object.entries(STYLE_RANGES) as [keyof TreeStyle, { min: number; max: number; step: number }][]) {
+    stylePanel.add(style, key, r.min, r.max, r.step).name(STYLE_NAMES[key]).onChange(save);
+  }
+  stylePanel.add({ reset: () => (Object.assign(style, LOOK_STYLES[state.look]), refreshNumbers(), save()) }, "reset").name("the look's own style");
   const detailPanel = sceneGui.addFolder("Detail");
   detailPanel.add(detail, "nearPx", 20, 1200, 1).name("near above (px)").onChange(save);
   detailPanel.add(detail, "farPx", 5, 600, 1).name("far below (px)").onChange(save);
@@ -701,6 +730,9 @@ async function start() {
     if (typeof p === "string") return p;
     // (The list may be longer or shorter than before: the trees are made again from it, never re-read.)
     applyPreset(p);
+    // (A preset handed in is all of it, its look too, whatever the address said.)
+    if (p.look) state.look = p.look;
+    refreshLook();
     chosen.row = Math.min(chosen.row, species.length - 1);
     rebuildSpecies();
     refreshNumbers();
@@ -721,7 +753,7 @@ async function start() {
     navigator.clipboard.writeText(text.value).then(() => (note.textContent = "Copied."), () => (note.textContent = "Could not copy: select the text instead."));
   });
   el("preset-reset").addEventListener("click", async () => {
-    await load({ version: 1, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: DEFAULT_STYLE, detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
+    await load({ version: 1, look: state.look, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: LOOK_STYLES[state.look], detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
     text.value = JSON.stringify(preset(), null, 2);
     note.textContent = "Back to the package's starter species.";
   });
@@ -902,6 +934,7 @@ async function start() {
     load,
     preset,
     setBare,
+    setLook,
     setScene: (name: SceneName) => {
       setScene(name);
       refreshScene();
