@@ -1,0 +1,658 @@
+// Turn the downloaded scans (fetch.mjs) into what the realistic look loads: assets/bark, assets/leaves,
+// assets/scans.json (what each picture holds and how big it is in the world) and assets/SOURCES.md (who made
+// each, under what licence). Same sources, same tools, same bytes out.
+//
+//   node tools/scans/build.mjs <raw> [--preview <dir>]
+//
+// Bark: each set is a tile 1024 texels square, resampled from the scan as a tile (wrapping round its edges,
+// in linear light), with the light left in the photograph evened out over long distances (so a repeat is not
+// marked by a bright or dark patch), its normals made unit length, its height stretched to 0..1.
+//   <id>.albedo.avif   colour (sRGB), roughness in alpha
+//   <id>.normal.avif   normal x, normal y (OpenGL: y up the picture), height; z is sqrt(1 - x² - y²)
+// Leaves: each set a sheet of single leaves, cut from the scan along its coverage, stood upright (stalk
+// down, tip up), the colour bled out past each leaf's edge (so mipmaps do not darken its rim), packed.
+//   <id>.albedo.avif   colour (sRGB), coverage in alpha
+//   <id>.normal.avif   normal x, normal y, how much light the leaf lets through (0..1)
+
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { BARK, LEAVES, SITES, SOURCES } from "./recipe.mjs";
+import { Img, avifVersion, blur, hex, luminance, magickVersion, quantile, read, seamRatio, toLinear, toSrgb, writeAvif, writePng } from "./image.mjs";
+
+const args = process.argv.slice(2);
+const raw = args[0];
+const previewAt = args.indexOf("--preview") >= 0 ? args[args.indexOf("--preview") + 1] : null;
+const only = args.indexOf("--only") >= 0 ? args[args.indexOf("--only") + 1].split(",") : null;
+if (!raw) {
+  console.error("usage: node tools/scans/build.mjs <raw> [--preview <dir>] [--only id,id]");
+  process.exit(1);
+}
+const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const OUT = join(root, "assets");
+const TMP = join(previewAt ?? join(root, "node_modules/.cache"), "scans-tmp");
+mkdirSync(join(OUT, "bark"), { recursive: true });
+mkdirSync(join(OUT, "leaves"), { recursive: true });
+mkdirSync(TMP, { recursive: true });
+if (previewAt) mkdirSync(previewAt, { recursive: true });
+
+const BARK_N = 1024;
+/** The mean lightness (linear) a leaf kept as lightness only is brought to: a mid green leaf's. */
+const TONE_MEAN = 0.18;
+const r3 = (x) => Math.round(x * 1000) / 1000;
+
+/** The file holding map `m` of a source (its own names for them). */
+function mapFile(key, m) {
+  const s = SOURCES[key];
+  const names = s.site === "ambientcg" ? { diff: "Color", nor_gl: "NormalGL", rough: "Roughness", disp: "Displacement", alpha: "Opacity", scatter: "Scattering" } : {};
+  const f = join(raw, key, s.map(names[m] ?? m));
+  return existsSync(f) ? f : null;
+}
+
+function encode(img, name, opts) {
+  const png = join(TMP, `${name.replace(/\//g, "_")}.png`);
+  writePng(img, png);
+  writeAvif(png, join(OUT, `${name}.avif`), opts);
+  return png;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Bark.
+
+function buildBark(set, layer) {
+  const s = SOURCES[set.source];
+  const N = BARK_N;
+  const opt = { resize: [N, N], tile: true };
+  const albedo = read(mapFile(set.source, "diff"), { channels: 3, ...opt, linear: true });
+  const nor = read(mapFile(set.source, "nor_gl"), { channels: 3, ...opt });
+  const rough = read(mapFile(set.source, "rough"), { channels: 1, ...opt });
+  const disp = read(mapFile(set.source, "disp"), { channels: 1, ...opt });
+  const seams = { albedo: r3(seamRatio(albedo)), normal: r3(seamRatio(nor)) };
+
+  // Into linear light.
+  const lin = new Img(N, N, 3);
+  for (let i = 0; i < lin.data.length; i++) lin.data[i] = toLinear(albedo.data[i]);
+
+  // Even out the photograph's light: its lightness over long distances (a blur a sixth of the tile wide) is
+  // pulled towards the tile's mean, as much as `delight` says. Colour is kept, only scaled.
+  const logL = new Img(N, N, 1);
+  for (let i = 0; i < N * N; i++) logL.data[i] = Math.log(luminance(lin.data[i * 3], lin.data[i * 3 + 1], lin.data[i * 3 + 2]) + 0.005);
+  const meanLog = logL.data.reduce((a, b) => a + b, 0) / (N * N);
+  const low = blur(logL, Math.round(N / 12));
+  for (let i = 0; i < N * N; i++) {
+    const f = Math.exp((meanLog - low.data[i]) * set.delight);
+    for (let k = 0; k < 3; k++) lin.data[i * 3 + k] = Math.min(1, lin.data[i * 3 + k] * f);
+  }
+
+  if (set.birch) birchFrom(lin, disp, set.birch);
+
+  // Height: stretched so its 0.5 % and 99.5 % points are 0 and 1.
+  const h0 = quantile(disp.data, 0.005);
+  const h1 = quantile(disp.data, 0.995);
+  const height = disp.data.map((v) => Math.min(1, Math.max(0, (v - h0) / Math.max(1e-6, h1 - h0))));
+
+  const out = new Img(N, N, 4);
+  const surf = new Img(N, N, 3);
+  const mean = [0, 0, 0];
+  let roughMean = 0;
+  for (let i = 0; i < N * N; i++) {
+    for (let k = 0; k < 3; k++) {
+      out.data[i * 4 + k] = toSrgb(lin.data[i * 3 + k]);
+      mean[k] += lin.data[i * 3 + k] / (N * N);
+    }
+    out.data[i * 4 + 3] = rough.data[i];
+    roughMean += rough.data[i] / (N * N);
+    let x = nor.data[i * 3] * 2 - 1;
+    let y = nor.data[i * 3 + 1] * 2 - 1;
+    let z = nor.data[i * 3 + 2] * 2 - 1;
+    const l = Math.hypot(x, y, Math.max(0.05, z));
+    x /= l;
+    y /= l;
+    surf.data[i * 3] = x * 0.5 + 0.5;
+    surf.data[i * 3 + 1] = y * 0.5 + 0.5;
+    surf.data[i * 3 + 2] = height[i];
+  }
+  const aPng = encode(out, `bark/${set.id}.albedo`, { quality: 62, alphaQuality: 50, yuv: "420" });
+  const nPng = encode(surf, `bark/${set.id}.normal`, { quality: 70, yuv: "444" });
+  if (previewAt) barkPreview(set, aPng, nPng);
+
+  const mm = set.tileCm ? set.tileCm.map((c) => c * 10) : s.sizeMm;
+  return {
+    id: set.id,
+    layer,
+    tileCm: mm.map((v) => Math.round(v) / 10),
+    tileFrom: set.tileFrom ?? s.sizeFrom ?? `measured: ${SITES[s.site].name}'s stated size of the scan`,
+    meanLinear: mean.map(r3),
+    meanColor: "#" + mean.map((v) => Math.round(toSrgb(v) * 255).toString(16).padStart(2, "0")).join(""),
+    roughness: r3(roughMean),
+    seams,
+    look: set.look,
+    for: set.for,
+    source: set.source,
+  };
+}
+
+/**
+ * A birch's bark from a cherry's: the cherry's lenticels and cracks (where it is darker than round about,
+ * and long across the stem) laid dark on white, a little peach where the outer layer stands proud.
+ */
+function birchFrom(lin, disp, c) {
+  const N = lin.w;
+  const white = hex(c.white).map(toLinear);
+  const dark = hex(c.dark).map(toLinear);
+  const peach = hex(c.peach).map(toLinear);
+  const logL = new Img(N, N, 1);
+  for (let i = 0; i < N * N; i++) logL.data[i] = Math.log(luminance(lin.data[i * 3], lin.data[i * 3 + 1], lin.data[i * 3 + 2]) + 0.005);
+  const local = blur(logL, 20);
+  // Darker than round about, smeared along the lenticels' length (across the stem: the picture's rows).
+  const dk = new Img(N, N, 1);
+  for (let i = 0; i < N * N; i++) dk.data[i] = Math.max(0, local.data[i] - logL.data[i]);
+  const along = new Img(N, N, 1);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let s = 0;
+      for (let k = -4; k <= 4; k++) s += dk.data[y * N + ((x + k + N) % N)];
+      along.data[y * N + x] = s / 9;
+    }
+  const lo = quantile(along.data, 0.8);
+  const hi = quantile(along.data, 0.985);
+  const dh = blur(disp, 12);
+  const p0 = quantile(disp.data.map((v, i) => v - dh.data[i]), 0.9);
+  for (let i = 0; i < N * N; i++) {
+    const t = Math.min(1, Math.max(0, (along.data[i] - lo) / Math.max(1e-6, hi - lo)));
+    const mark = t * t * (3 - 2 * t);
+    const proud = Math.min(1, Math.max(0, (disp.data[i] - dh.data[i] - p0) * 30)) * 0.35;
+    // A faint mottle of the cherry's own lightness, so the white is not flat paint.
+    const mottle = Math.exp((logL.data[i] - local.data[i]) * 0.25);
+    for (let k = 0; k < 3; k++) {
+      const base = (white[k] * (1 - proud) + peach[k] * proud) * mottle;
+      lin.data[i * 3 + k] = Math.min(1, base * (1 - mark) + dark[k] * mark);
+    }
+  }
+}
+
+/** A preview of a bark set: its colour tiled two by two, and its surface lit from the upper left. */
+function barkPreview(set, aPng, nPng) {
+  const nrm = read(nPng, { channels: 3 });
+  const N = nrm.w;
+  const lit = new Img(N, N, 3);
+  const L = [-0.5, 0.6, 0.62];
+  for (let i = 0; i < N * N; i++) {
+    const x = nrm.data[i * 3] * 2 - 1;
+    const y = nrm.data[i * 3 + 1] * 2 - 1;
+    const z = Math.sqrt(Math.max(0, 1 - x * x - y * y));
+    const d = Math.max(0, x * L[0] + y * L[1] + z * L[2]);
+    lit.data[i * 3] = d * 0.8 + 0.1;
+    lit.data[i * 3 + 1] = d * 0.8 + 0.1;
+    lit.data[i * 3 + 2] = nrm.data[i * 3 + 2];
+  }
+  const litPng = join(TMP, `${set.id}-lit.png`);
+  writePng(lit, litPng);
+  execMagick([aPng, "-alpha", "off", "-write", "mpr:a", "+delete", "mpr:a", "mpr:a", "+append", "-write", "mpr:r", "+delete", "mpr:r", "mpr:r", "-append", "-resize", "1024x1024", join(previewAt, `bark-${set.id}-tiled.jpg`)]);
+  execMagick([aPng, "-alpha", "off", "-resize", "512x512", litPng, "-resize", "512x512", "+append", join(previewAt, `bark-${set.id}.jpg`)]);
+}
+
+function execMagick(a) {
+  execFileSync(process.env.MAGICK ?? "magick", a);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Leaves.
+
+/** Label each covered texel (alpha over a half) by the patch of covered texels it is joined to (8 ways). */
+function components(alpha) {
+  const { w, h } = alpha;
+  const lab = new Int32Array(w * h).fill(-1);
+  const comps = [];
+  const stack = [];
+  for (let i0 = 0; i0 < w * h; i0++) {
+    if (lab[i0] >= 0 || alpha.data[i0] <= 0.5) continue;
+    const id = comps.length;
+    const c = { id, n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, y0: h, x1: 0, y1: 0 };
+    lab[i0] = id;
+    stack.push(i0);
+    while (stack.length) {
+      const i = stack.pop();
+      const x = i % w;
+      const y = (i / w) | 0;
+      c.n++;
+      c.sx += x;
+      c.sy += y;
+      c.sxx += x * x;
+      c.syy += y * y;
+      c.sxy += x * y;
+      if (x < c.x0) c.x0 = x;
+      if (x > c.x1) c.x1 = x;
+      if (y < c.y0) c.y0 = y;
+      if (y > c.y1) c.y1 = y;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          const j = yy * w + xx;
+          if (lab[j] < 0 && alpha.data[j] > 0.5) {
+            lab[j] = id;
+            stack.push(j);
+          }
+        }
+    }
+    comps.push(c);
+  }
+  return { lab, comps };
+}
+
+/** Grow every patch's label `r` texels into the uncovered texels round it (so its soft edge is its own). */
+function growLabels(lab, w, h, r) {
+  let cur = lab;
+  for (let p = 0; p < r; p++) {
+    const next = Int32Array.from(cur);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (cur[i] >= 0) continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h && cur[yy * w + xx] >= 0) {
+            next[i] = cur[yy * w + xx];
+            break;
+          }
+        }
+      }
+    cur = next;
+  }
+  return cur;
+}
+
+/** Bilinear sample of channel k at (x, y), 0 outside. */
+function sample(img, x, y, k) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  let s = 0;
+  for (const [dx, dy, wgt] of [[0, 0, (1 - fx) * (1 - fy)], [1, 0, fx * (1 - fy)], [0, 1, (1 - fx) * fy], [1, 1, fx * fy]]) {
+    const xx = x0 + dx;
+    const yy = y0 + dy;
+    if (xx < 0 || yy < 0 || xx >= img.w || yy >= img.h) continue;
+    s += img.data[(yy * img.w + xx) * img.c + k] * wgt;
+  }
+  return s;
+}
+
+const BASE_DIR = { down: [0, 1], left: [-1, 0], right: [1, 0], up: [0, -1] };
+
+function buildLeaves(set) {
+  const key = set.source;
+  const color = read(mapFile(key, "diff"), { channels: 3 });
+  const alpha = read(mapFile(key, "alpha"), { channels: 1 });
+  const nor = read(mapFile(key, "nor_gl"), { channels: 3 });
+  const dispFile = mapFile(key, "disp");
+  const disp = dispFile ? read(dispFile, { channels: 1 }) : null;
+  const scatFile = mapFile(key, "scatter");
+  const scat = scatFile ? read(scatFile, { channels: 1 }) : null;
+  const { w, h } = color;
+
+  // Where to look, and which way the stalks point there.
+  const rects = set.rects ?? [{ x0: 0, y0: 0, x1: 1, y1: 1, base: set.base }];
+  const inRect = new Int8Array(w * h).fill(-1);
+  rects.forEach((r, k) => {
+    for (let y = Math.floor(r.y0 * h); y < Math.ceil(r.y1 * h); y++) for (let x = Math.floor(r.x0 * w); x < Math.ceil(r.x1 * w); x++) inRect[y * w + x] = k;
+  });
+  const a = new Img(w, h, 1, alpha.data.map((v, i) => (inRect[i] >= 0 ? v : 0)));
+  const { lab, comps } = components(a);
+
+  // The leaves: patches at least a tenth the size of the biggest in their rectangle (not specks, not bits).
+  let leaves = [];
+  rects.forEach((r, k) => {
+    const mine = comps.filter((c) => inRect[c.y0 * w + c.x0] === k || inRect[Math.round(c.sy / c.n) * w + Math.round(c.sx / c.n)] === k);
+    const biggest = Math.max(...mine.map((c) => c.n));
+    const big = mine.filter((c) => c.n >= biggest * 0.1).sort((p, q) => q.n - p.n);
+    for (const c of big.slice(0, r.count ?? big.length)) leaves.push({ ...c, base: r.base ?? set.base });
+  });
+  // In reading order: rows (patches whose middles are within half a typical patch's height), then left to right.
+  const midY = (c) => (c.y0 + c.y1) / 2;
+  leaves.sort((p, q) => midY(p) - midY(q));
+  const rowsOf = [];
+  const typH = quantile(leaves.map((c) => c.y1 - c.y0), 0.5);
+  for (const c of leaves) {
+    const row = rowsOf.find((r) => Math.abs(midY(r[0]) - midY(c)) < typH * 0.5);
+    if (row) row.push(c);
+    else rowsOf.push([c]);
+  }
+  leaves = rowsOf.flatMap((r) => r.sort((p, q) => p.x0 - q.x0));
+  if (process.env.DEBUG) leaves.forEach((c, i) => console.log(`  ${i}: x ${c.x0}..${c.x1} y ${c.y0}..${c.y1} n ${c.n}`));
+  leaves = leaves.filter((_, i) => !(set.skip ?? []).includes(i)).slice(0, set.max ?? 8);
+  const grown = growLabels(lab, w, h, 3);
+
+  // Each stood up: its long axis turned to point its stalk straight down (within 40° of the way the recipe
+  // says its stalk points; else just that way).
+  for (const c of leaves) {
+    const b = BASE_DIR[c.base];
+    let u = b;
+    if (set.deskew !== false) {
+      const mx = c.sx / c.n;
+      const my = c.sy / c.n;
+      const cxx = c.sxx / c.n - mx * mx;
+      const cyy = c.syy / c.n - my * my;
+      const cxy = c.sxy / c.n - mx * my;
+      const ang = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+      let v = [Math.cos(ang), Math.sin(ang)];
+      if (v[0] * b[0] + v[1] * b[1] < 0) v = [-v[0], -v[1]];
+      if (v[0] * b[0] + v[1] * b[1] > Math.cos((40 * Math.PI) / 180)) u = v;
+    }
+    // The turn taking u to (0, 1): out = R · d.
+    const th = Math.atan2(1, 0) - Math.atan2(u[1], u[0]);
+    c.cos = Math.cos(th);
+    c.sin = Math.sin(th);
+    // Its extent once turned.
+    let ox0 = Infinity;
+    let ox1 = -Infinity;
+    let oy0 = Infinity;
+    let oy1 = -Infinity;
+    for (let y = c.y0; y <= c.y1; y++)
+      for (let x = c.x0; x <= c.x1; x++) {
+        if (lab[y * w + x] !== c.id) continue;
+        const X = c.cos * x - c.sin * y;
+        const Y = c.sin * x + c.cos * y;
+        if (X < ox0) ox0 = X;
+        if (X > ox1) ox1 = X;
+        if (Y < oy0) oy0 = Y;
+        if (Y > oy1) oy1 = Y;
+      }
+    Object.assign(c, { ox0, ox1, oy0, oy1, len: oy1 - oy0 });
+  }
+  const longest = Math.max(...leaves.map((c) => c.len));
+  const scale = set.px / longest;
+  const PAD = 6;
+  const SS = 3;
+
+  const sprites = leaves.map((c) => {
+    const sw = Math.ceil((c.ox1 - c.ox0) * scale) + 2 * PAD;
+    const sh = Math.ceil((c.oy1 - c.oy0) * scale) + 2 * PAD;
+    const col = new Img(sw, sh, 4);
+    const sur = new Img(sw, sh, 3);
+    const thick = [];
+    for (let oy = 0; oy < sh; oy++)
+      for (let ox = 0; ox < sw; ox++) {
+        let A = 0;
+        const rgb = [0, 0, 0];
+        let nx = 0;
+        let ny = 0;
+        let tr = 0;
+        for (let sy = 0; sy < SS; sy++)
+          for (let sx = 0; sx < SS; sx++) {
+            // Back from the sprite to the scan: unscale, unturn.
+            const X = (ox + (sx + 0.5) / SS - PAD) / scale + c.ox0;
+            const Y = (oy + (sy + 0.5) / SS - PAD) / scale + c.oy0;
+            const x = c.cos * X + c.sin * Y;
+            const y = -c.sin * X + c.cos * Y;
+            const xi = Math.round(x);
+            const yi = Math.round(y);
+            if (xi < 0 || yi < 0 || xi >= w || yi >= h || grown[yi * w + xi] !== c.id) continue;
+            const al = sample(a, x, y, 0);
+            if (al <= 0) continue;
+            A += al;
+            for (let k = 0; k < 3; k++) rgb[k] += toLinear(sample(color, x, y, k)) * al;
+            // The normal turned with the leaf (the picture's y runs down, the normal's up).
+            const n0 = sample(nor, x, y, 0) * 2 - 1;
+            const n1 = -(sample(nor, x, y, 1) * 2 - 1);
+            nx += (c.cos * n0 - c.sin * n1) * al;
+            ny += -(c.sin * n0 + c.cos * n1) * al;
+            tr += (scat ? sample(scat, x, y, 0) : disp ? sample(disp, x, y, 0) : 0.5) * al;
+          }
+        const i = oy * sw + ox;
+        const cover = A / (SS * SS);
+        col.data[i * 4 + 3] = cover;
+        if (A > 0) {
+          for (let k = 0; k < 3; k++) col.data[i * 4 + k] = rgb[k] / A;
+          sur.data[i * 3] = nx / A;
+          sur.data[i * 3 + 1] = ny / A;
+          sur.data[i * 3 + 2] = tr / A;
+          if (cover > 0.5) thick.push(tr / A);
+        }
+      }
+    // Light through: the scan's own scattering map where it has one, else thinner where the leaf lies lower
+    // than its veins and midrib (its displacement): 0.35 at the thickest, 1 at the thinnest.
+    const t0 = quantile(thick, 0.05);
+    const t1 = quantile(thick, 0.95);
+    for (let i = 0; i < sw * sh; i++) {
+      const v = (sur.data[i * 3 + 2] - t0) / Math.max(1e-6, t1 - t0);
+      const t = Math.min(1, Math.max(0, v));
+      sur.data[i * 3 + 2] = scat ? 0.35 + 0.65 * t : disp ? 1 - 0.65 * t : 0.75;
+    }
+    // Where it stands: its stalk's end (the middle of its lowest covered row) and its tip (of its highest).
+    const rowMid = (oy) => {
+      let s = 0;
+      let n = 0;
+      for (let ox = 0; ox < sw; ox++)
+        if (col.data[(oy * sw + ox) * 4 + 3] > 0.5) {
+          s += ox;
+          n++;
+        }
+      return n ? s / n : null;
+    };
+    let by = sh - 1;
+    while (by > 0 && rowMid(by) === null) by--;
+    let ty = 0;
+    while (ty < sh - 1 && rowMid(ty) === null) ty++;
+    return { col, sur, w: sw, h: sh, base: [rowMid(by), by + 1], tip: [rowMid(ty), ty], size: c.len / longest };
+  });
+
+  // Colour, and the turned normals, bled out past the edges; then lightness only, for an autumn scan.
+  for (const s of sprites) {
+    bleed(s.col, 4, [0, 1, 2]);
+    const cov = new Img(s.w, s.h, 4);
+    for (let i = 0; i < s.w * s.h; i++) {
+      cov.data[i * 4] = s.sur.data[i * 3];
+      cov.data[i * 4 + 1] = s.sur.data[i * 3 + 1];
+      cov.data[i * 4 + 2] = s.sur.data[i * 3 + 2];
+      cov.data[i * 4 + 3] = s.col.data[i * 4 + 3];
+    }
+    bleed(cov, 4, [0, 1, 2]);
+    for (let i = 0; i < s.w * s.h; i++) {
+      let x = cov.data[i * 4];
+      let y = cov.data[i * 4 + 1];
+      const l = Math.hypot(x, y);
+      if (l > 0.98) {
+        x *= 0.98 / l;
+        y *= 0.98 / l;
+      }
+      s.sur.data[i * 3] = x * 0.5 + 0.5;
+      s.sur.data[i * 3 + 1] = y * 0.5 + 0.5;
+      s.sur.data[i * 3 + 2] = cov.data[i * 4 + 3] > 0 ? cov.data[i * 4 + 2] : 0.75;
+    }
+    if (set.tone) {
+      // Lightness only, each leaf brought to the same mean (an autumn sheet's leaves run from tan to near
+      // black; the species gives a live leaf's colour, so only each leaf's own shading is kept).
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < s.w * s.h; i++) {
+        const L = luminance(s.col.data[i * 4], s.col.data[i * 4 + 1], s.col.data[i * 4 + 2]);
+        const al = s.col.data[i * 4 + 3];
+        sum += Math.log(L + 0.005) * al;
+        n += al;
+        for (let k = 0; k < 3; k++) s.col.data[i * 4 + k] = L;
+      }
+      const f = TONE_MEAN / Math.exp(sum / n);
+      for (let i = 0; i < s.w * s.h; i++) for (let k = 0; k < 3; k++) s.col.data[i * 4 + k] = Math.min(1, s.col.data[i * 4 + k] * f);
+    }
+    for (let i = 0; i < s.w * s.h; i++) for (let k = 0; k < 3; k++) s.col.data[i * 4 + k] = toSrgb(s.col.data[i * 4 + k]);
+  }
+
+  // Packed in shelves, tallest first, at whichever width (512, 768 or 1024) leaves the smallest sheet.
+  const GAP = 4;
+  const order = sprites.map((_, i) => i).sort((p, q) => sprites[q].h - sprites[p].h || p - q);
+  const pack = (W) => {
+    let x = GAP;
+    let y = GAP;
+    let shelf = 0;
+    const at = [];
+    for (const i of order) {
+      const s = sprites[i];
+      if (s.w + 2 * GAP > W) return null;
+      if (x + s.w + GAP > W) {
+        x = GAP;
+        y += shelf + GAP;
+        shelf = 0;
+      }
+      at[i] = [x, y];
+      x += s.w + GAP;
+      shelf = Math.max(shelf, s.h);
+    }
+    return { W, H: Math.ceil((y + shelf + GAP) / 16) * 16, at };
+  };
+  const best = [512, 768, 1024].map(pack).filter((p) => p).sort((p, q) => p.W * p.H - q.W * q.H || p.W - q.W)[0];
+  const { W, H } = best;
+  sprites.forEach((s, i) => ([s.x, s.y] = best.at[i]));
+  const sheet = new Img(W, H, 4);
+  const surf = new Img(W, H, 3);
+  for (let i = 0; i < W * H; i++) {
+    surf.data[i * 3] = 0.5;
+    surf.data[i * 3 + 1] = 0.5;
+    surf.data[i * 3 + 2] = 0.75;
+  }
+  const mean = [0, 0, 0];
+  let covered = 0;
+  for (const s of sprites)
+    for (let yy = 0; yy < s.h; yy++)
+      for (let xx = 0; xx < s.w; xx++) {
+        const i = yy * s.w + xx;
+        const j = (s.y + yy) * W + s.x + xx;
+        for (let k = 0; k < 4; k++) sheet.data[j * 4 + k] = s.col.data[i * 4 + k];
+        for (let k = 0; k < 3; k++) surf.data[j * 3 + k] = s.sur.data[i * 3 + k];
+        const al = s.col.data[i * 4 + 3];
+        for (let k = 0; k < 3; k++) mean[k] += toLinear(s.col.data[i * 4 + k]) * al;
+        covered += al;
+      }
+  const aPng = encode(sheet, `leaves/${set.id}.albedo`, { quality: 66, alphaQuality: 80, yuv: "420" });
+  encode(surf, `leaves/${set.id}.normal`, { quality: 66, yuv: "444" });
+  if (previewAt) execMagick([aPng, "-background", "#8a9aa8", "-alpha", "remove", "-alpha", "off", join(previewAt, `leaves-${set.id}.jpg`)]);
+
+  const m = mean.map((v) => v / covered);
+  return {
+    id: set.id,
+    size: [W, H],
+    lengthCm: set.lengthCm,
+    tone: !!set.tone,
+    meanLinear: m.map(r3),
+    meanColor: "#" + m.map((v) => Math.round(toSrgb(v) * 255).toString(16).padStart(2, "0")).join(""),
+    sprites: sprites.map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h, base: s.base.map((v) => Math.round(v * 10) / 10), tip: s.tip.map((v) => Math.round(v * 10) / 10), size: r3(s.size) })),
+    look: set.look,
+    for: set.for,
+    source: set.source,
+  };
+}
+
+/**
+ * Fill the uncovered texels' channels `ks` (alpha in channel 3) from the covered ones round them: a pyramid
+ * of coverage-weighted averages, each level filling the holes of the one below (push-pull). `levels` deep.
+ */
+function bleed(img, levels, ks) {
+  const pyr = [img];
+  for (let l = 0; l < levels; l++) {
+    const p = pyr[l];
+    const w = Math.max(1, p.w >> 1);
+    const h = Math.max(1, p.h >> 1);
+    const q = new Img(w, h, 4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const acc = [0, 0, 0];
+        let A = 0;
+        for (let dy = 0; dy < 2; dy++)
+          for (let dx = 0; dx < 2; dx++) {
+            const xx = Math.min(p.w - 1, 2 * x + dx);
+            const yy = Math.min(p.h - 1, 2 * y + dy);
+            const a = p.data[(yy * p.w + xx) * 4 + 3];
+            A += a;
+            for (const k of ks) acc[k] += p.data[(yy * p.w + xx) * 4 + k] * a;
+          }
+        for (const k of ks) q.data[(y * w + x) * 4 + k] = A > 0 ? acc[k] / A : 0;
+        q.data[(y * w + x) * 4 + 3] = Math.min(1, A);
+      }
+    pyr.push(q);
+  }
+  for (let l = levels - 1; l >= 0; l--) {
+    const p = pyr[l];
+    const q = pyr[l + 1];
+    for (let y = 0; y < p.h; y++)
+      for (let x = 0; x < p.w; x++) {
+        const i = (y * p.w + x) * 4;
+        const a = p.data[i + 3];
+        if (a >= 0.999) continue;
+        const j = (Math.min(q.h - 1, y >> 1) * q.w + Math.min(q.w - 1, x >> 1)) * 4;
+        if (q.data[j + 3] <= 0) continue;
+        // Below the leaf's own colour where it is partly covered; the coarser level's where it is not.
+        for (const k of ks) p.data[i + k] = a > 0 ? p.data[i + k] : q.data[j + k];
+        if (l > 0) p.data[i + 3] = Math.max(a, q.data[j + 3] > 0 ? 1 : 0);
+      }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+const manifestFile = join(OUT, "scans.json");
+const prev = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, "utf8")) : { bark: { sets: [] }, leaves: { sets: [] } };
+const bark = BARK.map((set, layer) => {
+  if (only && !only.includes(set.id)) return prev.bark.sets.find((b) => b.id === set.id);
+  console.log(`bark ${set.id}`);
+  return buildBark(set, layer);
+}).filter(Boolean);
+const leaves = LEAVES.map((set) => {
+  if (only && !only.includes(set.id)) return prev.leaves.sets.find((b) => b.id === set.id);
+  console.log(`leaves ${set.id}`);
+  return buildLeaves(set);
+}).filter(Boolean);
+const manifest = {
+  about: "What the realistic look's scanned pictures hold. Written by tools/scans/build.mjs; sources and licences in SOURCES.md.",
+  tools: { magick: magickVersion(), avifenc: avifVersion() },
+  bark: { size: BARK_N, albedo: "colour (sRGB), roughness in alpha", normal: "normal x, normal y (OpenGL, y up the picture), height 0..1", sets: bark },
+  leaves: { albedo: "colour (sRGB), coverage in alpha", normal: "normal x, normal y (OpenGL), light let through 0..1", sprite: "x, y, w, h in texels from the top left; base (stalk end) and tip in the sprite's texels; size: its length over its set's longest", sets: leaves },
+};
+writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
+writeFileSync(join(OUT, "SOURCES.md"), sourcesMd());
+console.log("done");
+
+function sourcesMd() {
+  const lines = [
+    "# Scanned sources",
+    "",
+    "The realistic look's bark and leaf pictures (this folder) are made from these scans. Every one is **CC0 1.0 Universal**",
+    "(public domain dedication) as its publisher states for everything it publishes: ambientCG (" + SITES.ambientcg.licenceUrl + ")",
+    "and Poly Haven (" + SITES.polyhaven.licenceUrl + "). Credit is not required; it is given here anyway, with thanks.",
+    "",
+    "They are cut, cleaned, resampled and packed by `tools/scans/build.mjs` from the files `tools/scans/fetch.mjs` downloads",
+    "(the list is `tools/scans/recipe.mjs`). This file is written by the build.",
+    "",
+    "## Bark",
+    "",
+    "| Set | Look | For | Source | Author | Licence | Tile (cm) |",
+    "|---|---|---|---|---|---|---|",
+  ];
+  const credit = (key) => {
+    const s = SOURCES[key];
+    const site = SITES[s.site];
+    const page = site.page(s.id);
+    return { src: `[${site.name}: ${s.title ?? s.id}](${page}) (\`${s.id}\`)`, author: s.authors ? s.authors.join(", ") : site.author, licence: `[${site.licence}](${site.licenceUrl})` };
+  };
+  for (const b of bark) {
+    const c = credit(b.source);
+    lines.push(`| ${b.id} | ${b.look} | ${b.for.join(", ")} | ${c.src} | ${c.author} | ${c.licence} | ${b.tileCm.join(" × ")} |`);
+  }
+  lines.push("", "## Leaves", "", "| Set | Look | For | Source | Author | Licence |", "|---|---|---|---|---|---|");
+  for (const l of leaves) {
+    const c = credit(l.source);
+    lines.push(`| ${l.id} | ${l.look} | ${l.for.join(", ")} | ${c.src} | ${c.author} | ${c.licence} |`);
+  }
+  lines.push("", "## Downloaded files", "");
+  const used = [...new Set([...BARK, ...LEAVES].map((s) => s.source))];
+  for (const key of used) {
+    const s = SOURCES[key];
+    const urls = s.zip ? [s.zip] : Object.values(s.files);
+    lines.push(`- \`${s.id}\`: ${urls.map((u) => `<${u}>`).join(", ")}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}

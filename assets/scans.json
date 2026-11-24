@@ -1,0 +1,1701 @@
+{
+  "about": "What the realistic look's scanned pictures hold. Written by tools/scans/build.mjs; sources and licences in SOURCES.md.",
+  "tools": {
+    "magick": "Version: ImageMagick 7.1.1-47 Q16-HDRI aarch64 22763",
+    "avifenc": "Version: 1.4.2 (dav1d [dec]:1.5.4, aom [enc/dec]:3.15.2)"
+  },
+  "bark": {
+    "size": 1024,
+    "albedo": "colour (sRGB), roughness in alpha",
+    "normal": "normal x, normal y (OpenGL, y up the picture), height 0..1",
+    "sets": [
+      {
+        "id": "eucalyptus",
+        "layer": 0,
+        "tileCm": [
+          182,
+          182
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.108,
+          0.078,
+          0.055
+        ],
+        "meanColor": "#5c4f42",
+        "roughness": 0.888,
+        "seams": {
+          "albedo": 1.28,
+          "normal": 1.492
+        },
+        "look": "smooth, peeling plates, mottled grey-brown-cream (Tasmanian blue gum itself)",
+        "for": [
+          "Eucalyptus"
+        ],
+        "source": "bark_bluegum"
+      },
+      {
+        "id": "plane",
+        "layer": 1,
+        "tileCm": [
+          80,
+          80
+        ],
+        "tileFrom": "estimated: largest patches ~16 cm, a plane's 3–15 cm",
+        "meanLinear": [
+          0.613,
+          0.601,
+          0.421
+        ],
+        "meanColor": "#cdccae",
+        "roughness": 0.509,
+        "seams": {
+          "albedo": 1.084,
+          "normal": 1.101
+        },
+        "look": "jigsaw exfoliation: cream, olive and sage patches",
+        "for": [
+          "Plane",
+          "California sycamore"
+        ],
+        "source": "plane"
+      },
+      {
+        "id": "beech",
+        "layer": 2,
+        "tileCm": [
+          90,
+          180
+        ],
+        "tileFrom": "measured: Poly Haven's stated 1.8 m, taken as the length of this 1:2 scan",
+        "meanLinear": [
+          0.091,
+          0.065,
+          0.035
+        ],
+        "meanColor": "#554835",
+        "roughness": 0.925,
+        "seams": {
+          "albedo": 1.086,
+          "normal": 0.999
+        },
+        "look": "smooth grey skin with lichen dots and faint horizontal lines",
+        "for": [
+          "Beech"
+        ],
+        "source": "chinese_hackberry_bark"
+      },
+      {
+        "id": "birch",
+        "layer": 3,
+        "tileCm": [
+          160,
+          160
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.784,
+          0.759,
+          0.707
+        ],
+        "meanColor": "#e5e2db",
+        "roughness": 0.615,
+        "seams": {
+          "albedo": 1.115,
+          "normal": 1.104
+        },
+        "look": "white, with dark horizontal lenticels (recoloured from a cherry's lenticelled bark)",
+        "for": [
+          "Silver birch"
+        ],
+        "source": "sakura_bark"
+      },
+      {
+        "id": "oak",
+        "layer": 4,
+        "tileCm": [
+          35,
+          70
+        ],
+        "tileFrom": "estimated: ~8 ridges across, an oak's ridges 2–6 cm",
+        "meanLinear": [
+          0.231,
+          0.223,
+          0.206
+        ],
+        "meanColor": "#84827d",
+        "roughness": 0.725,
+        "seams": {
+          "albedo": 1.058,
+          "normal": 1.156
+        },
+        "look": "deep vertical fissures between grey checkered ridges",
+        "for": [
+          "Oak",
+          "Black alder",
+          "Hawthorn",
+          "Coast live oak"
+        ],
+        "source": "oak"
+      },
+      {
+        "id": "ridged",
+        "layer": 5,
+        "tileCm": [
+          215,
+          215
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.248,
+          0.195,
+          0.152
+        ],
+        "meanColor": "#887a6d",
+        "roughness": 0.694,
+        "seams": {
+          "albedo": 1.07,
+          "normal": 1.178
+        },
+        "look": "grey-brown interlacing furrows and corky ridges",
+        "for": [
+          "Weeping willow",
+          "Lombardy poplar",
+          "Red oak",
+          "Sugar maple"
+        ],
+        "source": "bark_willow_02"
+      },
+      {
+        "id": "pine",
+        "layer": 6,
+        "tileCm": [
+          200,
+          200
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.139,
+          0.089,
+          0.054
+        ],
+        "meanColor": "#685442",
+        "roughness": 0.707,
+        "seams": {
+          "albedo": 0.903,
+          "normal": 1.117
+        },
+        "look": "red-brown plates between dark fissures",
+        "for": [
+          "Scots pine",
+          "Corsican pine",
+          "Monterey pine",
+          "Torrey pine",
+          "Aleppo pine",
+          "Stone pine",
+          "Eastern white pine"
+        ],
+        "source": "pine_bark"
+      },
+      {
+        "id": "pineFlakes",
+        "layer": 7,
+        "tileCm": [
+          180,
+          180
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.334,
+          0.239,
+          0.162
+        ],
+        "meanColor": "#9c8670",
+        "roughness": 0.683,
+        "seams": {
+          "albedo": 1.158,
+          "normal": 1.211
+        },
+        "look": "thin papery flakes, orange on a pale ground (a Scots pine's upper stem, once tinted)",
+        "for": [
+          "Scots pine"
+        ],
+        "source": "japanese_zelkova_bark"
+      },
+      {
+        "id": "spruce",
+        "layer": 8,
+        "tileCm": [
+          60,
+          60
+        ],
+        "tileFrom": "estimated: ~20 scales across, a spruce's 1–3 cm",
+        "meanLinear": [
+          0.306,
+          0.283,
+          0.256
+        ],
+        "meanColor": "#96918a",
+        "roughness": 0.528,
+        "seams": {
+          "albedo": 1.094,
+          "normal": 1.068
+        },
+        "look": "small thin grey scales with orange-brown flakes",
+        "for": [
+          "Spruce",
+          "Sitka spruce",
+          "White spruce"
+        ],
+        "source": "spruce"
+      },
+      {
+        "id": "douglas",
+        "layer": 9,
+        "tileCm": [
+          120,
+          120
+        ],
+        "tileFrom": "measured: ambientCG's stated size of the scan",
+        "meanLinear": [
+          0.2,
+          0.14,
+          0.087
+        ],
+        "meanColor": "#7c6853",
+        "roughness": 0.619,
+        "seams": {
+          "albedo": 1.178,
+          "normal": 1.171
+        },
+        "look": "thick corky red-brown bark, long ridges and deep furrows",
+        "for": [
+          "Douglas fir"
+        ],
+        "source": "douglas"
+      },
+      {
+        "id": "fibrous",
+        "layer": 10,
+        "tileCm": [
+          194,
+          194
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.102,
+          0.052,
+          0.028
+        ],
+        "meanColor": "#5a402e",
+        "roughness": 0.927,
+        "seams": {
+          "albedo": 1.026,
+          "normal": 0.968
+        },
+        "look": "long red-brown fibrous strips peeling to grey",
+        "for": [
+          "Western red cedar",
+          "Monterey cypress"
+        ],
+        "source": "metasequoia_bark"
+      },
+      {
+        "id": "palmRings",
+        "layer": 11,
+        "tileCm": [
+          65,
+          130
+        ],
+        "tileFrom": "measured: Poly Haven's stated 1.3 m, taken as the length of this 1:2 scan",
+        "meanLinear": [
+          0.349,
+          0.295,
+          0.238
+        ],
+        "meanColor": "#9f9486",
+        "roughness": 0.699,
+        "seams": {
+          "albedo": 1.094,
+          "normal": 1.158
+        },
+        "look": "grey stem with ring-like leaf scars",
+        "for": [
+          "Mexican fan palm"
+        ],
+        "source": "palm_tree_bark"
+      },
+      {
+        "id": "palmFibre",
+        "layer": 12,
+        "tileCm": [
+          186,
+          186
+        ],
+        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "meanLinear": [
+          0.099,
+          0.076,
+          0.06
+        ],
+        "meanColor": "#594e45",
+        "roughness": 0.93,
+        "seams": {
+          "albedo": 0.962,
+          "normal": 1.11
+        },
+        "look": "dark fibrous stem, horizontal leaf-base ridges",
+        "for": [
+          "Canary date palm"
+        ],
+        "source": "palm_bark"
+      }
+    ]
+  },
+  "leaves": {
+    "albedo": "colour (sRGB), coverage in alpha",
+    "normal": "normal x, normal y (OpenGL), light let through 0..1",
+    "sprite": "x, y, w, h in texels from the top left; base (stalk end) and tip in the sprite's texels; size: its length over its set's longest",
+    "sets": [
+      {
+        "id": "oak",
+        "size": [
+          512,
+          944
+        ],
+        "lengthCm": 11,
+        "tone": false,
+        "meanLinear": [
+          0.303,
+          0.454,
+          0.074
+        ],
+        "meanColor": "#96b44d",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 179,
+            "h": 332,
+            "base": [
+              94,
+              326
+            ],
+            "tip": [
+              95,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 340,
+            "w": 206,
+            "h": 300,
+            "base": [
+              112,
+              294
+            ],
+            "tip": [
+              114.5,
+              6
+            ],
+            "size": 0.898
+          },
+          {
+            "x": 204,
+            "y": 644,
+            "w": 213,
+            "h": 286,
+            "base": [
+              69.2,
+              279
+            ],
+            "tip": [
+              108,
+              6
+            ],
+            "size": 0.854
+          },
+          {
+            "x": 187,
+            "y": 4,
+            "w": 227,
+            "h": 304,
+            "base": [
+              132,
+              297
+            ],
+            "tip": [
+              119.3,
+              6
+            ],
+            "size": 0.91
+          },
+          {
+            "x": 4,
+            "y": 644,
+            "w": 196,
+            "h": 288,
+            "base": [
+              126.5,
+              281
+            ],
+            "tip": [
+              118.5,
+              6
+            ],
+            "size": 0.861
+          },
+          {
+            "x": 214,
+            "y": 340,
+            "w": 186,
+            "h": 298,
+            "base": [
+              91.5,
+              292
+            ],
+            "tip": [
+              42,
+              6
+            ],
+            "size": 0.892
+          }
+        ],
+        "look": "lobed oak leaves",
+        "for": [
+          "Oak",
+          "Hawthorn"
+        ],
+        "source": "LeafSet016"
+      },
+      {
+        "id": "redOak",
+        "size": [
+          768,
+          608
+        ],
+        "lengthCm": 17,
+        "tone": true,
+        "meanLinear": [
+          0.179,
+          0.179,
+          0.179
+        ],
+        "meanColor": "#757575",
+        "sprites": [
+          {
+            "x": 183,
+            "y": 308,
+            "w": 177,
+            "h": 281,
+            "base": [
+              36,
+              274
+            ],
+            "tip": [
+              89,
+              6
+            ],
+            "size": 0.931
+          },
+          {
+            "x": 4,
+            "y": 308,
+            "w": 175,
+            "h": 285,
+            "base": [
+              139.5,
+              279
+            ],
+            "tip": [
+              85,
+              6
+            ],
+            "size": 0.947
+          },
+          {
+            "x": 557,
+            "y": 308,
+            "w": 192,
+            "h": 276,
+            "base": [
+              60.5,
+              270
+            ],
+            "tip": [
+              97,
+              7
+            ],
+            "size": 0.916
+          },
+          {
+            "x": 364,
+            "y": 308,
+            "w": 189,
+            "h": 278,
+            "base": [
+              127.5,
+              272
+            ],
+            "tip": [
+              93,
+              7
+            ],
+            "size": 0.923
+          },
+          {
+            "x": 507,
+            "y": 4,
+            "w": 175,
+            "h": 286,
+            "base": [
+              88,
+              279
+            ],
+            "tip": [
+              88,
+              6
+            ],
+            "size": 0.949
+          },
+          {
+            "x": 329,
+            "y": 4,
+            "w": 174,
+            "h": 291,
+            "base": [
+              85.5,
+              284
+            ],
+            "tip": [
+              88.5,
+              7
+            ],
+            "size": 0.966
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 159,
+            "h": 300,
+            "base": [
+              65,
+              294
+            ],
+            "tip": [
+              94.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 167,
+            "y": 4,
+            "w": 158,
+            "h": 298,
+            "base": [
+              91,
+              292
+            ],
+            "tip": [
+              71,
+              6
+            ],
+            "size": 0.993
+          }
+        ],
+        "look": "bristle-lobed red oak leaves (autumn colours, kept as lightness only)",
+        "for": [
+          "Red oak"
+        ],
+        "source": "LeafSet030"
+      },
+      {
+        "id": "maple",
+        "size": [
+          768,
+          704
+        ],
+        "lengthCm": 16,
+        "tone": false,
+        "meanLinear": [
+          0.181,
+          0.338,
+          0.019
+        ],
+        "meanColor": "#769d25",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 372,
+            "w": 305,
+            "h": 315,
+            "base": [
+              108,
+              309
+            ],
+            "tip": [
+              94.5,
+              7
+            ],
+            "size": 0.86
+          },
+          {
+            "x": 313,
+            "y": 372,
+            "w": 258,
+            "h": 313,
+            "base": [
+              136,
+              306
+            ],
+            "tip": [
+              131,
+              7
+            ],
+            "size": 0.853
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 280,
+            "h": 364,
+            "base": [
+              156.5,
+              358
+            ],
+            "tip": [
+              89,
+              7
+            ],
+            "size": 1
+          },
+          {
+            "x": 288,
+            "y": 4,
+            "w": 229,
+            "h": 356,
+            "base": [
+              74.5,
+              350
+            ],
+            "tip": [
+              96,
+              7
+            ],
+            "size": 0.976
+          }
+        ],
+        "look": "palmate maple leaves",
+        "for": [
+          "Plane",
+          "California sycamore",
+          "Sugar maple"
+        ],
+        "source": "LeafSet010"
+      },
+      {
+        "id": "round",
+        "size": [
+          512,
+          880
+        ],
+        "lengthCm": 9,
+        "tone": false,
+        "meanLinear": [
+          0.231,
+          0.308,
+          0.02
+        ],
+        "meanColor": "#849727",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 308,
+            "w": 199,
+            "h": 284,
+            "base": [
+              108.5,
+              278
+            ],
+            "tip": [
+              90,
+              6
+            ],
+            "size": 0.943
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 198,
+            "h": 300,
+            "base": [
+              85.5,
+              294
+            ],
+            "tip": [
+              104.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 206,
+            "y": 4,
+            "w": 186,
+            "h": 287,
+            "base": [
+              85,
+              281
+            ],
+            "tip": [
+              108,
+              6
+            ],
+            "size": 0.954
+          },
+          {
+            "x": 180,
+            "y": 596,
+            "w": 196,
+            "h": 238,
+            "base": [
+              153.5,
+              231
+            ],
+            "tip": [
+              119.5,
+              6
+            ],
+            "size": 0.782
+          },
+          {
+            "x": 4,
+            "y": 596,
+            "w": 172,
+            "h": 273,
+            "base": [
+              82.5,
+              266
+            ],
+            "tip": [
+              96,
+              6
+            ],
+            "size": 0.904
+          },
+          {
+            "x": 207,
+            "y": 308,
+            "w": 198,
+            "h": 274,
+            "base": [
+              89,
+              268
+            ],
+            "tip": [
+              107,
+              6
+            ],
+            "size": 0.909
+          }
+        ],
+        "look": "round leaves, toothed",
+        "for": [
+          "Black alder"
+        ],
+        "source": "LeafSet009"
+      },
+      {
+        "id": "deltoid",
+        "size": [
+          512,
+          976
+        ],
+        "lengthCm": 10,
+        "tone": false,
+        "meanLinear": [
+          0.062,
+          0.131,
+          0.009
+        ],
+        "meanColor": "#466518",
+        "sprites": [
+          {
+            "x": 196,
+            "y": 4,
+            "w": 175,
+            "h": 324,
+            "base": [
+              109.5,
+              318
+            ],
+            "tip": [
+              59.5,
+              6
+            ],
+            "size": 0.974
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 188,
+            "h": 332,
+            "base": [
+              92.5,
+              326
+            ],
+            "tip": [
+              97,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 183,
+            "y": 658,
+            "w": 197,
+            "h": 294,
+            "base": [
+              132,
+              287
+            ],
+            "tip": [
+              65.5,
+              7
+            ],
+            "size": 0.879
+          },
+          {
+            "x": 4,
+            "y": 340,
+            "w": 175,
+            "h": 314,
+            "base": [
+              104.5,
+              308
+            ],
+            "tip": [
+              58.5,
+              6
+            ],
+            "size": 0.942
+          },
+          {
+            "x": 183,
+            "y": 340,
+            "w": 163,
+            "h": 309,
+            "base": [
+              87,
+              302
+            ],
+            "tip": [
+              79,
+              6
+            ],
+            "size": 0.926
+          },
+          {
+            "x": 4,
+            "y": 658,
+            "w": 175,
+            "h": 301,
+            "base": [
+              72,
+              294
+            ],
+            "tip": [
+              83,
+              6
+            ],
+            "size": 0.902
+          }
+        ],
+        "look": "triangular leaves on long stalks",
+        "for": [
+          "Lombardy poplar",
+          "Silver birch"
+        ],
+        "source": "LeafSet004"
+      },
+      {
+        "id": "serrate",
+        "size": [
+          768,
+          656
+        ],
+        "lengthCm": 9,
+        "tone": false,
+        "meanLinear": [
+          0.272,
+          0.417,
+          0.088
+        ],
+        "meanColor": "#8ead53",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 156,
+            "h": 332,
+            "base": [
+              87.5,
+              326
+            ],
+            "tip": [
+              84,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 164,
+            "y": 4,
+            "w": 178,
+            "h": 325,
+            "base": [
+              59.5,
+              319
+            ],
+            "tip": [
+              87,
+              6
+            ],
+            "size": 0.978
+          },
+          {
+            "x": 186,
+            "y": 340,
+            "w": 165,
+            "h": 306,
+            "base": [
+              62,
+              300
+            ],
+            "tip": [
+              69,
+              6
+            ],
+            "size": 0.918
+          },
+          {
+            "x": 4,
+            "y": 340,
+            "w": 178,
+            "h": 308,
+            "base": [
+              118,
+              302
+            ],
+            "tip": [
+              66,
+              7
+            ],
+            "size": 0.923
+          },
+          {
+            "x": 346,
+            "y": 4,
+            "w": 174,
+            "h": 325,
+            "base": [
+              102,
+              319
+            ],
+            "tip": [
+              74,
+              6
+            ],
+            "size": 0.976
+          },
+          {
+            "x": 524,
+            "y": 4,
+            "w": 162,
+            "h": 322,
+            "base": [
+              110.5,
+              315
+            ],
+            "tip": [
+              85,
+              6
+            ],
+            "size": 0.967
+          }
+        ],
+        "look": "ovate leaves, finely toothed, straight veins",
+        "for": [
+          "Silver birch"
+        ],
+        "source": "LeafSet014"
+      },
+      {
+        "id": "beech",
+        "size": [
+          512,
+          1200
+        ],
+        "lengthCm": 9,
+        "tone": false,
+        "meanLinear": [
+          0.177,
+          0.307,
+          0.06
+        ],
+        "meanColor": "#759645",
+        "sprites": [
+          {
+            "x": 224,
+            "y": 308,
+            "w": 227,
+            "h": 292,
+            "base": [
+              149.5,
+              285
+            ],
+            "tip": [
+              82,
+              6
+            ],
+            "size": 0.969
+          },
+          {
+            "x": 221,
+            "y": 4,
+            "w": 208,
+            "h": 295,
+            "base": [
+              86,
+              289
+            ],
+            "tip": [
+              117.5,
+              6
+            ],
+            "size": 0.982
+          },
+          {
+            "x": 4,
+            "y": 308,
+            "w": 216,
+            "h": 294,
+            "base": [
+              88,
+              288
+            ],
+            "tip": [
+              114.5,
+              6
+            ],
+            "size": 0.978
+          },
+          {
+            "x": 221,
+            "y": 606,
+            "w": 214,
+            "h": 289,
+            "base": [
+              120.5,
+              283
+            ],
+            "tip": [
+              92.5,
+              6
+            ],
+            "size": 0.961
+          },
+          {
+            "x": 4,
+            "y": 902,
+            "w": 214,
+            "h": 288,
+            "base": [
+              101,
+              281
+            ],
+            "tip": [
+              112.5,
+              6
+            ],
+            "size": 0.955
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 213,
+            "h": 300,
+            "base": [
+              115.5,
+              294
+            ],
+            "tip": [
+              98,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 222,
+            "y": 902,
+            "w": 212,
+            "h": 287,
+            "base": [
+              150.5,
+              280
+            ],
+            "tip": [
+              96,
+              6
+            ],
+            "size": 0.952
+          },
+          {
+            "x": 4,
+            "y": 606,
+            "w": 213,
+            "h": 292,
+            "base": [
+              76.5,
+              285
+            ],
+            "tip": [
+              121,
+              6
+            ],
+            "size": 0.969
+          }
+        ],
+        "look": "oval leaves with wavy margins and straight veins",
+        "for": [
+          "Beech"
+        ],
+        "source": "LeafSet024"
+      },
+      {
+        "id": "elliptic",
+        "size": [
+          768,
+          352
+        ],
+        "lengthCm": 7,
+        "tone": false,
+        "meanLinear": [
+          0.164,
+          0.201,
+          0.061
+        ],
+        "meanColor": "#717c46",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 129,
+            "h": 332,
+            "base": [
+              104,
+              325
+            ],
+            "tip": [
+              75.5,
+              6
+            ],
+            "size": 0.997
+          },
+          {
+            "x": 431,
+            "y": 4,
+            "w": 118,
+            "h": 294,
+            "base": [
+              41,
+              287
+            ],
+            "tip": [
+              61.5,
+              6
+            ],
+            "size": 0.879
+          },
+          {
+            "x": 278,
+            "y": 4,
+            "w": 149,
+            "h": 323,
+            "base": [
+              79.5,
+              316
+            ],
+            "tip": [
+              67.5,
+              6
+            ],
+            "size": 0.97
+          },
+          {
+            "x": 137,
+            "y": 4,
+            "w": 137,
+            "h": 332,
+            "base": [
+              84,
+              326
+            ],
+            "tip": [
+              82,
+              6
+            ],
+            "size": 1
+          }
+        ],
+        "look": "elliptic leaves, toothed",
+        "for": [
+          "Coast live oak",
+          "Shrub"
+        ],
+        "source": "LeafSet003"
+      },
+      {
+        "id": "lance",
+        "size": [
+          512,
+          416
+        ],
+        "lengthCm": 12,
+        "tone": false,
+        "meanLinear": [
+          0.251,
+          0.328,
+          0.016
+        ],
+        "meanColor": "#899b22",
+        "sprites": [
+          {
+            "x": 202,
+            "y": 4,
+            "w": 86,
+            "h": 295,
+            "base": [
+              43,
+              288
+            ],
+            "tip": [
+              21.5,
+              6
+            ],
+            "size": 0.735
+          },
+          {
+            "x": 109,
+            "y": 4,
+            "w": 89,
+            "h": 339,
+            "base": [
+              41.5,
+              332
+            ],
+            "tip": [
+              33,
+              6
+            ],
+            "size": 0.849
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 101,
+            "h": 396,
+            "base": [
+              46,
+              390
+            ],
+            "tip": [
+              40.5,
+              6
+            ],
+            "size": 1
+          }
+        ],
+        "look": "narrow lanceolate leaves",
+        "for": [
+          "Weeping willow",
+          "Eucalyptus"
+        ],
+        "source": "LeafSet013"
+      },
+      {
+        "id": "scale",
+        "size": [
+          512,
+          480
+        ],
+        "lengthCm": 18,
+        "tone": false,
+        "meanLinear": [
+          0.066,
+          0.154,
+          0.038
+        ],
+        "meanColor": "#496d37",
+        "sprites": [
+          {
+            "x": 354,
+            "y": 4,
+            "w": 116,
+            "h": 227,
+            "base": [
+              61,
+              221
+            ],
+            "tip": [
+              42,
+              6
+            ],
+            "size": 0.479
+          },
+          {
+            "x": 188,
+            "y": 4,
+            "w": 162,
+            "h": 426,
+            "base": [
+              49.5,
+              419
+            ],
+            "tip": [
+              26.5,
+              6
+            ],
+            "size": 0.922
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 180,
+            "h": 460,
+            "base": [
+              122,
+              454
+            ],
+            "tip": [
+              83.5,
+              6
+            ],
+            "size": 1
+          }
+        ],
+        "look": "sprays of scale leaves",
+        "for": [
+          "Western red cedar",
+          "Monterey cypress"
+        ],
+        "source": "LeafSet019"
+      },
+      {
+        "id": "pine",
+        "size": [
+          512,
+          480
+        ],
+        "lengthCm": 22,
+        "tone": false,
+        "meanLinear": [
+          0.1,
+          0.091,
+          0.038
+        ],
+        "meanColor": "#595537",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 220,
+            "h": 460,
+            "base": [
+              118.5,
+              454
+            ],
+            "tip": [
+              83,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 228,
+            "y": 4,
+            "w": 210,
+            "h": 330,
+            "base": [
+              152.5,
+              323
+            ],
+            "tip": [
+              54,
+              6
+            ],
+            "size": 0.708
+          }
+        ],
+        "look": "pine shoots with their needles",
+        "for": [
+          "Scots pine",
+          "Corsican pine",
+          "Monterey pine",
+          "Torrey pine",
+          "Aleppo pine",
+          "Stone pine",
+          "Eastern white pine",
+          "Gorse"
+        ],
+        "source": "pine_tree_01"
+      },
+      {
+        "id": "fir",
+        "size": [
+          512,
+          1680
+        ],
+        "lengthCm": 25,
+        "tone": false,
+        "meanLinear": [
+          0.078,
+          0.11,
+          0.028
+        ],
+        "meanColor": "#4f5d2f",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 1336,
+            "w": 296,
+            "h": 327,
+            "base": [
+              143.5,
+              320
+            ],
+            "tip": [
+              125,
+              6
+            ],
+            "size": 0.701
+          },
+          {
+            "x": 304,
+            "y": 1336,
+            "w": 175,
+            "h": 178,
+            "base": [
+              60.5,
+              172
+            ],
+            "tip": [
+              30,
+              6
+            ],
+            "size": 0.37
+          },
+          {
+            "x": 4,
+            "y": 930,
+            "w": 351,
+            "h": 402,
+            "base": [
+              189.5,
+              396
+            ],
+            "tip": [
+              214,
+              6
+            ],
+            "size": 0.869
+          },
+          {
+            "x": 4,
+            "y": 468,
+            "w": 414,
+            "h": 458,
+            "base": [
+              215.5,
+              451
+            ],
+            "tip": [
+              235,
+              6
+            ],
+            "size": 0.994
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 393,
+            "h": 460,
+            "base": [
+              189.5,
+              454
+            ],
+            "tip": [
+              252,
+              6
+            ],
+            "size": 1
+          }
+        ],
+        "look": "fir sprays, flat-needled",
+        "for": [
+          "Spruce",
+          "Sitka spruce",
+          "White spruce",
+          "Douglas fir"
+        ],
+        "source": "fir_tree_01"
+      },
+      {
+        "id": "blade",
+        "size": [
+          512,
+          544
+        ],
+        "lengthCm": 40,
+        "tone": false,
+        "meanLinear": [
+          0.082,
+          0.144,
+          0.036
+        ],
+        "meanColor": "#516a35",
+        "sprites": [
+          {
+            "x": 98,
+            "y": 4,
+            "w": 46,
+            "h": 504,
+            "base": [
+              24.5,
+              497
+            ],
+            "tip": [
+              39,
+              6
+            ],
+            "size": 0.959
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 32,
+            "h": 524,
+            "base": [
+              15.3,
+              518
+            ],
+            "tip": [
+              18,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 40,
+            "y": 4,
+            "w": 54,
+            "h": 512,
+            "base": [
+              25.8,
+              505
+            ],
+            "tip": [
+              6,
+              7
+            ],
+            "size": 0.975
+          },
+          {
+            "x": 195,
+            "y": 4,
+            "w": 34,
+            "h": 499,
+            "base": [
+              17,
+              493
+            ],
+            "tip": [
+              8,
+              7
+            ],
+            "size": 0.951
+          },
+          {
+            "x": 148,
+            "y": 4,
+            "w": 43,
+            "h": 501,
+            "base": [
+              26,
+              494
+            ],
+            "tip": [
+              6,
+              6
+            ],
+            "size": 0.954
+          },
+          {
+            "x": 233,
+            "y": 4,
+            "w": 30,
+            "h": 494,
+            "base": [
+              13.5,
+              486
+            ],
+            "tip": [
+              9.5,
+              6
+            ],
+            "size": 0.94
+          },
+          {
+            "x": 300,
+            "y": 4,
+            "w": 41,
+            "h": 477,
+            "base": [
+              20,
+              470
+            ],
+            "tip": [
+              33,
+              6
+            ],
+            "size": 0.907
+          },
+          {
+            "x": 267,
+            "y": 4,
+            "w": 29,
+            "h": 494,
+            "base": [
+              14.5,
+              488
+            ],
+            "tip": [
+              9,
+              6
+            ],
+            "size": 0.941
+          }
+        ],
+        "look": "long narrow blades (a palm's leaflets)",
+        "for": [
+          "Canary date palm",
+          "Mexican fan palm"
+        ],
+        "source": "Foliage001"
+      }
+    ]
+  }
+}
