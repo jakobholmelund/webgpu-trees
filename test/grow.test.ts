@@ -64,7 +64,8 @@ for (const sp of ALL_SPECIES) {
         }
       });
 
-      test(`${name}: it is the size it was asked to be`, () => {
+      // (A palm's size and envelope are its own test's: test/palm.test.ts, its fronds' leaves and all.)
+      if (sp.architecture !== "palm") test(`${name}: it is the size it was asked to be`, () => {
         let top = 0;
         for (let i = 0; i < k.count; i++) top = Math.max(top, k.y[i]);
         let reach = 0;
@@ -80,7 +81,7 @@ for (const sp of ALL_SPECIES) {
         assert.ok(lowest <= size.crownBase + 0.15 * depth, `the lowest clump's bottom at ${lowest.toFixed(2)}, well over the crown's base ${size.crownBase}`);
       });
 
-      test(`${name}: its crown keeps to its species' outline`, () => {
+      if (sp.architecture !== "palm") test(`${name}: its crown keeps to its species' outline`, () => {
         const bands = 6;
         for (let i = 0; i < c.count; i++) {
           const t = (c.y[i] - size.crownBase) / depth;
@@ -121,8 +122,13 @@ for (const sp of ALL_SPECIES) {
             else if (k.order[k.parent[i]] === 0) fronds++;
             assert.ok(k.order[i] <= 1, `node ${i} is on a branch off a frond`);
           }
-          assert.ok(Math.abs(k.radius[top] / size.trunkRadius - 1) <= 0.1, `its stem's top is ${k.radius[top].toFixed(3)} m, not ${size.trunkRadius}`);
-          assert.ok(fronds >= 0.8 * sp.whorl && fronds <= sp.whorl, `${fronds} fronds of ${sp.whorl}`);
+          // (A feather palm's stem as thick at its top as at breast height; a fan palm's tapering a little: MORPHOLOGY.md.)
+          const k0 = k.radius[top] / size.trunkRadius;
+          assert.ok(sp.palmLeaf === "fan" ? k0 >= 0.6 && k0 <= 1.1 : Math.abs(k0 - 1) <= 0.1, `its stem's top is ${k.radius[top].toFixed(3)} m, not ${size.trunkRadius}`);
+          // (Its green leaves, as many as its species carries, fewer where it is cut back; its dead besides.)
+          const green = tree.palm!.fronds.filter((f) => f.cls !== "dead").length;
+          assert.ok(green >= 0.5 * sp.whorl && green <= sp.whorl, `${green} green fronds of ${sp.whorl}`);
+          assert.ok(fronds === tree.palm!.fronds.length && fronds <= 1.4 * sp.whorl, `${fronds} fronds`);
           for (let i = 0; i < k.count; i++) if (k.order[i] === 1) assert.ok(k.radius[i] < 0.5 * k.radius[top], `frond node ${i} is as thick as a stem`);
         });
       }

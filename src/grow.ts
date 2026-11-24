@@ -26,10 +26,9 @@
 //   as the crown is wide where it hangs (some missing, some broken short), and
 //   side shoots along each bough; smoothed and bowed as a broadleaf is. A
 //   conifer has one leader: its row's stems are not read.
-// - palm: one stem to the crown, as thick at its top as at its foot, and a
-//   head of fronds spiralling round its top by the golden angle, the young
-//   ones upright, the old ones hanging, each arching over as far as the crown
-//   lets it reach. Its leaves hang along each frond's outer part.
+// - palm: grown by palm.ts, as a palm: one stem from one tip, and a crown of
+//   fronds round its top by the golden angle, the young upright, the old
+//   hanging, kept as it is pruned.
 //
 // Where it stands among other trees (stand.ts) is light too: its neighbours'
 // crowns hide the low sky on their side, as a shadow over the voxels where
@@ -56,6 +55,7 @@
 //
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
+import { growPalm } from "./palm.ts";
 import { type TreeSpecies } from "./species.ts";
 import { type Stand, standShare } from "./stand.ts";
 import { crownProfile, type Clumps, type GrownTree, type Skeleton, type TreeSize } from "./tree.ts";
@@ -222,35 +222,6 @@ const CONIFER_SAG = 0.5;
  */
 const WHORL_OF_CROWN = 0.3;
 
-// Palms.
-/** How far a frond leaves the crown from the level: the youngest, nearly upright ... */
-const FROND_YOUNG = 80 * DEG;
-/** ... to the oldest, hanging. */
-const FROND_OLD = -50 * DEG;
-/** How far a frond arches over along its length at arch 1, when it leaves level (less when it leaves upright, which its weight bends less). */
-const FROND_ARCH = 110 * DEG;
-/** The steepest a frond hangs. */
-const FROND_HANG = -85 * DEG;
-/** Where the fronds leave the stem: as a share of the way up the crown. */
-const PALM_HEART = 0.55;
-/** How far down the stem the oldest fronds leave it, below the youngest, as a share of the crown's depth (at most PALM_KNOB_MAX m). */
-const PALM_KNOB = 0.12;
-const PALM_KNOB_MAX = 1.2;
-const PALM_KNOB_NODES = 4;
-/** A frond bears leaflets from this share of the way along it to its tip. */
-const FROND_LEAFY = 0.2;
-/** A frond's rachis radius at its foot, as a share of its length, and at its tip, as a share of its foot's. */
-const RACHIS = 0.011;
-const RACHIS_TIP = 0.3;
-/** How much thicker a palm's stem is at its foot, and over what height the swell dies away (m). */
-const PALM_SWELL = 0.25;
-const PALM_SWELL_HEIGHT = 0.6;
-/** How far a palm's stem bows, per metre of stem at crooked 1 (m). */
-const PALM_BOW = 0.05;
-/** Pieces of a frond, at the most and the least. */
-const FROND_PIECES_MAX = 12;
-const FROND_PIECES_MIN = 3;
-
 // Whips.
 /** The share of the node budget kept from the crown's growing for its whips, at weep 1. */
 const WHIP_NODES = 0.45;
@@ -406,8 +377,8 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
       hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift);
       break;
     case "palm":
-      hung = palm(species, sz, rng.fork(), wood, clumpR);
-      break;
+      // (A palm is grown as a palm: palm.ts.)
+      return growPalm(species, sz, seed);
   }
   const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined), rng.fork(), st);
   return species.buttress ? { ...tree, buttress: species.buttress } : tree;
@@ -2101,123 +2072,6 @@ function hangNeedles(h: Hung, w: Wood, node: number, sp: TreeSpecies, size: Tree
   // None under the crown's base: down there it is too dark for needles.
   if (y - r < size.crownBase - 0.25 * r) return;
   hang(h, node, w.x[node], y, w.z[node], r);
-}
-
-// ---------------------------------------------------------------------------
-// Palms: one stem, and a head of fronds.
-
-/** A frond's line, of unit length: from `rise` over the level, arching down by `curve`, more towards its tip, in n pieces. */
-function frondLine(rise: number, curve: number, n: number): { h: number[]; v: number[] } {
-  const h = [0];
-  const v = [0];
-  for (let k = 0; k < n; k++) {
-    const s = (k + 0.5) / n;
-    const e = Math.max(FROND_HANG, rise - curve * s * Math.sqrt(s));
-    h.push(h[k] + Math.cos(e) / n);
-    v.push(v[k] + Math.sin(e) / n);
-  }
-  return { h, v };
-}
-
-function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
-  const { height: H, crownRadius: R, crownBase: base } = size;
-  const depth = Math.max(0.01, H - base);
-  // Where a clump's centre may be: in the crown, with room for the clump (and for a big one under it).
-  const inner = new Envelope(sp, size, clumpR, 1.2 * clumpR, clumpR);
-  const heart = Math.min(inner.hi - 0.05 * depth, Math.max(inner.lo + 0.05 * depth, base + PALM_HEART * depth));
-  const knob = Math.min(PALM_KNOB_MAX, PALM_KNOB * depth, 0.5 * (heart - inner.lo));
-  const arch = Math.min(1, Math.max(0, 0.5 * (1 - sp.bend)));
-  const fronds = Math.max(3, Math.round(sp.whorl));
-  const h = newHung();
-  const radius: number[] = [];
-  w.radius = radius;
-
-  // The stem: from its foot, bowed once by how crooked it is (a lean it has grown out of, upright at its
-  // top), as thick at its top as at breast height, and swollen at its foot.
-  const bh = breastHeight(size);
-  const swell = (y: number) => 1 + PALM_SWELL * Math.exp(-Math.max(0, y) / PALM_SWELL_HEIGHT);
-  const stemR = (y: number) => (size.trunkRadius * swell(y)) / swell(bh);
-  const lean = rng.range(0, 2 * Math.PI);
-  const bow = PALM_BOW * sp.crooked * heart;
-  const stemAt = (y: number): [number, number] => {
-    const u = Math.min(1, Math.max(0, y / heart));
-    const b = bow * (1 - (1 - u) * (1 - u));
-    return [b * Math.cos(lean), b * Math.sin(lean)];
-  };
-  // (Closer at the foot, where it swells.)
-  const clear = heart - knob;
-  const heights = [0, Math.min(0.25, 0.3 * clear), Math.min(0.6, 0.6 * clear)];
-  const steps = Math.max(1, Math.ceil((clear - heights[2]) / TRUNK_STEP));
-  for (let k = 1; k <= steps; k++) heights.push(heights[2] + ((clear - heights[2]) * k) / steps);
-  for (let k = 1; k <= PALM_KNOB_NODES; k++) heights.push(clear + (knob * k) / PALM_KNOB_NODES);
-  let prev = -1;
-  const knobNodes: number[] = [];
-  for (let k = 0; k < heights.length; k++) {
-    const y = heights[k];
-    const [x, z] = stemAt(y);
-    prev = addNode(w, x, y, z, prev, true);
-    radius.push(stemR(y));
-    if (k >= heights.length - PALM_KNOB_NODES - 1) knobNodes.push(prev);
-  }
-  const top = radius[radius.length - 1];
-
-  // The fronds, the youngest first: round the stem by the golden angle, from nearly upright to hanging,
-  // the older ones leaving the stem lower down. Each arches over by its weight, and is as long as the
-  // crown lets it be.
-  const piece = 2.1 * thinGap(sp) * clumpR;
-  const turn = rng.range(0, 2 * Math.PI);
-  // (The oldest first: where crowded clumps are thinned, the lowest leaves are kept.)
-  for (let f = fronds - 1; f >= 0; f--) {
-    const age = Math.min(1, Math.max(0, (f + rng.range(0.2, 0.8)) / fronds));
-    const at = knobNodes[Math.round((1 - age) * (knobNodes.length - 1))];
-    const az = turn + f * GOLDEN_ANGLE + rng.range(-0.1, 0.1);
-    const ca = Math.cos(az);
-    const sa = Math.sin(az);
-    const rise = FROND_YOUNG + (FROND_OLD - FROND_YOUNG) * age + 4 * DEG * rng.gauss();
-    const curve = arch * FROND_ARCH * (0.35 + 0.65 * Math.max(0, Math.cos(rise)));
-    const ax = w.x[at];
-    const ay = w.y[at];
-    const az0 = w.z[at];
-    const longest = (n: number, most: number) => {
-      const line = frondLine(rise, curve, n);
-      const fits = (len: number) => {
-        for (let k = 1; k <= n; k++) {
-          const y = ay + line.v[k] * len;
-          const wd = inner.width(y);
-          if (wd < 0 || Math.hypot(ax + line.h[k] * len * ca, az0 + line.h[k] * len * sa) > wd) return false;
-        }
-        return true;
-      };
-      let lo = 0;
-      let hi = most;
-      for (let i = 0; i < 24; i++) {
-        const m = 0.5 * (lo + hi);
-        if (fits(m)) lo = m;
-        else hi = m;
-      }
-      return { line, len: lo };
-    };
-    const first = longest(16, 2 * R + depth);
-    // (In a crown with no room for it, a frond is a stub, and has no leaves.)
-    if (first.len < 0.5 * clumpR) continue;
-    const n = Math.min(FROND_PIECES_MAX, Math.max(FROND_PIECES_MIN, Math.round(first.len / piece)));
-    const { line, len } = longest(n, first.len * rng.range(0.92, 1));
-    const r0 = Math.min(0.5 * top, Math.max(0.008, RACHIS * len));
-    // A little wander square to the frond, by how crooked the species is.
-    let jitter = 0;
-    let q = at;
-    for (let k = 1; k <= n; k++) {
-      jitter += (0.06 * sp.crooked * len * rng.gauss()) / n;
-      const hh = line.h[k] * len;
-      q = addNode(w, ax + hh * ca - jitter * sa, ay + line.v[k] * len, az0 + hh * sa + jitter * ca, q, k > 1);
-      radius.push(r0 * (1 - ((1 - RACHIS_TIP) * k) / n));
-      if (k / n < FROND_LEAFY) continue;
-      // Its leaflets, along it: they hang a little under the rachis.
-      const r = clumpRadius(sp, clumpR, rng);
-      hang(h, q, w.x[q], w.y[q] - 0.15 * r, w.z[q], r);
-    }
-  }
-  return h;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # Species morphology reference for the tree library
 
-Covers 29 species plus a generic shrub, for courses in California, the Pacific Northwest, Ontario, Great Britain, France, the Netherlands and Denmark. Compiled 2026-11-24. TALLO per-species medians added the same day.
+Covers 31 species plus a generic shrub, for courses in California, the Pacific Northwest, Ontario, Great Britain, France, the Netherlands and Denmark. Compiled 2026-11-24. TALLO per-species medians added the same day.
 
 ## How to read this
 
@@ -91,6 +91,8 @@ Each species section below gives a crown spread and a height. The open-grown r/H
 | Stone pine | 0.40–0.60 | 3–10 m: 0.35 (0.29–0.42, n=2224); 10–18 m: 0.29 (0.22–0.36, n=886); 18–25 m: 0.30 (0.23–0.35, n=26) [S:TALLO] |
 | Canary date palm | 0.30–0.60 (falls with age as the trunk grows) | not in TALLO |
 | Mexican fan palm | 0.05–0.12 | not in TALLO |
+| California fan palm | 0.18–0.28 | not in TALLO |
+| Queen palm | 0.25–0.40 | not in TALLO |
 | Coast live oak | 0.50–0.80 (spread is often more than height [S:VT]) | not in TALLO |
 | California sycamore | 0.30–0.50 | not in TALLO |
 | Sugar maple | 0.30–0.45 (champion: 20.1 m spread, 23.8 m tall, r/H 0.42 [S:SILV]) | 3–10 m: 0.22 (0.16–0.27, n=349); 10–18 m: 0.17 (0.13–0.21, n=2370); 18–25 m: 0.16 (0.13–0.19, n=1774); 25 m and over: 0.16 (0.14–0.19, n=342) [S:TALLO] |
@@ -1032,7 +1034,7 @@ Each species section below gives a crown spread and a height. The open-grown r/H
 - Leaflets: 20–70 cm × 2–3.5 cm, 8–11 per 100 mm of rachis, ascending at about 45° from the rachis in a V-fold [S:SMM].
 - Lower leaflets: rigid spines to 40 cm [S:SMM].
 - Petiole: thick, about 75 mm at the base [S:SMM].
-- Leaf count: about 50–100 green leaves [est.].
+- Leaf count: healthy palms carry a full round canopy of **130–150 leaves**; potassium deficiency cuts this to half or less, and the average South Florida palm holds about 65 [S:UFPC; S:UFPP]. It makes about 50 leaves a year in South Florida [S:UFPC; S:UFPP]. A well-kept Californian course palm after pruning: about 60–100 green leaves [est.].
 - Leaf angles: from about 0–30° from vertical at the top to 100–130° for the old lower leaves, which arch strongly down [est.].
 - Curvature: the rachis arches along its whole length; tips droop.
 
@@ -1046,7 +1048,15 @@ Each species section below gives a crown spread and a height. The open-grown r/H
 2. Huge round ball of arching feather leaves.
 3. Pineapple knob under the crown.
 
-**Sources:** Prigge & Gibson, Flora of the Santa Monica Mountains (SMM).
+**Pruning on courses and in landscapes**
+- **The "pineapple" cut is the usual landscape look.** UC defines the pineapple as "the ball-like mass of persistent leaf bases just below the leaves" [S:IPMPN]. Crews sculpt it from the cut petiole stubs, and often "skin" or "peel" the old leaf bases off the trunk below [S:IPMPN], or cut them back to a neat diamond lattice [obs.].
+- **Ball size** [obs./est.]: an egg- or onion-shaped knob, widest about a third of the way down, then tapering into the trunk. It is about 1.3–1.6 times the trunk diameter across and 1.2–2 times the trunk diameter tall: roughly 1.0–1.3 m across and 1.0–1.5 m tall on a 0.8 m trunk. The stubs form a tight spiral of pale cut ends (#B8A27A fresh, weathering to the scar colour #6E604E).
+- **What the cut does to the crown.** Making a pineapple removes living lower leaves, so the green crown stops at about 70–90° from vertical instead of hanging to 100–130° [est.]. A properly pruned palm instead has a round canopy "with green leaves right down to the bottom" [S:UFPP].
+- **Pineapples are discouraged.** Pruning living leaves spreads Fusarium wilt on tools, and freshly cut living leaf bases attract palm weevils [S:UFPP; S:UFPC]. UC links sculpted pineapples and skinned trunks to sudden crown drop [S:IPMPN]. Hodel (UC Cooperative Extension) says to remove only dead leaves "or, at the most, leaves up to the horizontal (an imaginary line through the middle of the crown, from 3 to 9 o'clock)", and to refrain from excessive trunk skinning and "ball shaping" [S:HODGC].
+- **The hurricane cut** leaves only a tuft of the youngest leaves. It is discouraged: after the 2004–2005 Florida hurricanes, hurricane-cut palms were more likely to lose their crowns than full-crowned ones [S:UFPP]. UF cites the ANSI A300 (2001) pruning standard: no leaves with tips above the horizontal (the 9:00 and 3:00 positions on a clock face) should be removed [S:UFPP]. ISA's consumer guidance is reported to set the same limit [secondary].
+- **Cut height in a game** [est.]: "natural" keeps the full ball of leaves down to about 130°. "Pineapple" keeps only leaves within about 80–90° of vertical and adds the knob. A "hurricane" cut keeps only leaves within about 30° of vertical and should be rare.
+
+**Sources:** Prigge & Gibson, Flora of the Santa Monica Mountains (SMM); Broschat, UF/IFAS ENH-598 and ENH1182 (UFPC, UFPP); Hodel, UC IPM Pest Notes 74148 (IPMPN) and UCCE palm care sheet (HODGC).
 
 ### 23. Mexican fan palm — *Washingtonia robusta*
 
@@ -1074,7 +1084,21 @@ Each species section below gives a crown spread and a height. The open-grown r/H
 3. Straw skirt below the head, or a clean trimmed trunk.
 4. Flared base.
 
-**Sources:** Prigge & Gibson, Flora of the Santa Monica Mountains (SMM).
+**Further figures (UF/IFAS)**
+- Healthy palms have a full, rounded canopy of **at least 30 leaves**; potassium deficiency halves that [S:UFMF]. Up to 50 new leaves a year [S:UFMF]; UF's pruning paper gives 60 a year in South Florida [S:UFPP].
+- Leaves are about 3–5 ft (0.9–1.5 m) wide, on sharply toothed petioles about 4–6 ft (1.2–1.8 m) long. Leaf bases are split and reddish-brown [S:UFMF].
+- The trunk is reddish-brown, weathering to light grey. It tapers from nearly 2 ft (0.6 m) at the base to as little as 8 in (0.2 m) near the top of old specimens [S:UFMF]. Its base is abruptly and prominently flared, unlike *W. filifera* [S:HOD14].
+- In Florida young palms keep their dead leaves, or the leaf bases if the leaves are cut off, as a skirt. At about 30 ft (9 m), or 10–15 years old, the leaves and bases drop within a year or two, and the palm becomes largely self-cleaning [S:UFMF; S:UFNA; S:UFPP]. In arid climates the bases are reported to persist much longer [secondary].
+
+**Pruning on courses and in landscapes**
+- **Three looks are common.** (1) The *skirt cut*: the dead leaves are cut off at the petioles, and the split leaf bases ("boots") stay tightly attached in a criss-cross lattice the full length of the trunk [S:UFNA]. (2) *Skinned*: the skirt is trimmed, then the boots are removed to leave a smooth trunk [secondary; UF summary]. (3) *Natural*: the full dead skirt, rarer on maintained grounds.
+- **Why skirts come off.** Removing the skirt removes hiding places for rats, snakes and scorpions [S:UFPP]. Dead *Washingtonia* fronds are a fire hazard and must be removed by law in some areas [S:UFWF].
+- **The band of boots on a skinned palm.** The bases of living and recently dead leaves are firmly attached. Pulling off bases that do not come away easily tears a strip of trunk tissue, which lets in Thielaviopsis trunk rot [S:UFPP], so skinning stops short of the crown. Skinned trunks therefore keep a collar of boots under the green leaves, about **1–3 m deep (roughly 10–25 rows of bases)** below the lowest green petiole, ending in a fairly clean horizontal line [est.; growers report skinning only up to where the bases still look alive, secondary]. Phoenix city guidance recommends keeping the petiole bases ("peel") to protect the trunk from climbing spikes [S:PHX].
+- **How high to cut.** Phoenix guidance, given as a nationally accepted standard, says fan palm fronds "should not be pruned higher than fronds originating at a 45-degree angle from horizontal" [S:PHX]: no green leaf less than 45° from vertical is cut. The Californian and ANSI rule is gentler: dead leaves only, or at most leaves up to the horizontal (3 to 9 o'clock) [S:HODGC; S:UFPP, citing ANSI A300]. Hodel's sheet shows a "correctly pruned *Washingtonia robusta*" [S:HODGC].
+- **Over-pruning.** Severe pruning depletes the palm and gradually narrows and weakens the trunk [S:PHX; S:UFPP]. The hurricane cut (a tuft of the youngest leaves only) makes crowns more likely to snap [S:UFPP]. Over-pruned palms show a "feather-duster" crown instead of a round one [S:UFPP].
+- **In a game** [est.]: a "skinned" robusta shows the smooth grey trunk, a 1–3 m band of reddish-brown boots, then green leaves from about 90° from vertical upward. A "skirt" palm has boots to the ground and no dead blades.
+
+**Sources:** Prigge & Gibson, Flora of the Santa Monica Mountains (SMM); Broschat et al., UF/IFAS ENH-827, ENH1077 and ENH1182 (UFMF, UFNA, UFPP); Gilman et al., ENH-826 (UFWF); Hodel 2014 (HOD14) and UCCE palm care sheet (HODGC); City of Phoenix (PHX).
 
 ### 24. Coast live oak — *Quercus agrifolia*
 
@@ -1326,6 +1350,106 @@ This is not a species. For golf-course understorey and rough, model it as a mult
 
 Gorse is the spiny, yellow-flowered special case. Hawthorn, broom (*Cytisus scoparius*), heather (*Calluna*, under 0.6 m) and Californian chaparral would be further variants.
 
+### 31. California fan palm — *Washingtonia filifera*
+
+The native Californian palm: desert oases in southeastern California, western Arizona and northern Baja California [S:HOD14; S:SEINET]. Planted all over California, and the classic palm of the Coachella Valley courses. It hybridises freely with *W. robusta*; the hybrid (*W.* × *filibusta*) is now common in the trade and sits between the parents in every respect below [S:HOD14].
+
+**Form**
+- Height: commonly 40–50 ft (12–15 m), capable of 80 ft (24 m) [S:UFWF]; the fact-sheet range is 40–60 ft (12–18 m) [S:UFWF]. Other sources give 9–15 m [S:FEIS], to 20 m [S:HOD14], and wild Arizona trees to 15 m [S:SEINET]. It is shorter and slower-growing than *W. robusta* [S:UFWF]. A typical planted palm on a Californian course: 10–14 m [est.].
+- Trunk: **the stout one**. Hodel's comparison gives 50–90 cm dbh against 25–30 cm for *W. robusta* [S:HOD14]. FEIS gives 0.3–0.6 m [S:FEIS] and the Arizona flora "to 1 m" [S:SEINET]. The Flora of North America excerpt on SEINet reads "Stems massive, … 100–150 cm diam." [S:SEINET]; that text is garbled there and probably measures over the leaf bases. A skinned trunk of a mature planted palm is about 0.6–0.9 m across [est.].
+- Base: **only slightly flared**, where *W. robusta* is abruptly and prominently flared [S:HOD14]. Model a gentle swelling over the bottom 0.5–1 m, about 1.2 times the trunk diameter [est.], not robusta's bottle foot.
+- Taper: little; the column is close to uniform [obs.].
+- Crown spread: 10–15 ft (3–4.5 m) [S:UFWF]. That looks low for leaves 3.5–4 m long, which reach 2.5–3.5 m out from the axis, so a healthy planted palm is more like 5–7 m across [est.].
+- Canopy: loose and open, larger and more expansive than robusta's dense, compact head [S:HOD14]. UF rates the crown symmetrical and open [S:UFWF]. FEIS: "a rosette of large leaves" [S:FEIS].
+- Architecture: Corner's model, as entry 23.
+
+**Leaves**
+- Type: costapalmate fan [S:UFWF].
+- Total length, petiole and blade together: **3.5–4 m**, against 2–2.5 m in *W. robusta* [S:HOD14].
+- Blade: 1.5–2 m long, palmately divided nearly to the middle into 40–60 segments [S:SEINET, Simono 2014]. Overall leaf 3–6 ft (0.9–1.8 m) across [S:VT]. Blade width about 1.5–1.8 m [est.].
+- Petiole: about half the leaf, 1.5–2 m [est.; a search summary gives "up to 2 m", secondary]. Green, sharply toothed at the base [S:SEINET]. The spines are curved or hooked, prominent at the base and smaller toward the blade [S:SEINET, Mason 1999]. The teeth are relatively small and blunt compared with robusta's, and the petiole bases are mostly green [S:WPWF].
+- Hastula: no patch of white felt beneath, which robusta and the hybrid have [S:HOD14].
+- Split depth: nearly to the middle [S:SEINET]. In the hybrid the split runs about 30 % of the blade in the middle, 50 % at the sides and 90 % at the base, with pendulous free tips [S:HOD14]; use the same gradient for *filifera* [est.].
+- Drooping tips: the free segment tips hang down over the outer third of the blade [est., by analogy with the hybrid and robusta].
+- **Threads**: long, white, thread-like fibres hang between the segments, like cotton on young palms; hence "cotton palm" [S:WPWF]. The leaflet edges bear "fibrous white strands or filaments" [S:VT]. They are far more plentiful than on adult robusta [obs.]. Model them as 10–30 cm white strands hanging from most sinuses [est.].
+- Colour: **dull, grey-green or leaden green**, against robusta's bright, shiny dark green [S:HOD14]. Also "grey-green" [S:VT; S:SEINET], "grey/green" [S:UFWF] and grey-blue-green [S:WPWF].
+- Leaf count: no source gives one. A healthy tree carries about 25–40 green leaves [est.]; the hybrid has about 40 in a smaller, denser canopy [S:HOD14]. In coastal California and valleys with marine influence, diamond scale disease kills the lower leaves early and leaves a much reduced canopy [S:IPMPN], so 10–20 green leaves is normal on coastal courses [est.]. Desert palms are not affected [S:IPMPN].
+- Leaf angles, from vertical [est.]:
+  - spear: 0–5°;
+  - young: 10–30°;
+  - mature: 40–75°;
+  - old green: 80–110°, the petiole near level and the blade hanging;
+  - dead: the leaf drops and hangs against the trunk, 165–180° (the general habit of palms without a crownshaft [S:UFPP]).
+
+**The dead-leaf skirt**
+- Dead lower leaves persist and form a dense, brown, shaggy covering below the living leaves, which gives the name "petticoat palm" [S:UFWF]. Leaves die at the end of the summer growing season and stay attached [S:FEIS].
+- Untrimmed, the thatch may run the full length of the trunk [S:WPWF]; "nearly to the ground" [S:VT]. In FEIS's photographs the skirts reach from the base of the bole to the crown [S:FEIS]. **In the wild, model the full skirt to the ground.**
+- Fire: in a fire all the dead leaves usually burn, with most of the living rosette; each fire also burns off some of the trunk and reduces its diameter [S:FEIS]. The trunk is highly fire-resistant and fires rarely kill the palm [S:WPWF]. Wild oasis palms are therefore often skirtless, with blackened trunks under a regrown crown [obs.].
+- In landscapes the skirt is a fire hazard and a popular rodent roost, and must be removed by law in some areas [S:UFWF].
+- Shape [est.]: the dead leaves fold down with the petioles against the trunk and the folded blades overlapping like shingles. The skirt is about 1.5–2.5 m across at the top and narrows slightly downward.
+- Colour [est.]: straw grey-tan, #A39373 when newly dry, weathering to #8E8270.
+
+**Trunk**
+- Skinned: grey-brown, tough, splitting vertically [S:VT]; brown where exposed [S:WPWF]. The hybrid's skinned trunk is smooth and brown with vertical fissures [S:HOD14].
+- Rings: close horizontal leaf scars, about 2–5 cm apart, fading low on old trunks [est.].
+- Boots, when not skinned: persistent split leaf bases in a criss-cross lattice [obs.]. Each base is about as wide as the petiole foot, 10–15 cm (14 cm in the hybrid [S:HOD14]).
+- Colours [est.]: skinned trunk #857A6A, scar rings #6F6556, boots #8A6F52 weathering to #8C8476, crown #6F7F5E, threads #D8D2C2.
+
+**Signature at a glance**
+1. A thick, straight, nearly untapered column, two to three times robusta's girth, with only a slight flare at the foot.
+2. A big, loose, open head of grey-green fans, with white threads hanging from the segments.
+3. In the wild, a full straw skirt from crown to ground. On courses, a skinned trunk or a lattice of boots.
+4. Shorter than robusta: rarely above 15–18 m.
+
+**Pruning on courses and in landscapes.** The options and limits are those of entry 23: a skirt cut that keeps the boots, a skinned trunk with a 1–3 m band of boots under the crown, or the natural skirt. Remove dead leaves only, or at most leaves up to the horizontal [S:HODGC]. Removing leaves infected with diamond scale does not control the disease [S:IPMPN].
+
+**Sources:** Gilman et al., UF/IFAS ENH-826 (UFWF); Hodel 2014, *Phytoneuron* (HOD14); FEIS review by Howard 1992 (FEIS); SEINet portal page carrying the FNA, Mason 1999 and Simono 2014 descriptions (SEINET); Virginia Tech factsheet 598 (VT); Wikipedia (WPWF); UC IPM Pest Notes 74148 (IPMPN); Broschat, ENH1182 (UFPP). Jepson eFlora, FNA (floranorthamerica.org, efloras), Calscape and Palmpedia were not reachable.
+
+### 32. Queen palm — *Syagrus romanzoffiana*
+
+A South American feather palm (Atlantic and semideciduous forests of the Paraná basin [S:NOB17]), widely planted in coastal Southern California and Florida.
+
+**Form**
+- Height: up to 50 ft (15 m) [S:UFQP; S:VT]. The stem is 7–17 m [S:NOB17]; usually 10–15 m, to 20 m [S:BBNE]. A typical planted palm on a Californian course: 8–12 m [est.].
+- Trunk: smooth and grey, 8–15 in (20–38 cm) across depending on seed source and site, and may contain bulges [S:UFQP]. Noblick gives (14–)20–40(–50) cm, dark to light grey, with the leaf-scar intervals indistinct on older trunks [S:NOB17]; Frew gives typically about 30 cm, to 60 cm [S:BBNE]. "Light grayish brown, ringed, becoming more smooth and cement-like with age" [S:VT].
+- Rings: smooth lower trunk with faint scars; the scars are more distinct higher up, where leaves fell recently. The rings are widely spaced low down and closer near the top [S:BBNE]. No crownshaft [S:BBNE; S:UFPP].
+- Bulges: UF notes them [S:UFQP]. A gentle irregular waist or bulge along 10–20 % of trunks is a good variation [est.].
+- Spread: 20–25 ft (6–7.5 m) [S:UFQP].
+- Crown shape: a rounded, open head of arching plumes; when not over-pruned, the lowest green leaves hang below horizontal [est.].
+- Architecture: Corner's model.
+
+**Leaves**
+- Count: **7–25 in the crown**, spirally arranged and spreading [S:NOB17]; 10–25 [S:BBNE]. Potassium deficiency kills the oldest leaves early and reduces the number the palm can carry [S:UFQP]. A well-kept Californian palm: 12–18 [est.].
+- Size: the sheathing leaf base is 50–84 cm long and fibrous; the pseudopetiole 110–167 cm; the petiole proper 0–10 cm; the rachis 167–440 cm [S:NOB17]. The visible leaf (pseudopetiole and rachis) is therefore 2.8–6 m. Other sources: up to about 5 m [S:BBNE]; up to 15 ft (4.6 m) [S:VT]. Unarmed [S:NOB17].
+- Leaflets: 147–250(–340) per side, irregularly set in clusters of 2–5(–7) in divergent planes [S:NOB17]. Frew: groups of 2–7 pointing in different directions, which gives the plume-like, three-dimensional look, with the leaflets near the tip in a single plane [S:BBNE]. This is the **plumose** leaf: not a flat comb like the Canary date palm.
+- Leaflet size: middle 60–116 × 1.9–4.3 cm, basal 24–96 × 0.2–1.3 cm, apical 20–80 × 0.1–2.5 cm [S:NOB17].
+- Softness: the outer 60 cm or so of each leaflet often hangs down [S:BBNE]. The rachis arches strongly, so the whole leaf is soft and drooping [obs.].
+- Colour: dark green above, paler beneath [S:NOB17]. Crown seen from a distance #4A6B32; undersides #6E8458 [est.].
+- Leaf angles, measured at the leaf base, from vertical [est.]:
+  - spear: 0–5°;
+  - young: 10–30°;
+  - mature: 40–80°, with the rachis arching so its tip ends at 100–140°;
+  - old green: 80–110°, the tip hanging at 150–170°;
+  - dead: hangs against the trunk, 160–180° [S:UFPP, which uses the queen palm as its example of a palm without a crownshaft].
+
+**Dead leaves**
+- **Not self-cleaning**: every leaf must be cut off by hand after it dies, and the flower and fruit stalks are usually removed at the same time [S:UFQP]. Dead leaves stay on the palm a long time before they eventually fall [S:BBNE].
+- Do not pull off leaf bases that are still firmly attached: the wound lets in Thielaviopsis trunk rot [S:UFQP]. Avoid removing leaves that are not completely dead [S:UFQP].
+- Unpruned, expect 2–6 brown dead leaves hanging flat against the trunk under the green head, colour #8C7352 weathering grey [est.].
+- Fruit: large clusters of bright orange fruit, ¾–1 in long, can weigh over 100 lb [S:UFQP]. Hanging orange clusters in the crown are a strong cue [obs.].
+
+**Trunk colours** [est.]: smooth grey #A29D92, rings #8E897F, upper trunk near the crown browner #8D8470, fibrous sheaths at the top #7A6A55.
+
+**Signature at a glance**
+1. A slender, smooth, pale grey ringed column, like concrete, sometimes with a bulge.
+2. A head of 10–20 long, soft, arching feather leaves whose leaflets stick out in several planes, so each leaf reads as a plume.
+3. A few brown dead leaves hanging against the trunk under the green head, unless pruned.
+4. Orange fruit clusters hanging in the crown.
+
+**Pruning on courses and in landscapes.** Routine care is removing dead leaves and fruit stalks [S:UFQP], which leaves the clean grey ringed trunk. The ANSI limit applies as for the other palms: no leaves with tips above the horizontal should be removed [S:UFPP]. Queen palms are also cut into "feather-duster" heads that keep only the upper leaves [obs.]; this is the same over-pruning UF warns against [S:UFPP].
+
+**Sources:** Broschat et al., UF/IFAS ENH-767 (UFQP); Noblick 2017, *Phytotaxa* (NOB17); Frew, Botany Brisbane (BBNE); Virginia Tech factsheet 899 (VT); Broschat, ENH1182 (UFPP). Palmpedia, PACSOA and PalmWeb were not reachable.
+
 ---
 
 ## Parameters a grower needs
@@ -1372,8 +1496,10 @@ Gorse is the spiny, yellow-flowered special case. Hawthorn, broom (*Cytisus scop
 | Torrey pine | 0.2 | 3–6 | 60–90 | 50–80 | 40–60 | lvl-then-up (candelabra), 50° | 45 | whorl | 0 | 15 | 1 | 0.65 / – | 0.55 / – | 0.5 | 0.9 | 0.0 | 0.1 |
 | Aleppo pine | 0.3 | 3–6 | 45–80 | 50–80 | 50–80 | lvl-then-up, 30° | 30 | whorl, multi (young) | 0 | 12 | 1–3 | 0.55 / 0.40 | 0.38 / 0.20 | 0.5 | 0.4 | 0.1 | 0.6 |
 | Stone pine | 0.0 | 3–8 | 30–60 | 40–70 | 40–70 | up, flaring to level top, 25° | 40 | whorl | 0 | 6 | 1 | 0.35 / 0.35 | 0.50 / 0.35 | 1.0 | 0.4 | 0.0 | 0.5 |
-| Canary date palm | 1.0 (single axis) | 50–100 leaves | 0–130 (leaves) | leaflets 45 to rachis | – | arch (rachis), 60° | 0 | spiral | – | 0 | – | crown only | 0.45 | 0.0 | 0.0 | 0.4 | – |
+| Canary date palm | 1.0 (single axis) | 60–150 leaves | 0–130 (leaves) | leaflets 45 to rachis | – | arch (rachis), 60° | 0 | spiral | – | 0 | – | crown only | 0.45 | 0.0 | 0.0 | 0.4 | – |
 | Mexican fan palm | 1.0 | 20–40 green leaves + skirt | 20–60 (leaves) | – | – | petiole straight, blade droops | 0 | spiral | – | 0 | – | top 2 m green | 0.08 | 0.0 | 0.0 | 0.3 (skirt 1.0) | – |
+| California fan palm | 1.0 | 25–40 green leaves (coast 10–20) + skirt | 5–110 (leaves) | – | – | petiole straight, blade tips droop, white threads | 0 | spiral | – | 0 | – | top 2–3 m green | 0.23 | 0.0 | 0.0 | 0.3 (skirt 1.0) | – |
+| Queen palm | 1.0 | 7–25 leaves (about 15) | 5–110 (leaves) | leaflets in clusters of 2–5, divergent planes | – | arch (rachis), 70° | 0 | spiral | – | 0 | – | crown only | 0.30 | 0.0 | 0.0 | 0.6 | – |
 | Coast live oak | 0.1 | 3–8 from 1.2–2.4 m | 60–100 | 50–80 | 50–80 | kink, lvl / reclining, 50° | 10 | alt | 15 | 30 | – | 0.95 / 0.60 | 0.65 / 0.25 | 0.4 | 0.3 | 0.1 | 0.8 |
 | California sycamore | 0.2 | 2–6 (often multi-trunk, leaning) | 40–80 | 50–90 | 60–110 | kink, sinuous, 60° | 10 | alt | 25 | 30 | – | 0.65 / 0.45 | 0.40 / 0.25 | 0.2 | 0.5 | 0.2 | 0.3 |
 | Sugar maple | 0.5 | 4–8 | 25–45 | 40–60 | 40–60 | up, slight outcurve, 15° | 5 | opp | 0 | 5 | – | 0.85 / 0.33 | 0.40 / 0.15 | 0.1 | 0.1 | 0.1 | 0.8 |
@@ -1410,21 +1536,36 @@ Gorse is the spiny, yellow-flowered special case. Hawthorn, broom (*Cytisus scop
 |---|---|---|---|---|
 | EUAT | San-Miguel-Ayanz J. et al. (eds) 2016, *European Atlas of Forest Tree Species*, EU JRC | Beech, Norway spruce, Scots pine, black poplar, Douglas fir, black pine, stone pine, Sitka spruce, *E. globulus*, Aleppo pine, *Salix alba*. The oak, alder and birch chapters are over 10 MB and could not be fetched. No chapters exist for hawthorn, plane, *P. radiata*, *Q. rubra* or *P. strobus*. | https://forest.jrc.ec.europa.eu/en/european-atlas/ (chapters at `.../media/atlas/<Species>.pdf` or `ies-ows.jrc.ec.europa.eu/efdac/download/Atlas/pdf/`) | Open access. Reported as CC BY 4.0, but the copyright notice was not opened here; EC reuse policy (Decision 2011/833/EU) allows reuse with acknowledgement. Photos carry their own CC-BY credits. |
 | SILV | Burns & Honkala 1990, *Silvics of North America*, USDA Agric. Handbook 654 | Red oak (Sander) and sugar maple (Godman et al.): forest versus open form, forking, champion size. The srs.fs.usda.gov host did not resolve, so the Virginia Tech mirror was used. | https://dendro.cnre.vt.edu/DENDROLOGY/USDAFSSilvics/38.pdf, `/2.pdf` | Public domain (US Government work) |
-| FEIS | USDA Forest Service Fire Effects Information System species reviews | Coast live oak (open versus stand form), Monterey pine, sugar maple, red oak, white pine (two-thirds clear bole), white spruce, Douglas fir (crown base 20–40 m, self-pruning rates), Sitka spruce. The *plarac* and *thupla* pages returned 404. | https://research.fs.usda.gov/feis/species-reviews/<code> | Public domain (US Government work) |
+| FEIS | USDA Forest Service Fire Effects Information System species reviews | Coast live oak (open versus stand form), Monterey pine, sugar maple, red oak, white pine (two-thirds clear bole), white spruce, Douglas fir (crown base 20–40 m, self-pruning rates), Sitka spruce, California fan palm (Howard 1992, *wasfil*: size, skirt, fire). The *plarac* and *thupla* pages returned 404. | https://research.fs.usda.gov/feis/species-reviews/<code> | Public domain (US Government work) |
 | GDB | Earle C.J., *The Gymnosperm Database* | All conifers: sizes, crown, branching, needles, cones, bark | https://conifers.org/ | Free to read, © C.J. Earle. Reuse terms not checked; cite, do not copy text. |
 | TSO | *Trees and Shrubs Online* (International Dendrology Society; incl. Bean) | Oak, London plane, beech, alder, weeping willow, Lombardy poplar, California sycamore | https://www.treesandshrubsonline.org/ | Free to read, © IDS. Cite; do not copy text. |
 | WT | Woodland Trust species pages | Hawthorn, silver birch. The gorse page returned 404. | https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/ | Free to read, © Woodland Trust |
 | NRCAN | Natural Resources Canada, *Trees, insects and diseases of Canada's forests* | Eastern white pine (#50), sugar maple (#86) | https://tidcf.nrcan.gc.ca/en/trees/factsheet/50, `/86` | Crown copyright (Canada). Free to read; reproduction terms not checked. |
-| VT | Virginia Tech Dendrology factsheets | Coast live oak (#548), California sycamore (#473), red oak (#38), sugar maple (#2) | https://dendro.cnre.vt.edu/dendrology/syllabus/factsheet.cfm?ID=<n> | Free to read, © Virginia Tech |
+| VT | Virginia Tech Dendrology factsheets | Coast live oak (#548), California sycamore (#473), red oak (#38), sugar maple (#2), California fan palm (#598), queen palm (#899) | https://dendro.cnre.vt.edu/dendrology/syllabus/factsheet.cfm?ID=<n> | Free to read, © Virginia Tech |
 | EUCLID | *EUCLID: Eucalypts of Australia* (CSIRO, Lucidcentral) | *E. globulus* height, bark, juvenile and adult leaves | https://apps.lucidcentral.org/euclid/text/entities/eucalyptus_globulus_subsp._globulus.htm | Free to read, © CSIRO |
 | SMM | Prigge B.A. & Gibson A.C., Flora of the Santa Monica Mountains descriptions (UCLA) | *Washingtonia robusta*, *Phoenix canariensis*: full morphology | https://www.smmflowers.org/bloom/ANF-descriptions/Washingtonia_robusta_UCLA_SantaMonicas.pdf (and Phoenix_canariensis_…) | Free to read; licence not stated |
 | HEM | Hemery, Savill & Pryor 2005, *For. Ecol. Manage.* 215:285–294, via the co-author's blog table | Open-grown crown diameter versus dbh for oak, beech, birch, poplar and others | https://gabrielhemery.com/how-big-will-this-tree-grow | Paper © Elsevier; blog free to read |
 | TALLO | Jucker T. et al. 2022, *Global Change Biology* 28:5254–5268; dataset Zenodo 10.5281/zenodo.6637599 (also github.com/selva-lab-repo/TALLO) | Biome medians of H and CR; column list; per-species medians of crown radius over height by height band, computed from Tallo.csv. | https://doi.org/10.5281/zenodo.6637599 | CC BY 4.0 |
 | BC2007 | Barthélémy & Caraglio 2007, *Annals of Botany* 99:375 | Sympodial *Platanus*, monopodial *Acer*; definitions of the architectural models | https://pmc.ncbi.nlm.nih.gov/articles/PMC2802949 | Open access (OUP); check the article licence before copying |
 | SG71 / BESK | *Silvae Genetica* 20(5–6) 1971; *Beskydy* 2015 (Mendel Univ.) | Norway spruce branching types (comb, brush, plate) and their frequencies (search summaries only) | https://www.thuenen.de/media/institute/fg/PDF/Silvae_Genetica/1971/Vol._20_Heft_5-6/20_5-6_204.pdf ; https://beskydy.mendelu.cz/media/pdf/beskyd_2015008010009.pdf | Journal terms; not checked |
+| UFWF | Gilman E.F., Watson D.G., Klein R.W. & Hilbert D.R., *Washingtonia filifera: Desert Palm*, UF/IFAS ENH-826 (EDIS ST669), revised April 2024 | Height, spread, crown, leaf type and colour, petticoat skirt, fire hazard, removal by law | https://ask.ifas.ufl.edu/publication/ST669 | Free to read, © UF/IFAS. No licence stated in the copy read; ENH1182 from the same series is CC BY-NC-ND 4.0. |
+| UFQP | Broschat T.K., Klein R.W. & Hilbert D.R., *Syagrus romanzoffiana: Queen Palm*, UF/IFAS ENH-767 (EDIS ST609), revised March 2024 | Height, spread, trunk diameter, not self-cleaning, fruit, pruning cautions | https://ask.ifas.ufl.edu/publication/ST609 | As UFWF |
+| UFMF | Broschat T.K., Klein R.W. & Hilbert D.R., *Washingtonia robusta: Mexican Fan Palm*, UF/IFAS ENH-827 (EDIS ST670), revised April 2024 | Leaf count, leaf width, petiole length, trunk colour and taper, skirt shedding | https://ask.ifas.ufl.edu/publication/ST670 | As UFWF |
+| UFPC | Broschat T.K., *Phoenix canariensis: Canary Island Date Palm*, UF/IFAS ENH-598 (EDIS ST439), revised 2013 | Leaf count (130–150), leaf production, pineapple cut discouraged | https://ask.ifas.ufl.edu/publication/ST439 | As UFWF |
+| UFNA | Broschat T.K. & Elliott M.L., *Normal "Abnormalities" in Palms*, UF/IFAS ENH1077 (EDIS EP344), revised 2013 | *Washingtonia* skirt and leaf-base retention and shedding; booted versus smooth trunks | https://ask.ifas.ufl.edu/publication/EP344 | As UFWF |
+| UFPP | Broschat T.K., *Pruning Palms*, UF/IFAS ENH1182 (EDIS EP443), 2011, revised May 2014, doi:10.32473/EDIS-EP443-2011 | Proper canopy, pineapple and hurricane cuts, ANSI A300 9:00–3:00 rule, skirts and wildlife, leaf counts and leaf production table, wounding | https://ask.ifas.ufl.edu/publication/EP443 | CC BY-NC-ND 4.0 (stated in the PDF), © UF/IFAS |
+| HOD14 | Hodel D.R. 2014, *Washingtonia × filibusta* (Arecaceae: Coryphoideae), a new hybrid from cultivation, *Phytoneuron* 2014-68: 1–7 | Side-by-side table of *W. filifera*, hybrid and *W. robusta*: trunk height and dbh, base flare, canopy, leaf colour, leaf length; hybrid leaf dimensions | https://www.phytoneuron.net/2014Phytoneuron/68PhytoN-Washingtoniahybrid.pdf | Open access; photographs © D.R. Hodel; reuse terms not checked |
+| HODGC | Hodel D.R., *General Care and Maintenance of Palms*, UC Cooperative Extension, Los Angeles County (undated handout) | Pruning limit "up to the horizontal … from 3 to 9 o'clock", against trunk skinning and ball shaping | https://ucanr.edu/sites/default/files/2010-07/29078.pdf | Free to read, © UC Regents; licence not stated |
+| IPMPN | Hodel D.R. 2019, *UC IPM Pest Notes: Palm Diseases in the Landscape*, UC ANR Publication 74148 | Definition of the "pineapple", skinned or peeled trunks and sudden crown drop, diamond scale on California fan palm | https://ipm.ucanr.edu/legacy_assets/pdf/pestnotes/pnpalmdiseases.pdf | Free to read, © UC Regents; reuse terms not checked |
+| PHX | Adkins R. van-C., *Palm Maintenance in Historic Districts*, City of Phoenix Historic Preservation Office, 2009 | 45° above horizontal pruning limit for fan palms, keeping the petiole bases ("peel") | https://www.phoenix.gov/pddsite/Documents/HP/pdd_hp_pdf_00070.pdf | Municipal publication; licence not stated |
+| NOB17 | Noblick L.R. 2017, A revision of the genus *Syagrus* (Arecaceae), *Phytotaxa* 294(1) (species 52; journal pp. 181–182 in the page footers, cited by Plazi as pp. 448–450) | Full description of *S. romanzoffiana*: stem, leaf count, sheath, pseudopetiole and rachis lengths, leaflet numbers, clusters and planes | https://doi.org/10.11646/phytotaxa.294.1.1 ; read via https://tb.plazi.org/GgServer/xhtml/03A087ABFF15BDE50AECF89A05C2F7C3 | Paper © Magnolia Press; Plazi treatment text is offered as open data, but the licence for this treatment was not checked |
+| BBNE | Frew J., Botany Brisbane, *Syagrus romanzoffiana* page | Height, trunk, rings, 10–25 leaves, leaf length, leaflets in groups of 2–7 in several planes, drooping tips, persistent dead leaves | https://www.botanybrisbane.com/?p=16512 | © 2026 J. Frew; no licence stated. Read through a summarising fetch, not raw text. |
+| SEINET | NEON Biorepository (Symbiota/SEINet portal) taxon page for *W. filifera*, carrying Zona in *Flora of North America* vol. 22, Mason 1999 (*J. Ariz.-Nev. Acad. Sci.* 32(1)) and Simono 2014 | Trunk size, petiole spines, blade length, 40–60 segments split nearly to the middle, thread-like fibres, grey-green blades, native range | https://biorepo.neonscience.org/portal/taxa/index.php?taxon=8529 | Descriptions © their authors; portal terms not checked. The FNA excerpt is garbled on the page. |
+| WPWF | Wikipedia, *Washingtonia filifera* | Trunk 0.3–0.6 m, skirt to the full trunk length, white threads ("cotton palm"), grey-blue-green leaves, blunt petiole teeth, fire resistance | https://en.wikipedia.org/wiki/Washingtonia_filifera | CC BY-SA 4.0. Read through a summarising fetch; treat as a lead where it is the only source. |
 
 **Not reached**
-- **Jepson eFlora**: the connection was refused from this machine.
+- **Jepson eFlora**: the connection was refused from this machine (again on the palm pass, for *W. filifera*).
+- **Flora of North America** (floranorthamerica.org, efloras.org), **Calscape**, **Palmpedia**, **PalmWeb**, the USDA Woody Plant Seed Manual and the ISA "Pruning Palms" brochure copies: blocked by bot checks or 403 errors during the palm pass. The FNA text for *W. filifera* was read only as an excerpt on the SEINet portal.
 - **Cal Poly SelecTree**: the pages are JavaScript-only and returned no text.
 - **UK Forest Research species pages**: not fetched.
 

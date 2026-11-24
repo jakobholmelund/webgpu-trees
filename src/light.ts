@@ -182,7 +182,8 @@ export function bakeLight(tree: GrownTree, options: LightBakeOptions): LightVolu
   // The leaves: each clump's share of the crown's leaf area by its cross-section, spread over its ball.
   let cross = 0;
   for (let c = 0; c < cl.count; c++) cross += cl.radius[c] ** 2;
-  const leafArea = options.lai * Math.PI * tree.size.crownRadius ** 2;
+  // (A palm's, as its fronds measure: a crown of a few huge leaves is not a crown's worth of leaf area index.)
+  const leafArea = tree.leafArea ?? options.lai * Math.PI * tree.size.crownRadius ** 2;
   if (cross > 0) {
     for (let c = 0; c < cl.count; c++) {
       const a = (leafArea * cl.radius[c] ** 2) / cross;

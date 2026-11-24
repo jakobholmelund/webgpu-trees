@@ -11,6 +11,7 @@
 // in the shader, and lit as one thing, the way a brush lays a dab.
 
 import { flareHeight } from "./grow.ts";
+import { palmStemInto } from "./palmGeometry.ts";
 import { hash01 } from "./variants.ts";
 import { type GrownTree } from "./tree.ts";
 
@@ -58,7 +59,7 @@ export interface Pieces {
   ranges: Range[];
 }
 
-class Builder {
+export class Builder {
   readonly floats: Record<string, number[]> = {};
   readonly index: number[] = [];
   readonly ranges: Range[] = [];
@@ -576,6 +577,12 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
   const b = new Builder({ position: 3, aRadial: 4, aNormal: 3, aLimb: 4, aWood: 4, aFrame: 3, aAxis: 3 });
   trees.forEach((tree, v) => {
     b.begin();
+    if (tree.palm) {
+      // (A palm's stem, as palm.ts shaped it; its fronds' rachises are its leaves' to draw: palmGeometry.ts.)
+      palmStemInto(b, tree, shape, v);
+      b.end();
+      return;
+    }
     const sk = tree.skeleton;
     const W = woodLines(tree, shape);
     const trunk = sk.radius[0] || tree.size.trunkRadius;

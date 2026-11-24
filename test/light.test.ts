@@ -36,8 +36,10 @@ test("a box of light holds the leaf area and the wood put in: nothing lost, noth
     const { row, tree } = grownOf(name);
     const lai = leafAreaIndex(ALL_SPECIES[row].openness);
     const v = bakeLight(tree, { lai });
-    const want = 0.5 * lai * Math.PI * tree.size.crownRadius ** 2 + v.woodShadow;
-    assert.ok(Math.abs(v.leafArea - lai * Math.PI * tree.size.crownRadius ** 2) < 1e-6, name);
+    // (A palm's leaf area is its fronds' own, as palm.ts measures them.)
+    const area = tree.leafArea ?? lai * Math.PI * tree.size.crownRadius ** 2;
+    const want = 0.5 * area + v.woodShadow;
+    assert.ok(Math.abs(v.leafArea - area) < 1e-6, name);
     assert.ok(Math.abs(total(v) - want) / want < 1e-4, `${name}: ${total(v)} held, ${want} put in`);
     assert.ok(v.sigma.every((s) => s >= 0 && Number.isFinite(s)), name);
   }

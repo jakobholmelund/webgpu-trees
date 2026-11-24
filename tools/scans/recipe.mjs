@@ -99,6 +99,14 @@ export const SOURCES = {
   ai_canary_trunk: generated("canary-trunk-3", "canary-trunk-3.png", "Canary Island date palm trunk", "Canary Island date palm trunk surface… diamond-shaped leaf-base scars… seamless tileable", { crop: { x: 0.5, size: 1 } }),
   ai_eucalyptus_leaves: generated("eucalyptus-leaves-2", "eucalyptus-leaves-2.png", "Tasmanian blue gum adult leaves", "Six adult Tasmanian blue gum leaves laid flat on pure flat magenta…", { key: "magenta" }),
   ai_canary_frond: generated("canary-frond-2", "canary-frond-2.png", "Canary Island date palm frond", "One complete Canary Island date palm frond… on magenta…", { key: "magenta" }),
+  // The palms' pictures (generated 2026-11-24; the prompts as given in tools/ai-textures/PROMPTS.md).
+  ai_fan_leaf: generated("real-fan-leaf-2", "real-fan-leaf-2.jpg", "Mexican fan palm leaf", "One Mexican fan palm (Washingtonia robusta) leaf laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. A round costapalmate fan about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips. The whole leaf inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_fan_leaf_b: generated("real-fan-leaf-1", "real-fan-leaf-1.jpg", "Mexican fan palm leaf (a second)", "One Mexican fan palm (Washingtonia robusta) leaf laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. A round costapalmate fan about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips. The whole leaf inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_dead_fronds: generated("real-dead-fronds-1", "real-dead-fronds-1.jpg", "Dead hanging fan palm leaves", "Several dead dry palm fronds hanging straight down side by side, laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. Straw-tan to grey-brown, papery, folded and frayed fan leaves on long stalks, like the dead skirt of a Washingtonia fan palm. The whole group inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_queen_frond: generated("real-queen-frond-1", "real-queen-frond-1.jpg", "Queen palm frond", "One queen palm (Syagrus romanzoffiana) frond laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. A long arching midrib with many soft, narrow, glossy green leaflets set in several planes along it so the frond looks plumose and feathery, the leaflets drooping softly. The whole frond inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_pineapple: generated("real-pineapple-cut-2", "real-pineapple-cut-2.jpg", "Canary date palm pineapple cut", "The pruned leaf-base crown (\"pineapple cut\") of a Canary Island date palm, photographed straight-on as a flat seamless tileable texture, square. Neatly trimmed short leaf stubs in a tight interlocking diamond spiral, fresh cut faces pale tan and cream, darker brown fibres between them. Even diffuse light, no cast shadows, no perspective, no edges visible. Photographic scan quality.", { crop: { x: 0.5, size: 1 } }),
+  ai_paint_frond: generated("painterly-frond-2", "painterly-frond-2.jpg", "Painted feather palm frond", "A hand-painted stylized palm frond for a game tree, on a pure flat magenta #FF00FF background, tall 1:2. One arching feather palm frond, a curved yellow-green midrib from bottom to top with many narrow pointed leaflets on both sides angled forward in a V, longest in the middle; bright yellow-green on top, teal-green beneath, soft painted gradients. Flat orthographic, the whole frond inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
+  ai_paint_fan: generated("painterly-fan-1", "painterly-fan-1.jpg", "Painted fan palm leaf", "A hand-painted stylized fan palm leaf for a game tree, on a pure flat magenta #FF00FF background, square. One round fan-shaped leaf of a Mexican fan palm on a short stalk, many pleated narrow segments radiating from the centre with their tips split and drooping, a few hanging threads; yellow-green on top, teal beneath, soft painted gradients. Flat orthographic, centred, inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
   // Leaves.
   LeafSet016: acg("LeafSet016", "2K", { title: "Leaf Set 016" }),
   LeafSet030: acg("LeafSet030", "2K", { title: "Leaf Set 030" }),
@@ -218,8 +226,11 @@ export const BARK = [
     id: "palmRings",
     source: "palm_tree_bark",
     look: "grey stem with ring-like leaf scars",
-    for: ["Mexican fan palm"],
+    for: ["Mexican fan palm", "California fan palm", "Queen palm"],
     delight: 0.5,
+    // (The scan has one long dark gash, which marked every repeat of the tile up a tall stem: painted over with
+    // the bark half a tile across, where the rings run on at the same heights.)
+    heal: [{ x0: -0.03, y0: 0.16, x1: 0.33, y1: 0.67, dx: 0.5, dy: 0 }],
   },
   {
     id: "palmLattice",
@@ -230,6 +241,16 @@ export const BARK = [
     tileCm: [75, 75],
     tileFrom: "estimated: ~6 leaf bases across, a Canary palm's 10–15 cm",
     delight: 0.8,
+  },
+  {
+    id: "palmPineapple",
+    source: "ai_pineapple",
+    look: "a Canary palm's leaf bases trimmed into a pineapple: tight diamonds of pale cut stubs",
+    for: ["Canary date palm (its pineapple cut)"],
+    // Trimmed leaf bases 8–12 cm across: about twelve across the tile.
+    tileCm: [120, 120],
+    tileFrom: "estimated: ~12 cut bases across, a Canary palm's trimmed bases 8–12 cm",
+    delight: 0.6,
   },
 ];
 
@@ -297,4 +318,11 @@ export const LEAVES = [
   },
   { id: "frond", source: "ai_canary_frond", look: "a whole feather-shaped palm frond", for: ["Canary date palm"], base: "down", px: 640, lengthCm: 450, deskew: false },
   { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
+  // The palms' whole leaves, each one to a picture (palm.ts lays them on its own fronds).
+  { id: "fan", source: "ai_fan_leaf", look: "a whole fan palm leaf on a piece of its stalk", for: ["Mexican fan palm", "California fan palm"], base: "down", px: 896, lengthCm: 160, deskew: false, whole: true },
+  { id: "fanB", source: "ai_fan_leaf_b", look: "a whole fan palm leaf, a second", for: ["Mexican fan palm", "California fan palm"], base: "down", px: 896, lengthCm: 160, deskew: false, whole: true },
+  { id: "deadFronds", source: "ai_dead_fronds", look: "dead fan leaves hanging side by side (a skirt)", for: ["Mexican fan palm", "California fan palm"], base: "down", px: 960, lengthCm: 250, deskew: false, whole: true },
+  { id: "queenFrond", source: "ai_queen_frond", look: "a whole plumose queen palm frond", for: ["Queen palm"], base: "down", px: 960, lengthCm: 400, deskew: false, whole: true },
+  { id: "paintFrond", source: "ai_paint_frond", look: "a painted feather palm frond (the painterly looks')", for: ["Canary date palm", "Queen palm"], base: "down", px: 960, lengthCm: 450, deskew: false, whole: true },
+  { id: "paintFan", source: "ai_paint_fan", look: "a painted fan palm leaf (the painterly looks')", for: ["Mexican fan palm", "California fan palm"], base: "down", px: 896, lengthCm: 160, deskew: false, whole: true },
 ];

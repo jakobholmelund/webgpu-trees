@@ -23,6 +23,7 @@
 // turned so that side faces the way the tree's own wood is open; it leans
 // that way, as far as a lean may go.
 
+import { type Pruning } from "./palm.ts";
 import { type TreeSpecies } from "./species.ts";
 import { OPEN_STAND, type Stand, type Standing, standingOf, standsOf } from "./stand.ts";
 import { type TreeSize } from "./tree.ts";
@@ -45,6 +46,8 @@ export interface TreeInstance {
   seed?: number;
   /** Where it stands among the others, over what is worked out from its neighbours (stand.ts): any part of it. */
   stand?: Partial<Stand>;
+  /** A palm's: how it is kept (palm.ts), over its species' `pruning`. */
+  pruning?: Pruning;
 }
 
 /** Trees packed as numbers, `TREE_STRIDE` to a tree, in the order of `TREE_FIELDS`: what a host with many trees hands over. NaN for a size, yaw or seed is "left out". */
@@ -117,6 +120,8 @@ export interface Variant {
   /** Where it is grown as standing; and its stand, in its own frame (open along +x): its trees' on the whole. */
   standing: Standing;
   stand: Stand;
+  /** A palm's pruning, where its trees are kept otherwise than their species says (palm.ts); left out, its species'. */
+  pruning?: Pruning;
 }
 
 /** Where one tree on the ground stands and how its variant is fitted to it. */
@@ -235,17 +240,22 @@ function standOver(s: Stand, over: Partial<Stand> | null | undefined): Stand {
  * What to grow for these trees, and how each is fitted to what is grown. Each tree's stand is worked out
  * from its neighbours (stand.ts) unless `options.stands` is off; `stands` (by tree) sets any part of it.
  */
-export function planVariants(packed: Float32Array, species: readonly TreeSpecies[], options: VariantOptions = DEFAULT_VARIANT_OPTIONS, stands?: readonly (Partial<Stand> | null | undefined)[]): Plan {
+export function planVariants(packed: Float32Array, species: readonly TreeSpecies[], options: VariantOptions = DEFAULT_VARIANT_OPTIONS, stands?: readonly (Partial<Stand> | null | undefined)[], prunings?: readonly (Pruning | null | undefined)[]): Plan {
   const count = Math.floor(packed.length / TREE_STRIDE);
   const variants: Variant[] = [];
   const placements: Placement[] = new Array(count);
-  const bySpecies = new Map<number, number[]>();
+  // (By species, and a palm's by how it is kept where a tree says so: a pineapple cut and a natural palm are
+  // grown apart.)
+  const bySpecies = new Map<string, { s: number; pruning?: Pruning; members: number[] }>();
   const speciesOf = (i: number) => Math.min(species.length - 1, Math.max(0, Math.round(packed[i * TREE_STRIDE + 3])));
   for (let i = 0; i < count; i++) {
     const s = speciesOf(i);
-    let list = bySpecies.get(s);
-    if (!list) bySpecies.set(s, (list = []));
-    list.push(i);
+    const own = species[s].architecture === "palm" ? (prunings?.[i] ?? undefined) : undefined;
+    const pruning = own && own !== species[s].pruning ? own : undefined;
+    const key = `${s}|${pruning ?? ""}`;
+    let g = bySpecies.get(key);
+    if (!g) bySpecies.set(key, (g = { s, pruning, members: [] }));
+    g.members.push(i);
   }
   const allSizes: TreeSize[] = Array.from({ length: count }, (_, i) => sizeOf(packed, i, species[speciesOf(i)]));
   // Where each tree stands, from its neighbours; then whatever the host says of it.
@@ -258,7 +268,7 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
   const worked = options.stands !== false ? standsOf(xs, zs, allSizes) : null;
   const standOf = (i: number): Stand => standOver(worked ? worked[i] : { ...OPEN_STAND }, stands?.[i]);
   const leanMax = Math.sin((options.lean * Math.PI) / 180);
-  for (const [s, members] of [...bySpecies.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const { s, pruning, members } of [...bySpecies.values()].sort((a, b) => a.s - b.s || (a.pruning ?? "").localeCompare(b.pruning ?? ""))) {
     const sp = species[s];
     // (A shrub or a palm is grown as it stands in the open wherever it is: it is not shaped by a wood.)
     const shaped = options.stands !== false && (sp.architecture === "broadleaf" || sp.architecture === "conifer");
@@ -297,6 +307,7 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
             trees: 0,
             standing,
             stand,
+            ...(pruning ? { pruning } : {}),
           });
         }
         seedsOf.push(seeds);
