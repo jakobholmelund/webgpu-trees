@@ -5,8 +5,9 @@
 // whole shoots; a palm's leaflets along its rachis or round its fan.
 //
 // Each species has a row of the atlas: three near cards (a short twig with a few leaves, about a third of a
-// metre across: `nearCardHalf`) and one big card (a branch's end, a clump wide: the mid tier's cards, a
-// conifer's sheets, the far dabs). Its texels are as leaves.ts draws them, so the shaders read either alike:
+// metre across: `nearCardHalf`) and two big cards (a branch's end, a clump wide: the mid tier's cards, a
+// conifer's sheets, the far dabs; a pine's cushions, `drawCushionCard` and `drawnCushionCard`). Each card is
+// drawn from its foot: its first row is where its twig comes in (`CARD_V`). Its texels are as leaves.ts draws them, so the shaders read either alike:
 // red and blue a grey tone (the scan's lightness over its sheet's mean, lit a little by its own relief), green
 // a number of each leaf's own (how thin it is: the scan's translucency, by leaf), alpha coverage.
 //
@@ -16,15 +17,25 @@ import { type Pixels } from "./mips.ts";
 import { hash01 } from "./variants.ts";
 import { type LeafSet, type LeafSprite, type ScanLook, nearCardHalf } from "./scans.ts";
 
-/** Columns of a species' row: three near cards and the big one. */
-export const SPRAY_COLS = 4;
+/** Columns of a species' row: three near cards and two big ones. */
+export const SPRAY_COLS = 5;
 export const NEAR_CARDS = 3;
+/** The first big card's column, and how many big cards a row has (a clump's mass, a mid tree's cards, a far dab's). */
 export const BIG_CARD = 3;
+export const BIG_CARDS = 2;
 /** A leaf's tone on average (as leaves.ts's), and a twig's. */
 const LEAF = 0.6;
 const TWIG = 0.33;
 /** Where a near card's twig comes in: this share of the cell from its first row (geometry.ts `SPRAY_FOOT`: 0.8 of the half below the middle). */
-const FOOT = 0.1;
+export const FOOT = 0.1;
+/**
+ * How a card's corner (`aDab.y`, -1 at its twig's foot, 1 at its far end: geometry.ts `cardPieces`) is laid on
+ * its cell in the atlas, its rows from its first (engine.ts `vTreeUv`: v = row + 0.5 + this · aDab.y, over the
+ * rows): positive, so the foot corner is the cell's first row, where a card is drawn from its foot. three's
+ * WebGPU renderer samples a DataTexture's first row at v = 0 (no flip: `flipY` is for pictures), as WebGL
+ * does; checked in the lab with a texture of two rows.
+ */
+export const CARD_V = 0.5;
 /** A big card's leaves behind its own: from how dense a species (1 - openness), and how dark, in their shade. */
 const DENSE_FROM = 0.6;
 /**
@@ -737,14 +748,169 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     wsum += L.cover[o];
   }
   const mean = Math.min(1, wsum > 0 ? sum / wsum : LEAF);
-  const flipRows = look.spray === "tufts";
+  write(out, ox, oy, n, L, mean, whole);
+}
+
+/**
+ * One big card of a pine's cushions (`ScanLook.cushion`): a whole picture of one of them seen from the side
+ * (`cushions`, its `pick`th), its flat base on the card's foot row and as wide as the card, its domed top
+ * towards the far end: its own light and shade, lit top and dark beneath, kept as its tone. Fitted inside the
+ * cell's clear margin.
+ */
+export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, cushions: Sheet, pick: number): void {
+  const sprites = cushions.set.sprites;
+  const s = sprites[((pick % sprites.length) + sprites.length) % sprites.length];
+  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
+  // (Its frame on the sheet: up from its base (its flat base's middle) to its top, as the sheet stands it.)
+  const sl = Math.hypot(s.tip[0] - s.base[0], s.tip[1] - s.base[1]) || 1;
+  const room = n - 2 * MARGIN - 4;
+  // (As wide as the card, or as tall; below its base (twigs under it) as much of the picture as hangs there.)
+  const k = Math.min(room / s.w, room / s.h);
+  const lay: Lay = { x: n / 2 + (s.base[0] - s.w / 2) * k, y: MARGIN + 2 + Math.max(0, s.h - s.base[1]) * k, ang: UP, len: sl * k, sprite: s, width: 1, bend: 0, flip: true, tone: 1, own: 0.5 };
+  leaf(L, cushions, lay, 0);
+  const mean = (() => {
+    let sum = 0;
+    let w = 0;
+    for (let o = 0; o < n * n; o++) {
+      sum += L.tone[o];
+      w += L.cover[o];
+    }
+    return Math.min(1, w > 0 ? sum / w : LEAF);
+  })();
+  write(out, ox, oy, n, L, mean, false);
+}
+
+/** A drawn cushion's lit top and shaded underside (tone, as a leaf's), and how dark the creases between its lumps. */
+const CUSHION_TOP = 1.6;
+const CUSHION_UNDER = 0.28;
+const CUSHION_CREASE = 0.6;
+/** How high a drawn cushion's dome is for its width, and how many tufts to a tuft's own area within it (its closeness). */
+const CUSHION_HIGH = 0.5;
+/** How far a drawn cushion's flat base curls up at its ends, a share of its height. */
+const CUSHION_CURL = 0.35;
+/** A pine less dense than this has loose clumps of lumps, not a dome. */
+const CUSHION_LOOSE = 0.5;
+const CUSHION_PACK = 6;
+
+/**
+ * A pine's cushion drawn needle by needle, where it has no picture of one (`ScanLook.cushion` "drawn"): seen
+ * from the side, a few lumps side by side on one flat base, the middle's highest, together as wide as the card;
+ * filled with its own tufts (`needleTuft`, its needles' length at the card's scale) packed as close as it is
+ * dense, each bristling out of its lump; each lit as high as it is in its lump, its top's tips light and its
+ * underside near black, darker still in the creases where two lumps meet, a few twigs under its flat base.
+ * So a far cushion is a cushion's shape and light, and a near one its needles.
+ */
+export function drawnCushionCard(out: Pixels, ox: number, oy: number, n: number, look: ScanLook, extent: number, seed: number, density: number): void {
+  const rnd = rng(seed);
+  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
+  const k = n / extent;
+  const N = Math.max(6, Math.min(n * 0.09, needleOf(look) * k));
+  const d = clamp01(density);
+  // (Its lumps: as wide as the card all told, less a needle at either side for their tufts' tips.)
+  const base = MARGIN + 3 + N * 0.35;
+  const x0 = MARGIN + N;
+  const x1 = n - MARGIN - N;
+  // (A dome as wide as the card, flat beneath, and on it its puffs: lumps on its top and shoulders, each
+  // a smaller dome of its own, with creases between them.)
+  const W = x1 - x0;
+  // (An open pine's clumps (an Aleppo pine's) are looser: a few lumps of their own, at heights of their own,
+  // with air between, and no one dome under them.)
+  const loose = d < CUSHION_LOOSE;
+  const lumps: { x: number; y: number; rx: number; ry: number }[] = loose ? [] : [{ x: (x0 + x1) / 2, y: base, rx: W / 2, ry: W * CUSHION_HIGH }];
+  const m = loose ? 4 + Math.floor(rnd() * 3) : 3 + Math.floor(rnd() * 3);
+  for (let q = 0; q < m; q++) {
+    if (loose) {
+      const rx = W * (0.13 + 0.1 * rnd());
+      const ry = rx * (0.65 + 0.35 * rnd());
+      const f = (q + 0.5 + (rnd() - 0.5) * 0.8) / m;
+      lumps.push({ x: x0 + rx + (W - 2 * rx) * f, y: base + ry * 0.4 + W * CUSHION_HIGH * 0.5 * rnd() * (1 - Math.abs(2 * f - 1) * 0.6), rx, ry });
+      continue;
+    }
+    // (Round the dome from shoulder to shoulder, a little apart.)
+    const a = Math.PI * (0.12 + 0.76 * ((q + 0.5 + (rnd() - 0.5) * 0.5) / m));
+    const rx = W * (0.15 + 0.08 * rnd());
+    const ry = rx * (0.75 + 0.3 * rnd());
+    const cx = (x0 + x1) / 2 - Math.cos(a) * (W / 2 - rx * 0.6);
+    const cy = base + Math.sin(a) * (W * CUSHION_HIGH - ry * 0.7) * 0.9;
+    lumps.push({ x: cx, y: cy, rx, ry });
+  }
+  /** How far in a point is in a lump (0 its rim, 1 its heart), and which lumps it is in. */
+  const inLump = (x: number, y: number, l: { x: number; y: number; rx: number; ry: number }) => {
+    // (Its base flat beneath, curling up a little at its ends: a cushion's underside, not a board's edge.)
+    const u0 = (x - (x0 + x1) / 2) / (W / 2);
+    if (y < base + CUSHION_CURL * W * CUSHION_HIGH * u0 * u0 - N * 0.1) return 0;
+    const u = (x - l.x) / l.rx;
+    const v = (y - l.y) / l.ry;
+    return 1 - Math.hypot(u, l.y <= base ? Math.max(0, v) : v);
+  };
+  // (A few twigs under its flat base, its branch's shoots going up into it.)
+  for (let q = 0; q < (loose ? 0 : m + 2); q++) {
+    const x = x0 + (x1 - x0) * ((q + 0.5) / (m + 2)) + (rnd() - 0.5) * N;
+    stroke(L, x + (rnd() - 0.5) * N * 2, base - N * 0.25, x, base + N * 1.2, 1.2, 0.8, TWIG * 0.7);
+  }
+  // (Its tufts: as many as cover it some times over, fewer in an open pine's, with gaps between.)
+  const area = lumps.reduce((a, l) => a + (Math.PI / 2) * l.rx * l.ry, 0);
+  const count = Math.round(((area / (Math.PI * N * N * 0.5)) * CUSHION_PACK * (0.55 + 0.45 * d)));
+  const tufts: { x: number; y: number; ang: number; h: number; crease: number; t: number }[] = [];
+  for (let q = 0; q < count * 3 && tufts.length < count; q++) {
+    const x = x0 + (x1 - x0) * rnd();
+    const y = base + (n - MARGIN - base) * rnd() * 0.9;
+    let best = -1;
+    let bi = 0;
+    let second = -1;
+    for (let i = 0; i < lumps.length; i++) {
+      const f = inLump(x, y, lumps[i]);
+      if (f > best) {
+        second = best;
+        best = f;
+        bi = i;
+      } else if (f > second) second = f;
+    }
+    if (best <= 0) continue;
+    // (An open pine's cushion has holes: a share of its tufts left out, more of them deep in it.)
+    if (rnd() > 0.45 + 0.55 * d + 0.3 * (1 - best)) continue;
+    const l = lumps[bi];
+    // (Out of its lump: from its base's middle, up and out, the more so towards its top.)
+    const ux = (x - l.x) / l.rx;
+    const vy = (y - l.y) / l.ry;
+    const ang = Math.atan2(vy + 0.25, ux) + (rnd() - 0.5) * 1.6;
+    // (How high it is: in its lump, 0 at the lump's foot and 1 at its top above it, and in the cushion.)
+    const top = l.y + l.ry * Math.sqrt(Math.max(0, 1 - ux * ux));
+    const own = clamp01((y - (l.y - (l.y > base ? l.ry * 0.6 : 0))) / Math.max(1, top - l.y + (l.y > base ? l.ry * 0.6 : 0)));
+    const whole = clamp01((y - base) / (W * CUSHION_HIGH));
+    const h = 0.55 * own + 0.45 * whole;
+    // (In a crease where two lumps meet: both about as deep.)
+    const crease = second > 0 ? clamp01(1 - (best - second) / 0.25) : 0;
+    tufts.push({ x, y, ang, h, crease, t: 0.85 + 0.3 * rnd() });
+  }
+  // (The deep and low ones first, those on its top and rim last, over them.)
+  tufts.sort((a, b) => a.h - b.h);
+  for (const tf of tufts) {
+    const lit = lerp(CUSHION_UNDER, CUSHION_TOP, smoothstep01(tf.h ** 1.3)) * (1 - CUSHION_CREASE * tf.crease * (1 - tf.h * 0.5));
+    needleTuft(L, tf.x, tf.y, tf.ang, N * (0.8 + 0.4 * rnd()), rnd, lit * tf.t, rnd(), look.brush);
+  }
+  let sum = 0;
+  let w = 0;
+  for (let o = 0; o < n * n; o++) {
+    sum += L.tone[o];
+    w += L.cover[o];
+  }
+  write(out, ox, oy, n, L, Math.min(1, w > 0 ? sum / w : LEAF), false);
+}
+
+const smoothstep01 = (x: number) => {
+  const t = clamp01(x);
+  return t * t * (3 - 2 * t);
+};
+
+/** A card's layer written into its cell of the atlas: tone, its own number, coverage; where nothing is drawn, the card's mean tone. Its first row is its foot. */
+function write(out: Pixels, ox: number, oy: number, n: number, L: Layer, mean: number, whole: boolean): void {
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const o = j * n + i;
-      // (A pine's card is written bottom row first: the cards are drawn upside down on their twigs, the
-      // picture's first row at the twig's far end (seen in the lab: a card's foot showed above it), and a
-      // pine's tufts, held up off their shoots, hung from them. Its foot is so at the twig's foot.)
-      const p = ((oy + (flipRows ? n - 1 - j : j)) * out.width + ox + i) * 4;
+      // (Its first row is its foot: the shaders lay a card's first row at its twig's foot (geometry.ts
+      // `cardPieces`, engine.ts `vTreeUv`), every species' alike.)
+      const p = ((oy + j) * out.width + ox + i) * 4;
       // (A frond's stretch fades out at the card's edges, where its leaflets run on past it.)
       const edge = Math.min(i, j, n - 1 - i, n - 1 - j) - MARGIN;
       const fade = whole ? clamp01(edge / (n * 0.08)) : 1;
@@ -760,13 +926,18 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
   }
 }
 
-/** A species' row: its three near cards and its big card. `bigExtent`: how wide its big card is (m). */
-export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0): void {
+/**
+ * A species' row: its three near cards and its big cards. `bigExtent`: how wide its big cards are (m). A pine
+ * with pictures of its cushions (`cushions`, `ScanLook.cushion`) has them on its big cards, one to a card.
+ */
+export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet): void {
   // (A palm's near cards are the drawn ones' size: a clump's radius and a little less (geometry.ts `cardPieces`),
   // a big card's 0.8 / 1.45 of it.)
   const near = 2 * nearCardHalf(look) || bigExtent * (0.8 / 1.45);
   for (let c = 0; c < SPRAY_COLS; c++) {
-    const big = c === BIG_CARD;
-    drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
+    const big = c >= BIG_CARD;
+    if (big && look.cushion && cushions && cushions.set.sprites.length > 0) drawCushionCard(out, c * n, row * n, n, cushions, c - BIG_CARD);
+    else if (big && look.cushion) drawnCushionCard(out, c * n, row * n, n, look, bigExtent, seed * 31 + c * 7 + 3, density);
+    else drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
   }
 }

@@ -1383,7 +1383,7 @@ export interface FixedCards {
   rise?: number;
 }
 
-export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[]): Pieces {
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[], upright?: readonly boolean[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
   trees.forEach((tree, v) => {
     b.begin();
@@ -1468,7 +1468,12 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const along = [(along0[0] / l0) * (1 - hang), ((along0[1] / l0) * (1 - hang) - hang) * level, (along0[2] / l0) * (1 - hang)];
         const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
         const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
-        const tangent = Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
+        // (A variant `upright` says stands its big cards (a near tree's, every one of a mid tree's) upright on
+        // their twigs, facing out of the crown level: a pine's cushion picture, its flat base kept level, which the
+        // shader turns to the eye about the vertical.)
+        const stands = upright?.[v] === true && (!fix || filler);
+        const tangent = stands ? [0, 1, 0] : Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
+        const facing = stands ? (Math.hypot(n[0], n[2]) > 1e-3 ? norm([n[0], 0, n[2]]) : norm([off[0] + 1e-3, 0, off[2]])) : face;
         const half = (fix && !filler ? fix.half : fix ? r * fix.bigSize : r * size) * (0.8 + hash01(k, 24) * 0.4);
         // (The spray's own twig enters its picture near the bottom edge (leaves.ts): its centre is that far
         // on from its foot.)
@@ -1479,7 +1484,7 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
           // (How high the corner is in its clump, in the clump's radii: along the twig, which the card keeps
           // however it is turned to the eye. A dense clump's needles low in it are in its own shade.)
           const inClump = Math.max(-1.5, Math.min(1.5, (at[1] + tangent[1] * cy * half - cl.y[c]) / Math.max(r, 1e-3)));
-          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, filler ? 1 : 0], aTangent: [...tangent, inClump], aLimb: [...limb, v] });
+          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...facing, filler ? 1 : 0], aTangent: [...tangent, inClump], aLimb: [...limb, v] });
           if (f < 0) f = i;
         }
         b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);

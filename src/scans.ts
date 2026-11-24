@@ -110,6 +110,15 @@ export interface ScanLook {
    * along their last years' growth, bottle brushes standing side by side (a stone pine's, a Monterey pine's).
    */
   brush?: number;
+  /**
+   * A pine's cushions (a leaf set of whole pictures, assets/scans.json): its foliage as it is seen from a little
+   * way off, each picture one dense cushion or clump seen from the side, its flat base down, its own light and
+   * shade (its sunlit top yellow-green, its underside near black). Laid one to a big card (sprays.ts
+   * `drawCushionCard`), which stands upright and turns to the eye about the vertical, so its flat base stays
+   * flat: the canopy's cushions as game foliage lays its cluster cards. Its near cards stay its own drawn tufts.
+   * "drawn": no picture, its cushions drawn needle by needle (sprays.ts `drawnCushionCard`).
+   */
+  cushion?: string;
 }
 
 /** The photographs each of the library's species wears, by name. */
@@ -138,11 +147,11 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
   "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays" },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8 },
+  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "drawn" },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
   "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
-  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2 },
-  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2 },
+  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "drawn" },
+  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "drawn" },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },

@@ -12,7 +12,7 @@ import { LINE_STRIDE, TIER_SHAPES, flareBark, woodPieces } from "../src/geometry
 import { ALPHA_CUT, alphaOf, coverage, coverageMips } from "../src/mips.ts";
 import { leafSet, scanLookOf } from "../src/scans.ts";
 import { ALL_SPECIES } from "../src/species.ts";
-import { drawSprayRow, needleOf, pineShoots } from "../src/sprays.ts";
+import { BIG_CARD, SPRAY_COLS, drawSprayRow, needleOf, pineShoots } from "../src/sprays.ts";
 import { hash01 } from "../src/variants.ts";
 
 const species = (name: string) => ALL_SPECIES.find((s) => s.name === name)!;
@@ -209,27 +209,59 @@ test("a stone pine is an umbrella: two and a half to four times as wide as deep,
   }
 });
 
-test("a stone pine's stem forks below its umbrella into a few great limbs rising bare to it", () => {
+test("a stone pine's stem forks a third to half of the way up into a few thick stems, which fork again in V-forks", () => {
   const sp = species("Stone pine");
   for (const seed of SEEDS) {
     const tree = growTree(sp, { height: sp.height, crownRadius: sp.crownRadius, crownBase: sp.crownBase, trunkRadius: sp.trunkRadius }, seed);
     const k = tree.skeleton;
-    // (Its limbs' feet: the first node of each limb off the stem.)
-    const feet: number[] = [];
-    for (let i = 0; i < k.count; i++) if (k.order[i] === 1 && k.parent[i] >= 0 && k.order[k.parent[i]] === 0) feet.push(k.y[i]);
-    const low = feet.filter((y) => y < 0.9 * sp.crownBase);
-    assert.ok(low.length >= 3, `seed ${seed}: ${low.length} limbs leave the stem below its umbrella`);
-    assert.ok(Math.min(...feet) >= 0.25 * sp.height && Math.min(...feet) <= 0.5 * sp.height, `seed ${seed}: it forks at ${Math.min(...feet).toFixed(1)} m of ${sp.height}`);
+    const kids: number[][] = Array.from({ length: k.count }, () => []);
+    for (let i = 0; i < k.count; i++) if (k.parent[i] >= 0) kids[k.parent[i]].push(i);
+    // (Its fork: the first node up its stem with more than one child. Its stems: the children there, and a
+    // third or fourth leaving a little above it.)
+    let at = 0;
+    while (kids[at].length === 1) at = kids[at][0];
+    const forkY = k.y[at];
+    assert.ok(forkY >= 0.3 * sp.height && forkY <= 0.5 * sp.height, `seed ${seed}: it forks at ${forkY.toFixed(1)} m of ${sp.height}`);
+    const stems: number[] = [...kids[at]];
+    for (let guard = 0; guard < 4; guard++) {
+      const on = stems.find((c) => k.order[c] === 0 && kids[c].length === 2 && k.y[c] - forkY < 0.5);
+      if (on === undefined) break;
+      stems.splice(stems.indexOf(on), 1, ...kids[on]);
+    }
+    assert.ok(stems.length >= 2 && stems.length <= 4, `seed ${seed}: ${stems.length} stems at its fork`);
+    // (Thick: each at least 0.45 of the stem under the fork, and together, by the pipe model, about as thick.)
+    const r0 = k.radius[k.parent[at]];
+    for (const c of stems) assert.ok(k.radius[c] >= 0.45 * r0, `seed ${seed}: a stem ${k.radius[c].toFixed(3)} m thick off a stem ${r0.toFixed(3)} m`);
+    const pipe = Math.sqrt(stems.reduce((sum, c) => sum + k.radius[c] ** 2, 0));
+    assert.ok(pipe >= 0.85 * r0 && pipe <= 1.3 * r0, `seed ${seed}: its stems together ${pipe.toFixed(3)} m against ${r0.toFixed(3)} m`);
+    // (Each of them forks again under its crown's top in a V: two arms, the lesser at least half the greater.)
+    let vForks = 0;
+    for (const s0 of stems) {
+      let c = s0;
+      for (let guard = 0; guard < 200 && kids[c].length > 0; guard++) {
+        if (kids[c].length >= 2) {
+          const rs = kids[c].map((q) => k.radius[q]).sort((x, y) => y - x);
+          if (rs[1] >= 0.5 * rs[0] && rs[1] >= 0.25 * r0) {
+            vForks++;
+            break;
+          }
+        }
+        c = kids[c].reduce((best, q) => (k.radius[q] > k.radius[best] ? q : best), kids[c][0]);
+      }
+    }
+    assert.ok(vForks >= stems.length - 1, `seed ${seed}: ${vForks} of its ${stems.length} stems fork again in a V`);
+    // (Bare below its umbrella: no leaves under its crown's base.)
+    for (let c = 0; c < tree.clumps.count; c++) assert.ok(tree.clumps.y[c] >= 0.95 * sp.crownBase, `seed ${seed}: a clump at ${tree.clumps.y[c].toFixed(1)} m`);
   }
 });
 
-test("a pine's big card is a cushion of tufts, wider than high, and its near card stands on its twig's foot", () => {
+test("a pine's big cards are cushions of tufts, wider than high, and its near cards stand on their twigs' feet", () => {
   for (const name of ["Stone pine", "Scots pine", "Monterey pine"]) {
     const sp = species(name);
     const look = scanLookOf(sp);
     const n = 128;
     const sheet = { set: { sprites: [{ size: 1 }] }, albedo: { width: 1, height: 1, data: new Uint8Array(4) }, normal: { width: 1, height: 1, data: new Uint8Array(4) } };
-    const out = { width: 4 * n, height: n, data: new Uint8Array(4 * n * 4 * n) };
+    const out = { width: SPRAY_COLS * n, height: n, data: new Uint8Array(SPRAY_COLS * n * 4 * n) };
     drawSprayRow(out, 0, n, sheet as never, look, 1.45 * sp.clumpSize, 7, 1 - sp.openness);
     const box = (col: number) => {
       let x0 = n, x1 = 0, y0 = n, y1 = 0, rows = 0, sum = 0;
@@ -241,15 +273,17 @@ test("a pine's big card is a cushion of tufts, wider than high, and its near car
         }
       return { w: x1 - x0, h: y1 - y0, meanRow: rows / Math.max(1, sum), cover: sum / (n * n) };
     };
-    const big = box(3);
-    assert.ok(big.w > 1.3 * big.h, `${name}: its cushion ${big.w} texels wide and ${big.h} high`);
-    assert.ok(big.cover > 0.12, `${name}: its cushion covers ${(big.cover * 100).toFixed(0)}% of its card`);
-    // (Its cards are drawn upside down on their twigs, the picture's first row at the twig's far end (seen in
-    // the lab); a pine's are written so, its foot in its last rows and its tufts above it.)
+    for (let col = BIG_CARD; col < SPRAY_COLS; col++) {
+      const big = box(col);
+      assert.ok(big.w > 1.3 * big.h, `${name}: its cushion ${big.w} texels wide and ${big.h} high`);
+      assert.ok(big.cover > 0.12, `${name}: its cushion covers ${(big.cover * 100).toFixed(0)}% of its card`);
+    }
+    // (Its cards are drawn from their foot, their first row (test/orientation.test.ts): its tufts on past it,
+    // its twig coming in at the first rows.)
     for (const col of [0, 1, 2]) {
       const near = box(col);
-      assert.ok(near.meanRow < 0.75 * n, `${name}: a near card's needles over its foot (their mean row ${near.meanRow.toFixed(0)} of ${n})`);
-      assert.ok(out.data[((n - 1 - Math.round(0.1 * n)) * out.width + col * n + n / 2) * 4 + 3] > 0, `${name}: its twig comes in at its foot`);
+      assert.ok(near.meanRow > 0.3 * n, `${name}: a near card's needles past its foot (their mean row ${near.meanRow.toFixed(0)} of ${n})`);
+      assert.ok(out.data[((Math.round(0.1 * n) + 1) * out.width + col * n + n / 2) * 4 + 3] > 0, `${name}: its twig comes in at its foot`);
     }
   }
 });

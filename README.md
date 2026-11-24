@@ -323,11 +323,17 @@ pine's proportions (crown reach and base for height) and outlines are
 measured from photographs of open-grown trees (`test/outlines.json`; each
 grows within 12% of its photograph's outline, `test/outline.test.ts`). An
 old pine has given up its leader: the Scots, Torrey, Aleppo, Monterey and
-stone pines are grown as broadleaves, with needles. A stone pine's stem forks a
-third of the way up (`fork`, a share of its crown's base: its limbs leave together, in
-a vase, and rise bare to the umbrella), its crown some three times as wide as deep and
-flat on top (`test/pines.test.ts`); its outline test still reads the Roquebrune
-photograph, whose low left is another tree behind it.
+stone pines are grown as broadleaves, with needles. A stone pine's stem, sinuous
+or leaning a little as it is crooked, forks a third of the way up (`fork`, a share
+of its crown's base) into three thick crooked stems (`forkStems`, the stem's wood
+shared among them by the pipe model, each half or more its thickness), each of which
+divides twice more in V-forks (`forkSplits`), rising and then leaning out further at
+each, their last arms the limbs that reach out under the umbrella: the dark fan of
+limbs under its canopy. A V-fork's two arms share what the crown gives them by the
+light each gathers, neither favoured. Its crown is some three times as wide as deep
+and flat on top (`test/pines.test.ts`); its outline test still reads the Roquebrune
+photograph, whose low left is another tree behind it. Grown narrow in a wood (a crown
+less than a third as wide as deep) its limbs leave its stem one by one, as any tree's.
 
 A crown's outline is its `shape`'s, made round (`CROWN_OUTLINES`): widest
 some way up, upright there, curving in above and below. `crownPeak` (0..1)
@@ -483,6 +489,10 @@ grows as it did):
 - **`canopyLift`**: how much of the crown's underside is cleared of leaves,
   a bowl from its rim up into its middle, so its limbs show beneath it: a
   stone pine's umbrella on its bare vase of limbs.
+- **`fork`**, **`forkStems`**, **`forkSplits`**: where a broadleaf's stem divides
+  below its crown (a share of the crown's base), into how many stems (2 to 4),
+  and how many times each divides again in V-forks before its arms are limbs: a
+  stone pine's sinuous stem forked into a few thick crooked stems.
 - **`pads`**: how far its leaves gather into flat-topped pads, each branch
   off a great limb keeping only the leaves near its top, with air and bare
   wood under each: a Monterey cypress on a headland, an old Scots pine's
@@ -898,9 +908,11 @@ spoil).
 - **Leaves** are a sheet of single leaves a species wears, cut from a scan
   and stood upright, laid on the species' own twigs at their real size
   (`sprays.ts`): a row of cards for each species in the trees: three near
-  cards (a twig's end of a few shoots, 0.4 to 0.9 m across) and one big card
+  cards (a twig's end of a few shoots, 0.4 to 0.9 m across) and two big cards
   (a branch's end, a clump wide, for the mid tier, a conifer's sheets and the
-  far dabs). An oak's leaves one to a node with a cluster at the tip, a
+  far dabs; each big card one of the two by a number of its own). A card is
+  drawn from its foot: its first row is where its twig comes in, and the
+  shaders lay its first row at its twig's foot (`CARD_V`). An oak's leaves one to a node with a cluster at the tip, a
   maple's in pairs, a blue gum's few long sickles hanging from the twig's end
   (its cards hang too, standing upright, their leaves edge to the sky, as a
   blue gum's do: a card that faced up had no way down along it, and its
@@ -961,12 +973,46 @@ spoil).
   yellower at its top. Its light box holds its leaf area times a clumping index of
   0.55 (Chen and Black 1992): spread evenly through each clump's ball, it shaded the
   cushions' sunlit tops. Its near cards spread above their shoots, not under them.
-- **The cards stand upside down on their twigs.** Seen in the lab (a card of a triangle
-  whose point is its last row, on cards turned up their twigs: the points were down),
-  a card's first row is at its twig's far end, not at its foot, for every species; a
-  pine's cards are written bottom row first (`drawSprayCard`), so its tufts are held up
-  and its big card's cushion sits on its branch. The other species' cards are as
-  they were: to be looked at with the looks they were tuned under.
+- **Which way up a card is.** Thought drawn upside down on their twigs (a triangle card
+  had shown its point down on a pine), a pine's cards had been written bottom row
+  first; its tufts then hung under their shoots, their bare wood stood above them as
+  sticks over the crown, and its big cards' cushions hung under their branches. They
+  were never upside down: three's WebGPU renderer samples a DataTexture's first row at
+  v = 0, as WebGL does (`flipY` is for pictures, not data; checked in the lab with a
+  texture of two rows), the shaders lay v = 0 at a card's foot corner, and every
+  card is drawn from its foot. A triangle on every card, with every twig turned up,
+  stands point up; a willow's hanging whips hang theirs point down. A pine's twigs
+  mostly rise, but not all (a fifth lie sideways, a twentieth point down, under the
+  crown), which is likely what was seen. Now every card is written the one way, first
+  row at the foot (`test/orientation.test.ts`), and no other species needed retuning.
+- **Pines' cushions** (`ScanLook.cushion`). A stone pine's canopy is many dense cushions of
+  tufts, lit yellow-green on top and near black beneath, with dark creases between
+  them, as photographs show it: built of many small needle cards, it read as a scatter
+  of leafy blobs. A pine with cushions has them on its big cards, one to a card, as
+  game foliage lays its cluster cards: a picture of a cushion (a leaf set of whole
+  pictures, when there are any), or one drawn needle by needle (`"drawn"`,
+  `drawnCushionCard`): a dome as wide as the card on a flat base curling up a little
+  at its ends, puffs on its top and shoulders, packed with the pine's own tufts at
+  their size, each lit as high as it is in its puff and in the dome, darker in the
+  creases where two puffs meet; an open pine's (an Aleppo pine's) a few loose lumps
+  of its own at heights of their own, with air between. Two to a clump near to,
+  1.45 of its radius from their middle (one to an open pine's clump), and every mid
+  card: each stands upright on its twig, facing out of the crown level
+  (`cardPieces`' `upright`), and the shader turns it to the eye about the vertical,
+  a cylindrical billboard, so its flat base stays level; looked at steeply (from
+  under the crown) it tips over to the eye, a mass overhead and not a card edge on.
+  A far dab of such a pine stands upright too. Its tuft cards are fewer (three tenths
+  of a pine's) and drawn only close to, whole to 9 m and gone by 15 m: a tuft a few
+  pixels across was a broad leaf's blot on the cushions. Its wood thinner than 2 cm
+  is not drawn (it crossed over the cushions as sticks); its limbs are. The stone,
+  Monterey and Aleppo pines have them.
+- **Cost** of the cushion cards (and two big cards a species row): in the lab's grove
+  of stone pines only (`?scene=grove&fill=1`, 400 trees), 3456 x 1892, the frame took
+  6.24 and 4.51 ms in the clearing and 5.19 and 2.62 from outside before, 3.96 and 3.01
+  and 3.15 and 2.15 after (runs interleaved against the commit before, on a shared,
+  busy Mac): a cushion card a few tufts' cards' worth, and three tenths of the tufts.
+  In the mixed grove (no cushioned pine in it) 4.44 and 3.71 ms before, 4.29 and 3.52
+  after. On the graphics card the cards' atlas is a quarter wider (five cards a row).
 - **Cost** of the pines as cushions: in the lab's grove, 3456 x 2006, the frame took
   3.81 to 3.89 ms in the clearing and 3.39 to 3.50 from outside before, 4.05 to 5.63
   and 3.68 to 5.14 after (runs interleaved on a shared, busy Mac): more near cards to a

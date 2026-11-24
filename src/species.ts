@@ -185,6 +185,14 @@ export interface TreeSpecies {
    */
   fork?: number;
   /**
+   * How many stems a forked stem (`fork`) divides into there, 2 to 4 (a stone pine's few thick crooked stems),
+   * each as thick as the pipe model makes it, the stem's wood shared among them; with it, the stem leans or
+   * sways on the way up as `crooked` says. Left out: its great limbs leave it one by one, as `scaffolds` says.
+   */
+  forkStems?: number;
+  /** How many times each of those stems divides again in V-forks, rising then spreading, before its arms are limbs. Left out: once. */
+  forkSplits?: number;
+  /**
    * How far its leaves gather into flat-topped pads, 0..1: each branch off a great limb keeps only the leaves
    * near its top, so the crown is shelves of foliage with air and bare wood under each (a Monterey cypress
    * on a headland, an old Scots pine's plates, a cloud-pruned pine). 0 or left out: an even skin.
@@ -290,6 +298,8 @@ export const OPTIONAL_SPECIES_FIELDS = {
   sprayHang: "number",
   canopyLift: "number",
   fork: "number",
+  forkStems: "number",
+  forkSplits: "number",
   pads: "number",
   clusters: "number",
   buttress: "number",
@@ -1167,7 +1177,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     height: 15,
     crownRadius: 11.5,
     crownBase: 8,
-    trunkRadius: 0.45,
+    trunkRadius: 0.55,
     shape: "hemispherical",
     crownPeak: 0.45,
     crownRound: 4,
@@ -1188,11 +1198,13 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbCurveBack: -10,
     zigzag: 5,
     canopyLift: 0.6,
-    fork: 0.6,
+    fork: 0.72,
+    forkStems: 3,
+    forkSplits: 2,
     leafKind: "pine",
     clumpSize: 2.2,
     clumpSpread: 0.35,
-    leafColor: "#3f6029",
+    leafColor: "#476a2e",
     leafVariation: 0.2,
     treeVariation: 0.2,
     throughTint: [0.8, 0.95, 0.5],
@@ -1634,6 +1646,8 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.crownRound !== undefined && !(s.crownRound >= 0.8 && s.crownRound <= 8)) out.push("crownRound must be 0.8..8");
   if (s.lobes !== undefined && !(s.lobes >= 0 && s.lobes <= 1)) out.push("lobes must be 0..1");
   if (s.scaffolds !== undefined && !(Number.isInteger(s.scaffolds) && s.scaffolds >= 0 && s.scaffolds <= 12)) out.push("scaffolds must be a whole number 0..12");
+  if (s.forkStems !== undefined && !(Number.isInteger(s.forkStems) && s.forkStems >= 1 && s.forkStems <= 4)) out.push("forkStems must be a whole number 1..4");
+  if (s.forkSplits !== undefined && !(Number.isInteger(s.forkSplits) && s.forkSplits >= 0 && s.forkSplits <= 3)) out.push("forkSplits must be a whole number 0..3");
   if (s.shed !== undefined && !(s.shed >= 0 && s.shed <= 1)) out.push("shed must be 0..1");
   if (s.boleStubs !== undefined && !(s.boleStubs >= 0 && s.boleStubs <= 1)) out.push("boleStubs must be 0..1");
   if (s.limbAngle !== undefined && !(s.limbAngle.length === 2 && s.limbAngle.every((a) => a >= 0 && a <= 175))) out.push("limbAngle must be [top, base], each 0..175 degrees");

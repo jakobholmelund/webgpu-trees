@@ -130,6 +130,26 @@ const SCAFFOLD_SPAN = 0.14;
 const SCAFFOLD_SPAN_LEADER = 0.5;
 /** A stem that forks below its crown (`fork`) puts out its limbs over this share of the way from its fork to its crown's base. */
 const FORK_SPAN = 0.25;
+/**
+ * A stem that divides at its fork into a few stems (`forkStems`), each dividing again in V-forks (`forkSplits`):
+ * the angles (from upright) its first stems rise at, and how much further out each division's arms lean;
+ * how long its first stems are, as a share of the way from the fork to the crown's base and a share of its
+ * depth (FORK_INTO), and how much shorter each division's arms; how far apart round the stem its arms swing (rad); and
+ * how far a crooked one's piece of fork wanders each internode, as LIMB_WANDER does a limb's.
+ */
+const FORK_TILT: [number, number] = [28 * DEG, 40 * DEG];
+const FORK_TILT_STEP = 13 * DEG;
+/** How far into its crown a forked stem's arms rise before they are limbs: a share of its depth past its base. */
+const FORK_INTO = 0.3;
+/** How far out from its stem all its arms together may lean, a share of its crown's radius (a narrow crown's rise steeply). */
+const FORK_REACH = 0.55;
+const FORK_SHORTER = 0.72;
+const FORK_SWING = 0.5;
+const FORK_WANDER = 0.16;
+/** How far apart up the stem a third or fourth stem leaves it (m). */
+const FORK_APART = 0.3;
+/** How far a forked stem sways, at crooked 1, as a share of its height to the fork: a sinuous or leaning stem. */
+const STEM_SWAY = 0.2;
 /** How much wider than the species' angle the lowest scaffold leaves (and narrower the highest). */
 const SCAFFOLD_SWING = 40 * DEG;
 /** How far a scaffold turns up over a crown radius of its length, at bend 1 (down at -1), and how far it arches over by its weight. */
@@ -978,6 +998,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const alive = new Uint8Array(cap);
   const tBud = new Uint8Array(cap);
   const lBud = new Uint8Array(cap);
+  /** A V-fork (`forkStems`): its two arms share what it is given by the light each gathers, neither favoured. */
+  const even = new Uint8Array(cap);
   const az = new Float64Array(cap);
   /** How many nodes along its axis a node is: which of its axis's buds it bears, for opposite or two-ranked buds. */
   const rank = new Int32Array(cap);
@@ -1090,6 +1112,88 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       lay(foot, pts, Math.max(1, Math.round((pts.length / 3) * rng.range(0.75, 1))), 0, true);
       continue;
     }
+    /** The scaffolds to lay: where each leaves, and (a forked stem's) which way and at what angle from upright. */
+    const holds: { node: number; scaffold: number; az?: number; angle?: number }[] = [];
+    // (Not a crown grown narrow, in a wood: its stem's limbs leave it one by one, rising steeply, as any tree's.)
+    if (sp.forkStems !== undefined && sp.fork !== undefined && !liveAt && R / depth >= NARROW) {
+      // A stem that divides at its fork into a few stems, each dividing again in V-forks, rising and then
+      // spreading, their last arms the limbs that reach out under the crown (a stone pine's): its fork a share
+      // of the way to its crown's base, its stem sinuous or leaning a little on the way, as crooked as it is.
+      const yF = Math.min(1, Math.max(0, sp.fork)) * base;
+      const lean = rng.range(0, 2 * Math.PI);
+      const sway = STEM_SWAY * sp.crooked * yF * rng.range(0.6, 1);
+      const wave = rng.range(0.7, 1.1);
+      const steps = Math.max(2, Math.ceil(yF / TRUNK_STEP));
+      let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
+      lBud[at] = 0;
+      const stemAt = (y: number): V3 => {
+        const o = sway * Math.sin(Math.PI * wave * (y / yF));
+        return [o * Math.cos(lean), y, o * Math.sin(lean)];
+      };
+      // (Its stems leave it a little apart up it: a node has one stem to go on and one to put out, so a third
+      // or fourth leaves a little below the others.)
+      const n = Math.max(1, Math.round(sp.forkStems));
+      const below: number[] = [];
+      for (let k = 1; k <= steps; k++) {
+        const y = (yF * k) / steps;
+        const q = stemAt(y);
+        at = add(q[0], q[1], q[2], at, true, 0, norm([q[0] - px[at], q[1] - py[at], q[2] - pz[at]]));
+        lBud[at] = 0;
+      }
+      for (let k = 2; k < n; k++) {
+        below.push(at);
+        const q = stemAt(yF);
+        at = add(q[0], py[at] + FORK_APART, q[2], at, true, 0, [0, 1, 0]);
+        lBud[at] = 0;
+      }
+      const top = at;
+      even[top] = 1;
+      for (const b of below) even[b] = 1;
+      const az0 = rng.range(0, 2 * Math.PI);
+      const splits = Math.max(0, Math.round(sp.forkSplits ?? 1));
+      // (Its first arms as long as rise, with the arms after them, from its fork a little into its crown.)
+      let levels = 0;
+      for (let q = 0; q <= splits; q++) levels += FORK_SHORTER ** q;
+      const first = (Math.max(0.5, base - yF) + FORK_INTO * depth) / (levels * Math.cos(0.5 * (FORK_TILT[0] + FORK_TILT[1]) + FORK_TILT_STEP));
+      /** The most an arm `len` long may lean (from upright): its share of how far out they all may. */
+      const most = (len: number) => Math.asin(Math.min(1, (FORK_REACH * R) / (splits + 1) / Math.max(len, 1e-3)));
+      let scaffold = 0;
+      /** A piece of fork from `from`, `len` metres at `tilt` from upright round `a`, wandering; then its V-fork, or its limb. */
+      const arm = (from: number, onAxis: boolean, a: number, lean: number, len: number, left: number) => {
+        const tilt = Math.min(lean, most(len));
+        const m = Math.max(2, Math.round(len / L));
+        let node = from;
+        let we = 0;
+        let wa = 0;
+        for (let j = 0; j < m; j++) {
+          we = LIMB_KEEP * we + FORK_WANDER * sp.crooked * rng.gauss();
+          wa = LIMB_KEEP * wa + FORK_WANDER * sp.crooked * rng.gauss();
+          // (It rises, then leans out further along it: a V-fork's arms spread as they go.)
+          const e = 0.5 * Math.PI - Math.max(4 * DEG, Math.min(80 * DEG, tilt + 0.5 * FORK_TILT_STEP * (j / m) + we));
+          const d: V3 = [Math.cos(e) * Math.cos(a + wa), Math.sin(e), Math.cos(e) * Math.sin(a + wa)];
+          // (Bare below its crown; in it, its buds put out shoots as a limb's do.)
+          node = add(px[node] + d[0] * (len / m), py[node] + d[1] * (len / m), pz[node] + d[2] * (len / m), node, j > 0 || onAxis, 1, d);
+        }
+        const t = tilt + FORK_TILT_STEP;
+        if (left <= 0) {
+          holds.push({ node, scaffold: scaffold++, az: a + wa, angle: t + FORK_TILT_STEP });
+          return;
+        }
+        // (A V-fork: the arm that goes on steeper, the other swung out wider and leaning further.)
+        even[node] = 1;
+        const swing = FORK_SWING * rng.range(0.7, 1.2) * (rng.chance(0.5) ? 1 : -1);
+        arm(node, true, a + wa - 0.4 * swing, t - 0.7 * FORK_TILT_STEP, len * FORK_SHORTER * rng.range(0.85, 1.15), left - 1);
+        arm(node, false, a + wa + 0.6 * swing, t + 0.5 * FORK_TILT_STEP, len * FORK_SHORTER * rng.range(0.85, 1.15), left - 1);
+      };
+      const nodes = [top, top, ...below];
+      for (let k = 0; k < n; k++) {
+        const a = az0 + (k * 2 * Math.PI) / n + rng.range(-0.3, 0.3);
+        const tilt = rng.range(FORK_TILT[0], FORK_TILT[1]);
+        // (Some stems divide once less: not every arm of an old pine forked as often.)
+        const more = splits - (k > 0 && rng.chance(0.3) ? 1 : 0);
+        arm(nodes[k], k === 0, a, tilt, first * rng.range(0.85, 1.15), more);
+      }
+    } else {
     // A tree's trunk: bare to its crown's base, then through the scaffolds' span, one of them at each of
     // their heights (one in each of as many slots up it), its own lateral buds between.
     // (In a stand, from where its live crown starts, its wood's shade having lifted it.)
@@ -1111,7 +1215,6 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     lBud[at] = 0;
     let wx = 0;
     let wz = 0;
-    const holds: { node: number; scaffold: number }[] = [];
     for (const lv of levels) {
       const j = rng.onSphere();
       wx = 0.6 * wx + 0.08 * sp.crooked * j[0];
@@ -1139,6 +1242,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       at = lay(at, pts, pts.length / 3, 0, true);
     }
     tBud[at] = 1;
+    }
     // The scaffolds, round the trunk by the golden angle, the lowest leaving widest; each turns up (or down)
     // by the species' bend and arches over by its weight, sways a little, and reaches out to the crown's
     // outline (some stop a little short).
@@ -1149,7 +1253,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       if (sp.limbCurveBack === undefined) return c * Math.min(f, 1.2);
       return 2 * c * Math.min(f, 0.5) + 2 * sp.limbCurveBack * DEG * Math.min(0.7, Math.max(0, f - 0.5));
     };
-    for (const { node, scaffold: k } of holds) {
+    for (const h of holds) {
+      const { node, scaffold: k } = h;
       const pos = scaffolds > 1 ? k / (scaffolds - 1) : 0.5;
       const g = Math.max(-2, Math.min(2, rng.gauss()));
       // (No wider than the crown has room for: in a crown narrow for its depth (a tree grown in a wood, a
@@ -1158,9 +1263,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       // narrow cone, stop at its side.)
       const room = R / depth < NARROW && !sp.limbAngle ? Math.atan((2.4 * R) / depth) : Math.PI;
       // (The species' angle at its height in the crown, if it says; else its branch angle, swung wider low.)
-      const want = sp.limbAngle ? limbAngleAt(sp, (py[node] - base) / depth) + 0.5 * sp.branchAngleSpread * g * DEG : (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos);
+      const want = h.angle !== undefined ? h.angle : sp.limbAngle ? limbAngleAt(sp, (py[node] - base) / depth) + 0.5 * sp.branchAngleSpread * g * DEG : (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos);
       const angle = Math.min(110 * DEG, room, Math.max(8 * DEG, want));
-      let a0 = azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
+      let a0 = h.az ?? azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
       if (standAt && stand) {
         // (An edge tree's limbs swing out to the open side, along +x; one whose end would be in the dark has
         // died young and gone.)
@@ -1330,8 +1435,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const qm = m >= 0 ? gathered[m] : tBud[i] ? light[i] : 0;
       const ql = l >= 0 ? gathered[l] : lBud[i] ? light[i] : 0;
       // (A scaffold has as much say as the trunk it leaves: the great limbs share by the light each gathers.)
-      const wm = lambda * (kind[i] === 0 ? stemFavour : kind[i] === 1 ? SCAFFOLD_FAVOUR : 1) * qm;
-      const wl = (l >= 0 && kind[l] === 1 ? lambda * stemFavour : 1 - lambda) * ql;
+      const wm = even[i] ? qm : lambda * (kind[i] === 0 ? stemFavour : kind[i] === 1 ? SCAFFOLD_FAVOUR : 1) * qm;
+      const wl = even[i] ? ql : (l >= 0 && kind[l] === 1 ? lambda * stemFavour : 1 - lambda) * ql;
       if (wm + wl <= 0) continue;
       const vm = (v * wm) / (wm + wl);
       if (m >= 0) vIn[m] = vm;
