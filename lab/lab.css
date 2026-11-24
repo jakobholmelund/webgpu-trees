@@ -190,3 +190,6 @@ dialog#bench { width: min(760px, calc(100vw - 32px)); }
   #inspector { max-height: calc(100vh - 106px - var(--gap)); }
   #rail { max-height: calc(100vh - 106px - 64px); }
 }
+
+/* A link dressed as a button (the bar's Gallery). */
+a.plain { color: inherit; text-decoration: none; }

@@ -13,7 +13,7 @@ function rnd(n: number): number {
 }
 
 /** A tree of a species with its size varied as real trees of one kind vary: taller and shorter, wider and narrower, its crown higher or lower. */
-function measured(sp: TreeSpecies, row: number, x: number, z: number, k: number, spread = 1): TreeInstance {
+export function measured(sp: TreeSpecies, row: number, x: number, z: number, k: number, spread = 1): TreeInstance {
   const h = sp.height * (0.7 + rnd(k * 5 + 1) * 0.6 * spread + (1 - spread) * 0.3);
   const s = h / sp.height;
   return {

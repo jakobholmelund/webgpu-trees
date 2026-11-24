@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Tree gallery</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./lab.css" />
+    <link rel="stylesheet" href="./gallery.css" />
+  </head>
+  <body class="gallery">
+    <header id="gbar" class="paper">
+      <a id="mark" href="./index.html" title="Back to the lab">Tree gallery</a>
+      <div class="seg" id="look" role="group" aria-label="Look"></div>
+      <select id="one" aria-label="The species, for all the looks" hidden></select>
+      <div class="seg" id="hour" role="group" aria-label="Time of day"></div>
+      <div class="seg" id="wind" role="group" aria-label="Wind"></div>
+      <select id="region" aria-label="Region"></select>
+      <select id="kind" aria-label="Kind of tree"></select>
+      <span class="spacer"></span>
+      <button class="plain" id="thumbs" type="button" aria-pressed="true" title="Small copies of the reference photographs beside each species, loaded from Wikimedia Commons">Photos</button>
+      <button class="plain" id="compare-open" type="button" title="Two saved sets side by side, flickered or differenced">Compare</button>
+      <button class="go" id="save" type="button" title="All the cells as one contact sheet (PNG), named by the commit">Save set</button>
+    </header>
+
+    <div id="gstatus" role="status"><span id="gstatus-line">Starting…</span> <span id="gcommit"></span></div>
+
+    <main id="grid" aria-label="The trees, by species and view"></main>
+
+    <section id="compare" hidden aria-labelledby="compare-title">
+      <div class="cbar paper">
+        <h1 id="compare-title">Compare two sets</h1>
+        <label class="file">A <input id="file-a" type="file" accept="image/png" /></label>
+        <label class="file">B <input id="file-b" type="file" accept="image/png" /></label>
+        <button class="plain" id="use-this" type="button" title="Put the set this page has drawn in as B">This page as B</button>
+        <div class="seg" id="mode" role="group" aria-label="How to compare"></div>
+        <button class="plain" id="actual" type="button" aria-pressed="false" title="One of the sheet's pixels to one of the screen's">1:1</button>
+        <span class="spacer"></span>
+        <button class="plain" id="compare-close" type="button">Close</button>
+      </div>
+      <div id="compare-note"></div>
+      <div id="compare-view"></div>
+    </section>
+
+    <dialog id="zoom" class="sheet" aria-label="A cell, larger">
+      <img id="zoom-img" alt="" />
+      <div class="row"><span class="note" id="zoom-note"></span><button class="plain" id="zoom-px" type="button" aria-pressed="false">Pixels</button><button class="plain" id="zoom-close" type="button">Close</button></div>
+    </dialog>
+
+    <div id="fail"><p id="fail-text"></p></div>
+    <script type="module" src="./gallery.ts"></script>
+  </body>
+</html>

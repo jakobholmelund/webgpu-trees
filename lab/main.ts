@@ -17,7 +17,6 @@
 //   ?fresh           ignore what the lab kept from last time
 
 import * as THREE from "three/webgpu";
-import { dot, float, max, mix, normalize, positionGeometry, positionWorld, pow, smoothstep, uniform, vec3 } from "three/tsl";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import GUI from "three/addons/libs/lil-gui.module.min.js";
 import {
@@ -45,6 +44,7 @@ import {
 } from "../src/index";
 import { course, grove, oneTree, specimenRow, specimens } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
+import { SKY as SKY_HEX, makeGround, makeSky, sunAt, tintsFor } from "./stage";
 
 // (v3: the styles: four looks, and the style has lobe, bulge, warm, cool, chroma, rim and sprigs.)
 const STORE_KEY = "tree-lab-preset-v3";
@@ -74,29 +74,6 @@ function fail(text: string): never {
   document.getElementById("fail-text")!.textContent = text;
   document.getElementById("fail")!.classList.add("on");
   throw new Error(text);
-}
-
-/** Where the sun is at an hour of a summer's day at 50 degrees north (a direction towards it). */
-function sunAt(hour: number): THREE.Vector3 {
-  const decl = THREE.MathUtils.degToRad(20);
-  const lat = THREE.MathUtils.degToRad(50);
-  const ha = THREE.MathUtils.degToRad((hour - 12) * 15);
-  const up = Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(ha);
-  const east = -Math.cos(decl) * Math.sin(ha);
-  const north = Math.cos(lat) * Math.sin(decl) - Math.sin(lat) * Math.cos(decl) * Math.cos(ha);
-  return new THREE.Vector3(east, up, -north).normalize();
-}
-
-/**
- * The light's colours for a sun at this height, as the grass lab has them: white and high at noon, warmer
- * and lower at either end of the day. A sun above about 32 degrees gives a clear morning's light.
- */
-function tintsFor(sun: THREE.Vector3, sunTint: THREE.Vector3, shadeTint: THREE.Vector3) {
-  const elevation = THREE.MathUtils.radToDeg(Math.asin(Math.min(1, Math.max(-1, sun.y))));
-  const low = 1 - Math.min(1, Math.max(0, (elevation - 5) / 27));
-  const s = low * low * (3 - 2 * low);
-  sunTint.set(1.14 + 0.2 * s, 1.04 - 0.12 * s, 0.86 - 0.3 * s);
-  shadeTint.set(0.6 - 0.08 * s, 0.7 - 0.1 * s, 0.88 - 0.04 * s);
 }
 
 /** What is wrong with a species read from JSON, or null: every field there and of its kind, then the package's own check. */
@@ -212,7 +189,7 @@ async function start() {
 
   // ---- The world: a sky, a plain lit ground. ----
 
-  const SKY = new THREE.Color("#c9d8e3");
+  const SKY = new THREE.Color(SKY_HEX);
   const scene = new THREE.Scene();
   scene.background = SKY;
   const fog = new THREE.Fog(SKY, 100, 700);
@@ -224,31 +201,10 @@ async function start() {
   };
   setFog();
 
-  // The sky: pale at the horizon, bluer overhead.
-  {
-    const mat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, fog: false, depthWrite: false });
-    const up = normalize(positionGeometry);
-    mat.colorNode = mix(vec3(0.79, 0.85, 0.89), vec3(0.37, 0.58, 0.81), pow(smoothstep(float(0), float(0.75), up.y), float(0.6)));
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(9000, 32, 16), mat);
-    sky.renderOrder = -1;
-    scene.add(sky);
-  }
-
-  // The ground: flat, mown grass, lit by the same sun and in the same light's colours as the leaves.
-  // (Later the grass library may stand on it, as an option.)
-  const uSun = uniform(new THREE.Vector3(0, 1, 0));
-  const uSunTint = uniform(new THREE.Vector3(1.14, 1.04, 0.86));
-  const uShadeTint = uniform(new THREE.Vector3(0.6, 0.7, 0.88));
-  // (In the trees' shade where they cast it: the package's `sunAt`, from its `bakeShade`. So the ground's
-  // material is made again with each making of the trees.)
-  const groundFor = (t: Trees | null) => {
-    const mat = new THREE.MeshBasicNodeMaterial();
-    const lit = max(dot(vec3(0, 1, 0), uSun), float(0));
-    const sunLeft = t ? t.sunAt(positionWorld.xz) : float(1);
-    mat.colorNode = vec3(0.16, 0.25, 0.09).mul(mix(uShadeTint, uSunTint, lit.mul(sunLeft)));
-    return mat;
-  };
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), groundFor(null));
+  // The sky, and the ground: flat, mown grass, lit by the same sun and in the same light's colours as the
+  // leaves, in the trees' shade (stage.ts). (Later the grass library may stand on it, as an option.)
+  scene.add(makeSky());
+  const { mesh: ground, uSun, uSunTint, uShadeTint, materialFor: groundFor } = makeGround();
   scene.add(ground);
   /** What the shade was last worked out for: the trees and the hour. */
   let shadeFor: { trees: Trees | null; hour: number } = { trees: null, hour: NaN };
