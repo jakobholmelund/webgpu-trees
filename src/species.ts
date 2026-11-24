@@ -1268,7 +1268,6 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbCurve: 5,
     limbCurveBack: -10,
     zigzag: 0,
-    phyllotaxis: "opposite",
     leafKind: "broad",
     clumpSize: 2.0,
     clumpSpread: 0.3,
