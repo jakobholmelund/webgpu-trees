@@ -63,7 +63,8 @@ class Builder {
   readonly index: number[] = [];
   readonly ranges: Range[] = [];
   vertices = 0;
-  private start = { index: 0, vertex: 0 };
+  /** Where the variant being built starts: its first index and vertex. */
+  start = { index: 0, vertex: 0 };
   // (Not a parameter property: node runs this file's tests by stripping its types, which those are not.)
   readonly sizes: Record<string, number>;
   constructor(sizes: Record<string, number>) {
@@ -247,7 +248,9 @@ export function gatherClumps(tree: GrownTree, count: number): { centre: number[]
     const l = Math.hypot(nn[0], nn[1], nn[2]) || 1;
     // (Big enough to cover what it gathers, seen from any side, short of its farthest edge: a group of
     // clumps is not a ball of them.)
-    out.push({ centre: [cx[g], cy[g], cz[g]], size: Math.max(Math.sqrt(area) * 1.1, reach * 0.8), normal: nn.map((q) => q / l), depth: depth / m, own: hash01(g, 41) });
+    // (And never past it: a dab reaching out of the crown shows, as a tree passes from tier to tier and each
+    // draws in the other's pixels, as specks of leaves floating round its top.)
+    out.push({ centre: [cx[g], cy[g], cz[g]], size: Math.min(reach, Math.max(Math.sqrt(area) * 1.1, reach * 0.8)), normal: nn.map((q) => q / l), depth: depth / m, own: hash01(g, 41) });
   }
   return out;
 }
@@ -349,7 +352,7 @@ export function woodLines(tree: GrownTree, shape: TierShape): WoodLines {
       slope[i] = (before - R[i]) * (R[i] - R[c]) >= 0 ? g : 0;
     } else slope[i] = (R[i] - before) / Math.max(1e-6, len[i]);
   }
-  const hf = flareHeight(tree.size);
+  const hf = flareHeight(tree.size, tree.buttress ?? 0);
   for (let i = 0; i < n; i++) {
     if (!drawn(i)) continue;
     const p = sk.parent[i];
@@ -529,8 +532,9 @@ function sidesFor(shape: TierShape, r: number, trunk: number): number {
  * spacing. Gives how much they widen the stem at an angle round it (1 none) and a height above its foot,
  * how fast that changes round it (per radian) and up it (per m).
  */
-function buttresses(seed: number, hf: number): (angle: number, h: number) => [number, number, number] {
-  const count = 4 + Math.floor(hash01(seed, 17) * 3);
+function buttresses(seed: number, hf: number, foot = 0): (angle: number, h: number) => [number, number, number] {
+  // (A buttressed species' foot has more of them, and they stand out further: a cedar's fluted foot.)
+  const count = 4 + Math.floor(hash01(seed, 17) * 3) + Math.round(3 * foot);
   const step = (Math.PI * 2) / count;
   const at: number[] = [];
   const size: number[] = [];
@@ -550,7 +554,7 @@ function buttresses(seed: number, hf: number): (angle: number, h: number) => [nu
       lobe += g;
       dLobe += (-g * d) / (sigma * sigma);
     }
-    const A = BUTTRESS * Math.exp(-Math.max(0, h) / rise);
+    const A = BUTTRESS * (1 + 0.6 * foot) * Math.exp(-Math.max(0, h) / rise);
     const dA = h > 0 ? -A / rise : 0;
     return [1 + A * (lobe - 0.12), A * dLobe, dA * (lobe - 0.12)];
   };
@@ -573,7 +577,7 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
     const sk = tree.skeleton;
     const W = woodLines(tree, shape);
     const trunk = sk.radius[0] || tree.size.trunkRadius;
-    const hf = flareHeight(tree.size);
+    const hf = flareHeight(tree.size, tree.buttress ?? 0);
     const ownOf = new Float64Array(sk.count).fill(0.5);
     const stitch = (a: number, na: number, c: number, nc: number) => {
       let i = 0;
@@ -606,7 +610,7 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
       if (p < 0) ownOf[j] = own;
       const foot = p < 0 ? j : -1;
       const flared = foot >= 0 && shape.round && sk.radius[foot] > 0.06 && sk.radius[foot] > 1.02 * sk.radius[chain[0]];
-      const lobe = flared ? buttresses(foot * 7 + v * 1013, hf) : null;
+      const lobe = flared ? buttresses(foot * 7 + v * 1013, hf, tree.buttress ?? 0) : null;
       let u: number[] = [];
       let last = -1;
       let lastSides = 0;
@@ -858,6 +862,10 @@ export const SHEETS_PER_CLUMP = 2;
 /** A clump's own sheet: its length, and its half width, in the clump's radii; how far back along the wood its foot is. */
 const SHEET_LENGTH = 3.6;
 const SHEET_HALF = 1.4;
+/** A spire's sheets round its leader: how many to a clump, and how long and wide, in its clump's radii. */
+const SPIRE_SHEETS = 3;
+const SPIRE_SHEET_LENGTH = 2.2;
+const SPIRE_SHEET_HALF = 0.95;
 const SHEET_BACK = 0.75;
 /** A bough's sheets: each this many of its clumps' radii long, the next starting this share of it on. */
 const BOUGH_PIECE = 3.2;
@@ -890,6 +898,7 @@ export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[
       const covered = new Uint8Array(cl.count);
       boughSheets(b, tree, lines, kind, v, covered, coarse);
       const twigs = clumpTwigs(tree);
+      const spire: number[] = [];
       for (let c = 0; c < cl.count; c++) {
         if (covered[c]) continue;
         const r = cl.radius[c];
@@ -899,6 +908,28 @@ export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[
         // (Mid, only the leader's: a bough's own sheets, wider there, cover its side shoots' clumps well enough
         // from where a mid tree is seen.)
         if (coarse && sk.order[cl.node[c]] > 0) continue;
+        if (sk.order[cl.node[c]] === 0 && coarse) {
+          // (Mid, the spire is one: below.)
+          spire.push(c);
+          continue;
+        }
+        if (sk.order[cl.node[c]] === 0) {
+          // (On the leader, its spire: short sheets round it, splayed out and up as a fir's top shoots are,
+          // each turned from the last, so the leader is clothed in needles all round and ends in a point.)
+          const node = cl.node[c];
+          const foot = [sk.x[node], sk.y[node] - r * 0.35, sk.z[node]];
+          const around = coarse ? 2 : SPIRE_SHEETS;
+          const turn0 = c * 2.39996;
+          for (let s = 0; s < around; s++) {
+            const a = turn0 + (s * 2 * Math.PI) / around;
+            const out = [Math.cos(a), 0, Math.sin(a)];
+            const k = c * 53 + s;
+            const dir = norm([out[0] * 0.85, 1, out[2] * 0.85]);
+            const length = r * SPIRE_SHEET_LENGTH * (0.9 + 0.2 * hash01(k, 12));
+            sheet(b, foot, dir, length, r * SPIRE_SHEET_HALF, { lift: 0.04, droop: 0.12 + 0.08 * hash01(k, 14), arch: 0.5 + 0.3 * hash01(k, 15), twist: (hash01(k, 16) - 0.5) * 0.4 }, hash01(k, v * 389 + 11), n, cl.depth[c], kind, limbOf(sk, node), v, coarse ? 2 : SHEET_ALONG);
+          }
+          continue;
+        }
         const most = cl.depth[c] > 0.65 || coarse ? 1 : SHEETS_PER_CLUMP;
         const order = [...twigs[c]].sort((p, q) => (p === cl.node[c] ? -1 : q === cl.node[c] ? 1 : 0));
         for (const t of order) {
@@ -922,6 +953,34 @@ export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[
           laid.push({ foot, dir, length });
           const a = hash01(k, 14);
           sheet(b, foot, dir, length, half, { lift: 0.1 + 0.08 * a, droop: 0.26 + 0.22 * a, arch: 0.55 + 0.35 * hash01(k, 15), twist: (hash01(k, 16) - 0.5) * 0.7 }, hash01(k, v * 389 + 11), n, cl.depth[c], kind, limbOf(sk, t), v, coarse ? 2 : SHEET_ALONG);
+        }
+      }
+      // (Any twig's end the sheets leave out, a sheet of its own along that twig, over its end: a twig poking out
+      // of a conifer's needles bare is a dead stick, which it is not.)
+      coverEnds(b, tree, lines, kind, v, coarse);
+      if (spire.length > 0) {
+        // (Mid, a spire is two sheets crossed, from its lowest needles to its tip, widest at its foot: a
+        // narrow point and not a string of beads, which a few small sheets each its own read as.)
+        let lo = Infinity;
+        let hi = -Infinity;
+        let wide = 0;
+        let lowest = spire[0];
+        for (const c of spire) {
+          const r = cl.radius[c];
+          if (cl.y[c] - r * 0.6 < lo) {
+            lo = cl.y[c] - r * 0.6;
+            lowest = c;
+          }
+          hi = Math.max(hi, cl.y[c] + r * 0.9);
+          wide = Math.max(wide, r);
+        }
+        const node = cl.node[lowest];
+        const foot = [sk.x[node], lo, sk.z[node]];
+        const n = [cl.nx[lowest], cl.ny[lowest], cl.nz[lowest]];
+        for (let s = 0; s < 2; s++) {
+          const a = lowest * 2.39996 + s * Math.PI * 0.5;
+          const dir = norm([Math.cos(a) * 0.04, 1, Math.sin(a) * 0.04]);
+          sheet(b, foot, dir, hi - lo, wide * 1.15, { lift: 0, droop: 0.02, arch: 0.25, twist: 0, point: true }, hash01(lowest * 53 + s, v * 389 + 11), n, cl.depth[lowest], kind, limbOf(sk, node), v, 2);
         }
       }
     }
@@ -1019,6 +1078,103 @@ function boughSheets(b: Builder, tree: GrownTree, lines: WoodLines, kind: number
   }
 }
 
+/** How far past a sheet a twig's end may be (in its clump's radii, near and mid) before it is given a sheet of its own. */
+const END_UNDER = [0.18, 0.4];
+
+/**
+ * Each twig's end in the crown that the variant's sheets so far (those since `b.begin()`) leave more than
+ * `END_UNDER` of a clump's radius from them: a short sheet along its twig, over its end.
+ */
+function coverEnds(b: Builder, tree: GrownTree, lines: WoodLines, kind: number, v: number, coarse: boolean): void {
+  const { clumps: cl, skeleton: sk } = tree;
+  if (cl.count === 0) return;
+  const pos = b.floats.position;
+  // (This variant's triangles, as corner positions.)
+  const start = b.start;
+  const tris: number[] = [];
+  for (let t = start.index; t < b.index.length; t += 3) {
+    for (let c = 0; c < 3; c++) {
+      const vtx = (b.index[t + c] + start.vertex) * 3;
+      tris.push(pos[vtx], pos[vtx + 1], pos[vtx + 2]);
+    }
+  }
+  const has = new Uint8Array(sk.count);
+  for (let i = 0; i < sk.count; i++) if (sk.parent[i] >= 0) has[sk.parent[i]] = 1;
+  // (Each end's clump: the nearest whose ball it is in, for the size of what covers it.)
+  let rMean = 0;
+  for (let c = 0; c < cl.count; c++) rMean += cl.radius[c] / cl.count;
+  const reach = END_UNDER[coarse ? 1 : 0];
+  const off = (p: number[], most: number): number => {
+    let best = most;
+    for (let t = 0; t < tris.length; t += 9) {
+      const lo = Math.max(Math.min(tris[t], tris[t + 3], tris[t + 6]) - p[0], p[0] - Math.max(tris[t], tris[t + 3], tris[t + 6]), Math.min(tris[t + 1], tris[t + 4], tris[t + 7]) - p[1], p[1] - Math.max(tris[t + 1], tris[t + 4], tris[t + 7]), Math.min(tris[t + 2], tris[t + 5], tris[t + 8]) - p[2], p[2] - Math.max(tris[t + 2], tris[t + 5], tris[t + 8]));
+      if (lo >= best) continue;
+      best = Math.min(best, triangleDistance(p, tris, t));
+    }
+    return best;
+  };
+  for (let i = 0; i < sk.count; i++) {
+    if (has[i] || sk.parent[i] < 0 || sk.order[i] === 0 || sk.y[i] < tree.size.crownBase) continue;
+    const tip = [sk.x[i], sk.y[i], sk.z[i]];
+    let r = rMean;
+    let nearest = Infinity;
+    for (let c = 0; c < cl.count; c++) {
+      const d = Math.hypot(cl.x[c] - tip[0], cl.y[c] - tip[1], cl.z[c] - tip[2]);
+      if (d < nearest) {
+        nearest = d;
+        r = cl.radius[c];
+      }
+    }
+    r = Math.min(r, rMean);
+    if (off(tip, reach * r + 1e-6) <= reach * r) continue;
+    const shoot = shootOf(sk, lines, i, r * 1.2);
+    const foot = shoot.at(Math.min(shoot.length, r * 0.9)).p;
+    const along = norm(sub(tip, foot));
+    const dir = along;
+    const k = i * 37 + 5;
+    const length = Math.max(r * 1.7, Math.hypot(...sub(tip, foot)) * 1.6);
+    sheet(b, foot, dir, length, r * (coarse ? 0.9 : 0.75), { lift: 0, droop: 0.02 + 0.04 * hash01(k, 22), arch: 0.35, twist: (hash01(k, 24) - 0.5) * 0.4 }, hash01(k, v * 389 + 11), norm([tip[0], 0.4, tip[2]]), 0.3, kind, limbOf(sk, i), v, coarse ? 2 : SHEET_ALONG);
+    // (Its triangles count for the ends after it.)
+    const vtx = b.vertices - (coarse ? 2 : SHEET_ALONG) * SHEET_ACROSS;
+    const rows = coarse ? 2 : SHEET_ALONG;
+    for (let j = 0; j + 1 < rows; j++)
+      for (let q = 0; q + 1 < SHEET_ACROSS; q++) {
+        const a = (vtx + j * SHEET_ACROSS + q) * 3;
+        const c2 = (vtx + (j + 1) * SHEET_ACROSS + q) * 3;
+        for (const [x, y, z] of [
+          [a, a + 3, c2],
+          [a + 3, c2 + 3, c2],
+        ])
+          tris.push(pos[x], pos[x + 1], pos[x + 2], pos[y], pos[y + 1], pos[y + 2], pos[z], pos[z + 1], pos[z + 2]);
+      }
+  }
+}
+
+/** How far a point is from the triangle at `t` in a flat list of corners. */
+function triangleDistance(p: number[], tris: number[], t: number): number {
+  const a = [tris[t], tris[t + 1], tris[t + 2]];
+  const ab = [tris[t + 3] - a[0], tris[t + 4] - a[1], tris[t + 5] - a[2]];
+  const ac = [tris[t + 6] - a[0], tris[t + 7] - a[1], tris[t + 8] - a[2]];
+  const ap = sub(p, a);
+  const d1 = dot(ab, ap);
+  const d2 = dot(ac, ap);
+  const d00 = dot(ab, ab);
+  const d01 = dot(ab, ac);
+  const d11 = dot(ac, ac);
+  const den = d00 * d11 - d01 * d01;
+  if (den > 1e-12) {
+    const s = (d11 * d1 - d01 * d2) / den;
+    const w = (d00 * d2 - d01 * d1) / den;
+    if (s >= 0 && w >= 0 && s + w <= 1) return Math.hypot(ap[0] - ab[0] * s - ac[0] * w, ap[1] - ab[1] * s - ac[1] * w, ap[2] - ab[2] * s - ac[2] * w);
+  }
+  const seg = (u: number[], d: number[]) => {
+    const f = Math.min(1, Math.max(0, dot(sub(p, u), d) / Math.max(1e-12, dot(d, d))));
+    return Math.hypot(p[0] - u[0] - d[0] * f, p[1] - u[1] - d[1] * f, p[2] - u[2] - d[2] * f);
+  };
+  const b = [tris[t + 3], tris[t + 4], tris[t + 5]];
+  return Math.min(seg(a, ab), seg(a, ac), seg(b, [tris[t + 6] - b[0], tris[t + 7] - b[1], tris[t + 8] - b[2]]));
+}
+
 /** How far a point lies from a sheet's line (its foot, the way it runs, its length): 0 on it. */
 function offLine(p: number[], foot: number[], dir: number[], length: number): number {
   const d = sub(p, foot);
@@ -1037,6 +1193,8 @@ interface SheetShape {
   droop: number;
   arch: number;
   twist: number;
+  /** Widest at its foot and narrowing to a point at its tip (a spire's), not narrower at both ends. */
+  point?: boolean;
 }
 
 /**
@@ -1058,7 +1216,7 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
     const t = twist * u;
     const sd = add(scale(side, Math.cos(t)), scale(top, Math.sin(t)));
     const tp = sub(scale(top, Math.cos(t)), scale(side, Math.sin(t)));
-    const wide = half * (0.62 + 0.38 * Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.95)));
+    const wide = shape.point ? half * Math.max(0.03, 1 - u) ** 0.85 : half * (0.62 + 0.38 * Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.95)));
     return add(add(c, scale(sd, s * wide)), scale(tp, -arch * wide * s * s));
   };
   let first = -1;

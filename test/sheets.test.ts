@@ -15,7 +15,8 @@ import { SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sheetAtlasPix
 import { ALPHA_CUT, alphaOf, coverage, coverageMips } from "../src/mips.ts";
 import { type GrownTree } from "../src/tree.ts";
 
-const CONIFERS = ALL_SPECIES.filter((s) => s.architecture === "conifer");
+// (A whorled conifer with needles or scales: a pine's tufts are sprays, not boughs, and have no sheets.)
+const CONIFERS = ALL_SPECIES.filter((s) => s.architecture === "conifer" && (s.leafKind === "needle" || s.leafKind === "small"));
 const kindOf = (leafKind: string) => (leafKind === "needle" ? 0 : 1);
 
 function grow(sp: (typeof ALL_SPECIES)[number], seed = 1): GrownTree {
@@ -48,8 +49,14 @@ for (const sp of CONIFERS) {
     assert.equal(near.index.length % (per * 3), 0, "whole sheets");
     const sheets = near.index.length / (per * 3);
     const cl = tree.clumps.count;
-    // (Bounded: no more than two sheets a clump close to, and the mid tier's coarser, at most half the triangles.)
-    assert.ok(sheets >= 1 && sheets <= cl * 2, `${sheets} sheets for ${cl} clumps`);
+    // (Bounded: no more than two sheets a clump close to, besides at most one over each twig's end the boughs'
+    // sheets leave out (geometry.ts `coverEnds`: a twig out of its needles is a bare stick), and the mid tier's
+    // coarser, at most half the triangles.)
+    let ends = 0;
+    const has = new Uint8Array(tree.skeleton.count);
+    for (let i = 0; i < tree.skeleton.count; i++) if (tree.skeleton.parent[i] >= 0) has[tree.skeleton.parent[i]] = 1;
+    for (let i = 0; i < tree.skeleton.count; i++) if (!has[i]) ends++;
+    assert.ok(sheets >= 1 && sheets <= cl * 2 + 0.6 * ends, `${sheets} sheets for ${cl} clumps and ${ends} twig ends`);
     assert.ok(mid.index.length <= near.index.length / 2, `mid ${mid.index.length / 3} triangles, near ${near.index.length / 3}`);
     const pos = near.attributes.position.array;
     const dab = near.attributes.aDab.array;
