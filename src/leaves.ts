@@ -68,6 +68,8 @@ interface Stroke {
   tone: number;
   /** How much lighter its upper side is than its lower, 0..1. */
   lit: number;
+  /** Whether it is wood (a twig, a stalk), not a needle or a leaflet. */
+  wood: boolean;
 }
 
 interface Blade {
@@ -102,8 +104,8 @@ interface Blade {
 
 type Shape = Stroke | Blade;
 
-function stroke(ax: number, ay: number, bx: number, by: number, ra: number, rb: number, tone: number, lit = 0.25): Stroke {
-  return { t: "stroke", ax, ay, bx, by, ra, rb, tone, lit };
+function stroke(ax: number, ay: number, bx: number, by: number, ra: number, rb: number, tone: number, lit = 0.25, wood = false): Stroke {
+  return { t: "stroke", ax, ay, bx, by, ra, rb, tone, lit, wood };
 }
 
 /** A run of numbers from 0 to 1, the same every time for the same seed. */
@@ -131,7 +133,7 @@ function twig(out: Shape[], x: number, y: number, a: number, len: number, curl: 
     a += curl / n + (rnd() - 0.5) * wobble;
     const nx = x + Math.cos(a) * step;
     const ny = y + Math.sin(a) * step;
-    out.push(stroke(x, y, nx, ny, lerp(r0, r1, (i - 1) / n), lerp(r0, r1, i / n), TWIG));
+    out.push(stroke(x, y, nx, ny, lerp(r0, r1, (i - 1) / n), lerp(r0, r1, i / n), TWIG, 0.25, true));
     x = nx;
     y = ny;
     pts.push({ x, y, a, s: i / n });
@@ -178,7 +180,7 @@ function leaf(out: Shape[], x: number, y: number, a: number, stalk: number, o: B
   if (stalk > 0) {
     bx = x + Math.cos(a) * stalk;
     by = y + Math.sin(a) * stalk;
-    out.push(stroke(x, y, bx, by, stalkR * 1.15, stalkR, TWIG * 1.25, 0));
+    out.push(stroke(x, y, bx, by, stalkR * 1.15, stalkR, TWIG * 1.25, 0, true));
   }
   out.push({
     t: "blade",
@@ -282,20 +284,24 @@ function narrowSpray(v: number, rnd: () => number): Shape[] {
       }
     }
   } else {
-    // (The twig arches up and over; shoots hang from it, leaves alongside them.)
+    // (The twig leans out and bends over, not round: shoots hang from it to either side, leaves along them, its own
+    // leaves set off to either side, so it runs inside the spray. Bent on round, as it was, it lay bare along
+    // the spray's top, an arc across every card: a dark ring round the leaves.)
     const dir = rnd() < 0.5 ? 1 : -1;
-    const main = twig(twigs, 0, 0, Math.PI / 2 - dir * 0.6, 230, -dir * 1.5, 2.4, 1.2, rnd, 12, 0.08);
+    const main = twig(twigs, 0, 0, Math.PI / 2 - dir * 0.2, 200, -dir * 0.7, 2.2, 1.1, rnd, 12, 0.08);
     const shoots: Pt[][] = [main];
-    for (let s = 0.1; s < 0.99; s += 0.05 + rnd() * 0.03) {
+    let side = rnd() < 0.5 ? 1 : -1;
+    for (let s = 0.12; s < 0.99; s += 0.05 + rnd() * 0.03) {
       const p = along(main, s);
-      shoots.push(twig(twigs, p.x, p.y, towards(p.a, down, 0.55 + rnd() * 0.3), 80 + rnd() * 90 * (1 - Math.abs(s - 0.55)), dir * (rnd() - 0.5) * 0.5, 1.4, 0.8, rnd, 6));
+      shoots.push(twig(twigs, p.x, p.y, towards(p.a + side * (0.8 + rnd() * 0.4), down, 0.35 + rnd() * 0.2), 60 + rnd() * 70 * (1 - Math.abs(s - 0.55)), dir * (rnd() - 0.5) * 0.5, 1.4, 0.8, rnd, 6));
+      side = -side;
     }
     for (const b of shoots) {
       let ls = rnd() < 0.5 ? 1 : -1;
-      const start = b === main ? 0.25 : 0.06;
+      const start = b === main ? 0.2 : 0.06;
       for (let s = start + rnd() * 0.05; s < 1.0; s += (b === main ? 0.05 : 0.085) + rnd() * 0.045) {
         const p = along(b, s);
-        const a = towards(p.a + ls * (0.25 + rnd() * 0.4), down, b === main ? 0.5 : 0.15);
+        const a = towards(p.a + ls * (b === main ? 0.7 + rnd() * 0.5 : 0.25 + rnd() * 0.4), down, 0.15);
         const len = 52 + rnd() * 26;
         leaf(leaves, p.x, p.y, a, 2 + rnd() * 2, { len, wid: len * (0.08 + rnd() * 0.03), p: 0.8, q: 1.3, bend: (rnd() - 0.5) * 0.2, veins: 0, shadow: 2 }, rnd, 0.8);
         ls = -ls;
@@ -654,6 +660,8 @@ interface Layer {
   tone: Float32Array;
   own: Float32Array;
   cover: Float32Array;
+  /** How much of each texel is wood, premultiplied by coverage as tone is. */
+  wood: Float32Array;
 }
 
 function box(cx0: number, cy0: number, cx1: number, cy1: number): [number, number, number, number] {
@@ -687,6 +695,7 @@ function drawStroke(L: Layer, s: Stroke, own: number): void {
       L.tone[o] = L.tone[o] * (1 - c) + tone * c;
       L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
+      L.wood[o] = L.wood[o] * (1 - c) + (s.wood ? c : 0);
     }
   }
 }
@@ -831,14 +840,29 @@ function drawBlade(L: Layer, b: Blade, own: number): void {
       L.tone[o] = L.tone[o] * (1 - c) + tone * c;
       L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
+      L.wood[o] *= 1 - c;
     }
   }
 }
 
 /** The atlas's texels, RGBA8 (row 0 is v = 0): the realistic look's texture (engine.ts makes it, with its mips: mips.ts). Pure, so it runs anywhere. */
 export function leafAtlasPixels(): { data: Uint8Array; width: number; height: number } {
+  return drawAtlas(null);
+}
+
+/**
+ * How much of each of the atlas's texels is wood (a twig or a stalk), 0..1, laid out as `leafAtlasPixels` is,
+ * one number a texel: for the tests, which look at where a spray's wood shows.
+ */
+export function leafAtlasWood(): { wood: Float32Array; width: number; height: number } {
+  const wood = new Float32Array(WIDTH * HEIGHT);
+  drawAtlas(wood);
+  return { wood, width: WIDTH, height: HEIGHT };
+}
+
+function drawAtlas(woodOut: Float32Array | null): { data: Uint8Array; width: number; height: number } {
   const data = new Uint8Array(WIDTH * HEIGHT * 4);
-  const L: Layer = { tone: new Float32Array(CELL * CELL), own: new Float32Array(CELL * CELL), cover: new Float32Array(CELL * CELL) };
+  const L: Layer = { tone: new Float32Array(CELL * CELL), own: new Float32Array(CELL * CELL), cover: new Float32Array(CELL * CELL), wood: new Float32Array(CELL * CELL) };
   for (let kind = 0; kind < LEAF_KINDS.length; kind++) {
     for (let v = 0; v < 2; v++) {
       const rnd = rng(7919 * (kind + 1) + 131 * v + 17);
@@ -847,6 +871,7 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
       L.tone.fill(0);
       L.own.fill(0);
       L.cover.fill(0);
+      L.wood.fill(0);
       // (Each shape's own number from where it is in the list, not from the spray's run of numbers, which
       // laid the spray as it is.)
       shapes.forEach((s, n) => {
@@ -878,6 +903,7 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
           data[o + 1] = k > 0 ? ((Math.min(1, L.own[n] / a) * 255 + 0.5) | 0) : 128;
           data[o + 2] = t;
           data[o + 3] = k;
+          if (woodOut) woodOut[(oy + j) * WIDTH + ox + (n - j * CELL)] = k > 0 ? Math.min(1, L.wood[n] / a) : 0;
         }
       }
     }

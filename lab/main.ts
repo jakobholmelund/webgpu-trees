@@ -20,15 +20,12 @@ import * as THREE from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import GUI from "three/addons/libs/lil-gui.module.min.js";
 import {
-  type Architecture,
-  type CrownShape,
   DEFAULT_DETAIL,
   DEFAULT_STYLE,
   DEFAULT_VARIANT_OPTIONS,
   ALL_SPECIES,
   LEAF_KIND_ROWS,
   LOOK_STYLES,
-  STARTER_SPECIES,
   STYLE_RANGES,
   TREE_LOOKS,
   type TreeLook,
@@ -45,21 +42,11 @@ import {
 import { course, grove, oneTree, specimenRow, specimens, woodland } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
 import { SKY as SKY_HEX, makeGround, makeSky, sunAt, tintsFor } from "./stage";
+import { ARCHITECTURES, type Preset, SHAPES, readPreset } from "./presets";
 
 // (v3: the styles: four looks, and the style has lobe, bulge, warm, cool, chroma, rim and sprigs.)
 const STORE_KEY = "tree-lab-preset-v3";
 const query = new URLSearchParams(location.search);
-
-/** What the lab keeps and hands out: everything set here that is not where the eye is. */
-interface Preset {
-  version: 1;
-  /** The look the style is for (left out: the painted look). */
-  look?: TreeLook;
-  species: TreeSpecies[];
-  style: TreeStyle;
-  detail: TreeDetail;
-  variants: VariantOptions;
-}
 
 type SceneName = "one" | "specimen" | "grove" | "woodland" | "course";
 const SCENES: [string, SceneName][] = [["One tree", "one"], ["Specimen", "specimen"], ["Grove", "grove"], ["Wood edge", "woodland"], ["Course", "course"]];
@@ -67,68 +54,11 @@ type EyeName = "standing" | "tree" | "overhead" | "course";
 const EYES: [string, EyeName, number][] = [["Standing", "standing", 1.7], ["Up a tree", "tree", 8], ["Overhead", "overhead", 60], ["Course", "course", 30]];
 const HOURS: [string, number][] = [["Dawn", 6], ["Morning", 9], ["Noon", 13], ["Evening", 18]];
 const WINDS: [string, number][] = [["Still", 0], ["Breeze", 4], ["Wind", 9], ["Gale", 16]];
-const ARCHITECTURES: Architecture[] = ["broadleaf", "conifer", "shrub", "palm"];
-const SHAPES: CrownShape[] = ["conical", "spherical", "hemispherical", "cylindrical", "taperedCylindrical", "flame", "inverseConical", "tendFlame"];
 
 function fail(text: string): never {
   document.getElementById("fail-text")!.textContent = text;
   document.getElementById("fail")!.classList.add("on");
   throw new Error(text);
-}
-
-/** What is wrong with a species read from JSON, or null: every field there and of its kind, then the package's own check. */
-const OPTIONAL_FIELDS = new Set(["latin", "regions", "leafColors"]);
-
-function speciesProblem(value: unknown, i: number): string | null {
-  if (typeof value !== "object" || value === null) return `species ${i + 1} is not an object`;
-  const o = value as Record<string, unknown>;
-  const name = typeof o.name === "string" ? o.name : `species ${i + 1}`;
-  // (Every field a species must have; `latin`, `regions` and `leafColors` may be left out.)
-  for (const [key, like] of Object.entries(STARTER_SPECIES[0])) {
-    if (OPTIONAL_FIELDS.has(key)) continue;
-    if (typeof o[key] !== typeof like) return `${name}: ${key} is missing or not a ${typeof like}`;
-  }
-  if (!Array.isArray(o.throughTint) || o.throughTint.length !== 3 || !o.throughTint.every((v) => Number.isFinite(v))) return `${name}: throughTint must be three numbers`;
-  if (!ARCHITECTURES.includes(o.architecture as Architecture)) return `${name}: architecture must be one of ${ARCHITECTURES.join(", ")}`;
-  if (!SHAPES.includes(o.shape as CrownShape)) return `${name}: shape must be one of ${SHAPES.join(", ")}`;
-  for (const key of ["leafColor", "barkColor"]) if (!/^#[0-9a-f]{6}$/i.test(o[key] as string)) return `${name}: ${key} must be a colour like #5b7f3a`;
-  const bad = checkSpecies(o as unknown as TreeSpecies);
-  return bad.length > 0 ? `${name}: ${bad.join("; ")}` : null;
-}
-
-/** Whether every field of `like` is a finite number in `value` (for style, detail and variants read from JSON). */
-function numbersLike(value: unknown, like: object): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const o = value as Record<string, unknown>;
-  return Object.entries(like).every(([key, v]) => (typeof v === "number" ? Number.isFinite(o[key]) : typeof o[key] === typeof v));
-}
-
-/** A preset read from JSON, or the reason it cannot be. */
-function readPreset(value: unknown): Preset | string {
-  const p = value as Partial<Preset> | null;
-  if (typeof p !== "object" || p === null || p.version !== 1) return "not a tree lab preset (version 1)";
-  if (!Array.isArray(p.species) || p.species.length === 0) return "it has no species";
-  for (let i = 0; i < p.species.length; i++) {
-    const bad = speciesProblem(p.species[i], i);
-    if (bad) return bad;
-  }
-  // (A style from before a number was added takes the package's for it: only those it has must be numbers.)
-  if (typeof p.style !== "object" || p.style === null || !Object.entries(p.style).every(([k, v]) => !(k in DEFAULT_STYLE) || Number.isFinite(v))) return "its style has something not a number";
-  if (!numbersLike(p.detail, DEFAULT_DETAIL)) return "its detail is missing a number";
-  // (Variants came later than the rest: a preset without them takes the package's own.)
-  // (And each option since: a preset without it takes the package's own.)
-  const variants = { ...DEFAULT_VARIANT_OPTIONS, ...p.variants };
-  if (!numbersLike(variants, DEFAULT_VARIANT_OPTIONS)) return "its variants are missing a number";
-  const look = p.look === undefined ? "stylized" : p.look;
-  if (!TREE_LOOKS.includes(look)) return `its look must be one of ${TREE_LOOKS.join(", ")}`;
-  return {
-    version: 1,
-    look,
-    species: p.species.map((s) => cloneSpecies(s)),
-    style: { ...LOOK_STYLES[look], ...p.style },
-    detail: { ...DEFAULT_DETAIL, ...p.detail },
-    variants: { ...DEFAULT_VARIANT_OPTIONS, ...variants },
-  };
 }
 
 async function start() {
@@ -207,8 +137,8 @@ async function start() {
   scene.add(makeSky());
   const { mesh: ground, uSun, uSunTint, uShadeTint, materialFor: groundFor } = makeGround();
   scene.add(ground);
-  /** What the shade was last worked out for: the trees and the hour. */
-  let shadeFor: { trees: Trees | null; hour: number } = { trees: null, hour: NaN };
+  /** What the shade was last worked out for: the trees, the hour, and the style's `structure` and `density` (bakeShade). */
+  let shadeFor: { trees: Trees | null; hour: number; structure: number; density: number } = { trees: null, hour: NaN, structure: NaN, density: NaN };
 
   // ---- The trees. ----
 
@@ -330,6 +260,11 @@ async function start() {
     return document.getElementById(id) as T;
   }
   const hud = el("status-line");
+  // (The rail and the inspector stand under the bar, however many lines it wraps to: its foot, kept in a variable.)
+  const bar = el("bar");
+  const fitUnderBar = () => document.documentElement.style.setProperty("--bar-bottom", `${Math.ceil(bar.getBoundingClientRect().bottom)}px`);
+  new ResizeObserver(fitUnderBar).observe(bar);
+  fitUnderBar();
   const speciesGui = new GUI({ container: el("species-gui"), title: "" });
   const sceneGui = new GUI({ container: el("scene-gui"), title: "" });
   const refreshNumbers = () => [speciesGui, sceneGui].forEach((g) => g.controllersRecursive().forEach((c) => c.updateDisplay()));
@@ -728,9 +663,9 @@ async function start() {
     navigator.clipboard.writeText(text.value).then(() => (note.textContent = "Copied."), () => (note.textContent = "Could not copy: select the text instead."));
   });
   el("preset-reset").addEventListener("click", async () => {
-    await load({ version: 1, look: state.look, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: LOOK_STYLES[state.look], detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
+    const bad = await load({ version: 1, look: state.look, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: LOOK_STYLES[state.look], detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
     text.value = JSON.stringify(preset(), null, 2);
-    note.textContent = "Back to the package's starter species.";
+    note.textContent = bad ? `Not reset: ${bad}.` : "Back to the package's own species and settings.";
   });
   el("preset-load").addEventListener("click", async () => {
     let parsed: unknown;
@@ -779,16 +714,17 @@ async function start() {
     Object.assign(trees.style, style);
     Object.assign(trees.detail, detail);
     Object.assign(trees.show, show);
-    // (The shade on the ground, again whenever the trees or the sun have changed. Over the scene's ground:
-    // finer for a few trees, coarser for a course.)
-    if (shadeFor.trees !== trees || shadeFor.hour !== light.hour) {
+    // (The shade on the ground, again whenever the trees, the sun, or how far the style takes the crowns' own
+    // leaves and how thick (`structure`, `density`) have changed. Over the scene's ground: finer for a few
+    // trees, coarser for a course.)
+    if (shadeFor.trees !== trees || shadeFor.hour !== light.hour || shadeFor.structure !== style.structure || shadeFor.density !== style.density) {
       if (shadeFor.trees !== trees) {
         (ground.material as THREE.Material).dispose();
         ground.material = groundFor(trees);
       }
       const side = state.scene === "course" ? 2600 : state.scene === "grove" || state.scene === "woodland" ? 400 : 200;
       trees.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: state.scene === "course" ? 1.25 : 0.4 });
-      shadeFor = { trees, hour: light.hour };
+      shadeFor = { trees, hour: light.hour, structure: style.structure, density: style.density };
     }
     trees.update(renderer, camera, clock.getElapsed());
     renderer.render(scene, camera);

@@ -219,6 +219,49 @@ export interface TreeSpecies {
   weep?: number;
 }
 
+/** The members of a type that may be left out. */
+type OptionalKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? K : never }[keyof T];
+
+/** What kind of value a species field read from JSON must be: a number, a string, a list of strings, two numbers, or one of some words. */
+export type SpeciesFieldKind = "number" | "string" | "strings" | "pair" | readonly string[];
+
+/**
+ * Every field a species may leave out (`TreeSpecies`'s optional members), and what it must be when given: for
+ * a host reading species from JSON (the lab's presets). The compiler holds the list to the type: a member
+ * missing or one too many will not build. The rest of a species must all be there; `checkSpecies` then says
+ * whether the values are sound.
+ */
+export const OPTIONAL_SPECIES_FIELDS = {
+  latin: "string",
+  regions: "strings",
+  crownPeak: "number",
+  crownRound: "number",
+  lobes: "number",
+  scaffolds: "number",
+  shed: "number",
+  boleStubs: "number",
+  limbAngle: "pair",
+  limbCurve: "number",
+  limbCurveBack: "number",
+  zigzag: "number",
+  phyllotaxis: ["spiral", "opposite", "distichous"],
+  sprayHang: "number",
+  canopyLift: "number",
+  pads: "number",
+  buttress: "number",
+  leafColors: "strings",
+  weep: "number",
+} as const satisfies Record<OptionalKeys<TreeSpecies>, SpeciesFieldKind>;
+
+/** Whether `value` is of `kind` (`SpeciesFieldKind`). */
+export function isSpeciesFieldKind(value: unknown, kind: SpeciesFieldKind): boolean {
+  if (typeof kind !== "string") return typeof value === "string" && kind.includes(value);
+  if (kind === "number") return typeof value === "number" && Number.isFinite(value);
+  if (kind === "string") return typeof value === "string";
+  if (kind === "strings") return Array.isArray(value) && value.every((v) => typeof v === "string");
+  return Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "number" && Number.isFinite(v));
+}
+
 /**
  * The trees a course in a temperate place is likely to have, at the sizes they reach there. By eye: the oak,
  * the plane, the eucalyptus and the Scots pine set against photographs of open-grown trees (an oak's crown
