@@ -37,7 +37,7 @@ import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
-import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
+import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, flowerColorCode, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
 import { clothed, growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
@@ -146,6 +146,16 @@ const CANOPY_SIZE = 2.6;
 const CUSHION_TIP_GROW = 0.6;
 /** How dark a cushion card is seen from beneath it (its underside, beside its picture's tone). */
 const CUSHION_BELOW = 0.45;
+/** A crown of thick pads (`ScanLook.padThick`): how far its sprays hang, and its mid cards' size beside its near pads' (two a clump, not four: as big again). */
+const PAD_SPRAY_HANG = 0.35;
+const PAD_MID = 0.95;
+/**
+ * How a photographed card's tone (sprays.ts: a leaf's lightness over its sheet's mean, 0.6 on average) is brought
+ * to the species' colour: a card's mean to the species' own. A species' colour is its crown's as it is seen from
+ * some way off (docs/MORPHOLOGY.md), its own leaves' shade in it; taken at the drawn marks' 0.67 of it, the
+ * pictures' own shade under their leaves was laid over it again, and the crown's own shade over both.
+ */
+const PHOTO_TONE = 1 / 0.6;
 /** How far off a cushioned pine's tuft cards are whole, and where they are gone (m). */
 const CUSHION_TUFTS_FAR = [9, 15] as const;
 /** A cushioned pine's wood thinner than the first (radius, m) is not drawn, and is whole from the second. */
@@ -347,6 +357,8 @@ export function createTrees(options: TreesOptions): Trees {
   // (Every look but the realistic one lays its leaves as dabs lit over the crown's lobes, as far as its style's
   // `lobe` says: the painted look's says not at all.)
   const lobed = !real && look !== "stylized";
+  // (Whether any species here keeps its flowers on its cards (`ScanLook.flowers`): the shaders colour them only then.)
+  const flowered = scanned && usedSpecies.some((s) => !!looks[s].flowers);
   const style: TreeStyle = { ...LOOK_STYLES[look] };
   // (A lobed look's crowns gathered into lobes, which their dabs are lit over: lobes.ts.)
   const lobeShape = LOOK_LOBES[look];
@@ -416,7 +428,8 @@ export function createTrees(options: TreesOptions): Trees {
       speciesData.set([dead.r, dead.g, dead.b, s.architecture === "palm" ? (sl.bark === "palmLattice" ? 1 : 2) : 0], (i * SPECIES_ROWS + 7) * 4);
       // (Whether its big cards are pictures of its cushions (`ScanLook.cushion`), stood upright and turned to the eye.)
       // (And whether they are photographs, whose warmth the cards keep: sprays.ts `Layer.warm`.)
-      speciesData.set([scanned && sl.cushion ? 1 : 0, scanned && sl.cushion && sl.cushion !== "drawn" ? 1 : 0, 0, 0], (i * SPECIES_ROWS + 8) * 4);
+      // (And whether its cards keep its flowers (`ScanLook.flowers`), and their colour, packed as an upper bark's.)
+      speciesData.set([scanned && sl.cushion ? 1 : 0, scanned && sl.cushion && sl.cushion !== "drawn" ? 1 : 0, scanned && sl.flowers ? 1 : 0, flowerColorCode(sl)], (i * SPECIES_ROWS + 8) * 4);
       speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
@@ -481,6 +494,11 @@ export function createTrees(options: TreesOptions): Trees {
   /** How closed a pine's crown is, for its cushions: 1 a stone pine's or a Monterey pine's (openness 0.25), 0 an Aleppo pine's (0.6). */
   // (Squared: a crown half way (a Scots pine's, 0.4) is more open than half way, its heavy limbs showing between its clumps.)
   const closedOf = (sp: number) => Math.min(1, Math.max(0, (CUSHION_OPEN - species[sp].openness) / (CUSHION_OPEN - CUSHION_CLOSED))) ** 2;
+  // (How many cushion cards to a clump near to, and how big (half width over the clump's radius): as closed as the
+  // crown is, or as its look says (`ScanLook.cushionCards`, `cushionSize`); a mid card as much bigger as its big card is.)
+  const cushionCardsOf = (sp: number) => looks[sp].cushionCards ?? Math.round(1 + (CUSHION_CARDS - 1) * closedOf(sp));
+  const cushionSizeByClosed = (sp: number) => CUSHION_SIZE_OPEN + (CUSHION_SIZE - CUSHION_SIZE_OPEN) * closedOf(sp);
+  const cushionSizeOf = (sp: number) => looks[sp].cushionSize ?? cushionSizeByClosed(sp);
   const fixedCards: (FixedCards | null)[] = plan.variants.map((v) => {
     const l = looks[v.species];
     const half = scanned ? nearCardHalf(l) : 0;
@@ -494,14 +512,16 @@ export function createTrees(options: TreesOptions): Trees {
           // (One with pictures of its cushions: those on its big cards, a few a clump, and fewer tufts over them,
           // at its rim and close to.)
           l.cushion
-          ? { half, fill: (PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness)) * CUSHION_TUFTS, most: 24, big: Math.round(1 + (CUSHION_CARDS - 1) * closedOf(v.species)), bigSize: CUSHION_SIZE_OPEN + (CUSHION_SIZE - CUSHION_SIZE_OPEN) * closedOf(v.species), hang: 0, rise: 0.8 }
+          ? { half, fill: (PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness)) * CUSHION_TUFTS, most: 24, big: cushionCardsOf(v.species), bigSize: cushionSizeOf(v.species), hang: 0, rise: 0.8 }
           : { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 36, big: species[v.species].openness < PINE_CUSHION_OPEN ? 1 : 0, bigSize: 1, hang: 0, rise: 0.8 }
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           // (One with pictures of its pads (a Monterey cypress's shelves): those on its big cards, as a pine's
           // cushions, and its sprays fewer over them.)
           l.cushion
-          ? { half, fill: 0.5 * CUSHION_SPRAYS, most: 24, big: Math.round(1 + (CUSHION_CARDS - 1) * closedOf(v.species)), bigSize: CUSHION_SIZE_OPEN + (CUSHION_SIZE - CUSHION_SIZE_OPEN) * closedOf(v.species), hang: 0 }
+          ? // (A pad thickened in layers (`padThick`, a coastal cypress's) has as many sprays as a crown without pads, some
+            // hanging from its underside: the wood leading into a shelf clothed near it, not bare sticks up to a disc.)
+            { half, fill: 0.5 * (l.padThick ? 1 : CUSHION_SPRAYS), most: 24, big: cushionCardsOf(v.species), bigSize: cushionSizeOf(v.species), hang: l.padThick ? PAD_SPRAY_HANG : 0 }
           : { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : // (A weeping tree's sprays hang less over its crown's top, over the arches of its limbs.)
           { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0, lift: clothed(species[v.species]) };
@@ -515,7 +535,7 @@ export function createTrees(options: TreesOptions): Trees {
   const cushioned = plan.variants.map((v) => scanned && !!looks[v.species].cushion);
   // (One with pictures of its canopy has bigger mid cards, each a strip of several cushions as wide as they are.)
   // (An open pine's mid cards smaller, as its near ones are: its clumps with air between.)
-  const midSizes = plan.variants.map((v) => (scanned && looks[v.species].cushionFar ? CANOPY_SIZE : scanned && looks[v.species].cushion ? 1.45 - CUSHION_MID_OPEN * (1 - closedOf(v.species)) : 1.45));
+  const midSizes = plan.variants.map((v) => (scanned && looks[v.species].cushionFar ? CANOPY_SIZE : scanned && looks[v.species].cushion ? Math.max((1.45 - CUSHION_MID_OPEN * (1 - closedOf(v.species))) * (cushionSizeOf(v.species) / cushionSizeByClosed(v.species)), looks[v.species].padThick ? cushionSizeOf(v.species) * PAD_MID : 0) : 1.45));
   const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards, undefined, cushioned) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs, undefined, midRises, cushioned, midSizes) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
   const frondSets: Pieces[] = TIER_SHAPES.map((_, t) => palmPieces(grown, t));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
@@ -1038,6 +1058,9 @@ export function createTrees(options: TreesOptions): Trees {
     let pineCard: Float | null = null;
     /** Whether this is a pine's photographed cushion or canopy card (a near big card, a mid card or a far dab), whose warmth its texels keep. */
     let photoBig: Float | null = null;
+    /** A flowering species' card (`ScanLook.flowers`): its flowers' colour over its leaves' (linear), and whether it has any; and the air's own light here. */
+    let flowerV: Vec4 | null = null;
+    let flowerAir: Vec4 | null = null;
     let sheetFace: Vec3 | null = null;
     // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
     // (Only on the upper half of its lobe, as sprigs stand on the tops of clay masses: from below they would
@@ -1174,6 +1197,20 @@ export function createTrees(options: TreesOptions): Trees {
       const leaf = T.srow(0);
       const tone = float(1).add(jit.mul(leaf.w).mul(0.6));
       let albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
+      if (flowered && !sheet) {
+        // (Its flowers lit as its leaves are, in their own colour: the leaves' light over the leaf's colour, times the
+        // flower's. Chosen, not mixed: a species with no flowers has a code of 0, which decodes to nonsense.)
+        const code = T.srow(8).w;
+        const c = code.sub(1);
+        const r = floor(c.div(65536));
+        const g = floor(c.sub(r.mul(65536)).div(256));
+        const b = c.sub(r.mul(65536)).sub(g.mul(256));
+        const lin = pow(max(vec3(r, g, b), vec3(0)).div(255), vec3(2.2));
+        flowerV = vec4(select(code.greaterThan(0.5), lin.div(max(albedo, vec3(0.004))), vec3(1)), T.srow(8).z);
+        // (And whether this card is in flower: as many of them as `bloom` says, each by its own number, so a bush
+        // part in flower is some sprays all yellow and some all spines, not every flower half faded.)
+        flowerAir = vec4(intoAir(vec3(0), at), smoothstep(own.sub(0.02), own.add(0.02), uLight.z));
+      }
       if (pineCard) {
         // (A pine's clump is a dense cushion of needles: those low in it are in its own shade, a light box
         // a clump to its cell cannot hold. Each clump lit on top and dark beneath, as a pine's are seen.)
@@ -1505,6 +1542,8 @@ export function createTrees(options: TreesOptions): Trees {
         // (Close to only: further off a soft fringe is a lace the sky shows through, and a far crown goes pale.)
         const vPine = pineCard && t === 0 ? varying(pineCard, "vTreePine") : null;
         const vWarm = photoBig ? varying(photoBig, "vTreeWarm") : null;
+        const vFlower = flowerV ? varying(flowerV, "vTreeFlower") : null;
+        const vFlowerAir = flowerAir ? varying(flowerAir, "vTreeFlowerAir") : null;
         // (The painted look's marks have no leaves of their own: each mark one thickness.)
         const ownLeaf = look === "stylized" ? 0 : 1;
         m.colorNode = Fn(() => {
@@ -1520,16 +1559,23 @@ export function createTrees(options: TreesOptions): Trees {
           // there the tufts were a pale lace the sky showed through.)
           const perPixel = max(fwidth(vUv.x), fwidth(vUv.y)).mul(cells.x).mul(cardCell);
           const soft = vPine ? vPine.mul(PINE_SOFT).mul(float(1).sub(smoothstep(float(1.5), float(5), perPixel))) : null;
-          const mark = vec4(tex.rgb, soft ? mix(crisp(tex), clamp(tex.a.sub(0.5).mul(PINE_RIM).add(0.5), 0, 1), soft) : crisp(tex));
+          let cover: Float = soft ? mix(crisp(tex), clamp(tex.a.sub(0.5).mul(PINE_RIM).add(0.5), 0, 1), soft) : crisp(tex);
+          // (A flowering species' flowers (blue, how far each texel is one) go as far as it is out of bloom (`bloom`).)
+          const flower = vFlower ? tex.b.mul(vFlower.w) : null;
+          const inBloom = vFlowerAir ? vFlowerAir.w : float(1);
+          if (flower) cover = cover.mul(float(1).sub(flower.mul(float(1).sub(inBloom))));
+          const mark = vec4(tex.rgb, cover);
           Discard(mark.a.lessThan(uAlphaCut));
           let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
-          base = base.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w));
+          base = base.mul(mix(float(1), mark.r.mul(scanned ? PHOTO_TONE : 1.12), uStyle2.w));
           // (A photographed cushion's own warmth (blue, 0.5 its mean): its sunlit top yellower, its underside cooler.)
           if (vWarm) {
             const w = mark.b.sub(0.5).mul(CUSHION_WARMTH);
             base = base.mul(mix(vec3(1), vec3(float(1).add(w), float(1).add(w.mul(0.3)), float(1).sub(w.mul(1.2))).max(vec3(0)), vWarm));
           }
           if (vThru) base = base.add(vThru.xyz.mul(vThru.w).mul(leafThin(ownLeaf ? mark.g : float(0.5))));
+          // (Its flowers in their own colour: the light on the leaf there, the air's own taken off and put back.)
+          if (vFlower && vFlowerAir && flower) base = mix(base, base.sub(vFlowerAir.xyz).mul(vFlower.xyz).add(vFlowerAir.xyz), flower.mul(inBloom));
           return vec4(base, mark.a);
         })();
       }
@@ -2288,7 +2334,7 @@ export function createTrees(options: TreesOptions): Trees {
       uStyle5.value.set(style.chroma, style.rim, style.sprigs, style.bright);
       uLeafSize.value = style.leafSize;
       uThrough.value.set(style.throughPower, style.throughWarp, style.throughVary, style.moss);
-      uLight.value.set(style.structure, style.density, 0, 0);
+      uLight.value.set(style.structure, style.density, style.bloom, 0);
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);

@@ -163,9 +163,7 @@
         "look": "deep vertical fissures between grey checkered ridges",
         "for": [
           "Oak",
-          "Black alder",
-          "Hawthorn",
-          "Coast live oak"
+          "Hawthorn"
         ],
         "source": "oak"
       },
@@ -191,10 +189,9 @@
         "origin": "scan",
         "look": "grey-brown interlacing furrows and corky ridges",
         "for": [
-          "Weeping willow",
-          "Lombardy poplar",
-          "Red oak",
-          "Sugar maple"
+          "California sycamore",
+          "Shrub",
+          "Gorse"
         ],
         "source": "bark_willow_02"
       },
@@ -223,7 +220,6 @@
           "Scots pine",
           "Corsican pine",
           "Monterey pine",
-          "Torrey pine",
           "Aleppo pine",
           "Eastern white pine"
         ],
@@ -441,6 +437,214 @@
           "Stone pine"
         ],
         "source": "ai_stonepine_bark"
+      },
+      {
+        "id": "alder",
+        "layer": 16,
+        "tileCm": [
+          50,
+          50
+        ],
+        "tileFrom": "estimated: ~16 plates across, an old black alder's 2–5 cm",
+        "meanLinear": [
+          0.085,
+          0.077,
+          0.065
+        ],
+        "meanColor": "#524e48",
+        "roughness": 0.829,
+        "seams": {
+          "albedo": 1.137,
+          "normal": 1.239
+        },
+        "origin": "generated",
+        "look": "dark grey-brown to near black, broken into small rough squarish plates by shallow fissures, a few lichen spots (an old black alder's)",
+        "for": [
+          "Black alder"
+        ],
+        "source": "ai_alder_bark"
+      },
+      {
+        "id": "liveOak",
+        "layer": 17,
+        "tileCm": [
+          60,
+          60
+        ],
+        "tileFrom": "estimated: ~7 broad ridges across, an old coast live oak's ridges several cm wide",
+        "meanLinear": [
+          0.259,
+          0.249,
+          0.215
+        ],
+        "meanColor": "#8b8980",
+        "roughness": 0.792,
+        "seams": {
+          "albedo": 1.031,
+          "normal": 1.133
+        },
+        "origin": "generated",
+        "look": "smooth light grey to grey-brown, broad flat ridges between shallow vertical furrows, pale green and grey lichen (an old coast live oak's)",
+        "for": [
+          "Coast live oak"
+        ],
+        "source": "ai_liveoak_bark"
+      },
+      {
+        "id": "birchFoot",
+        "layer": 18,
+        "tileCm": [
+          45,
+          45
+        ],
+        "tileFrom": "estimated: ~8 ridges across, an old silver birch's rugged foot",
+        "meanLinear": [
+          0.112,
+          0.102,
+          0.093
+        ],
+        "meanColor": "#5e5a56",
+        "roughness": 0.819,
+        "seams": {
+          "albedo": 1.027,
+          "normal": 1.11
+        },
+        "origin": "generated",
+        "look": "thick rough blackish-grey bark in rugged ridges between deep vertical fissures, a few white papery patches between them (an old silver birch's foot)",
+        "for": [
+          "Silver birch"
+        ],
+        "source": "ai_birch_foot_bark"
+      },
+      {
+        "id": "willow",
+        "layer": 19,
+        "tileCm": [
+          55,
+          55
+        ],
+        "tileFrom": "estimated: ~12 interlacing ridges across, a willow's 2–5 cm",
+        "meanLinear": [
+          0.158,
+          0.126,
+          0.1
+        ],
+        "meanColor": "#6f6459",
+        "roughness": 0.793,
+        "seams": {
+          "albedo": 1.011,
+          "normal": 1.192
+        },
+        "origin": "generated",
+        "look": "grey-brown, deeply furrowed into long thick interlacing ridges, a coarse net (a weeping willow's)",
+        "for": [
+          "Weeping willow"
+        ],
+        "source": "ai_willow_bark"
+      },
+      {
+        "id": "poplar",
+        "layer": 20,
+        "tileCm": [
+          60,
+          60
+        ],
+        "tileFrom": "estimated: ~7 thick ridges across, burrs ~8–10 cm",
+        "meanLinear": [
+          0.087,
+          0.074,
+          0.067
+        ],
+        "meanColor": "#534d49",
+        "roughness": 0.809,
+        "seams": {
+          "albedo": 1.044,
+          "normal": 1.242
+        },
+        "origin": "generated",
+        "look": "dark grey, deeply and roughly furrowed into thick vertical ridges, a few rounded burrs (a Lombardy poplar's)",
+        "for": [
+          "Lombardy poplar"
+        ],
+        "source": "ai_poplar_bark"
+      },
+      {
+        "id": "torreyPine",
+        "layer": 21,
+        "tileCm": [
+          75,
+          75
+        ],
+        "tileFrom": "estimated: ~6 broad plates across, an old pine's 8–15 cm",
+        "meanLinear": [
+          0.174,
+          0.109,
+          0.09
+        ],
+        "meanColor": "#745d55",
+        "roughness": 0.798,
+        "seams": {
+          "albedo": 0.956,
+          "normal": 1.02
+        },
+        "origin": "generated",
+        "look": "broad flat reddish-brown to grey-brown scaly plates between deep furrows (a Torrey pine's)",
+        "for": [
+          "Torrey pine"
+        ],
+        "source": "ai_torreypine_bark"
+      },
+      {
+        "id": "redOak",
+        "layer": 22,
+        "tileCm": [
+          55,
+          55
+        ],
+        "tileFrom": "estimated: ~7 flat ridges across, a red oak's 4–8 cm",
+        "meanLinear": [
+          0.163,
+          0.147,
+          0.133
+        ],
+        "meanColor": "#706b66",
+        "roughness": 0.795,
+        "seams": {
+          "albedo": 1.277,
+          "normal": 1.372
+        },
+        "origin": "generated",
+        "look": "long wide flat-topped grey ridges running straight up between shallow darker furrows, ski tracks (an old northern red oak's)",
+        "for": [
+          "Red oak"
+        ],
+        "source": "ai_redoak_bark"
+      },
+      {
+        "id": "maple",
+        "layer": 23,
+        "tileCm": [
+          55,
+          55
+        ],
+        "tileFrom": "estimated: ~10 plates across, an old sugar maple's 3–8 cm",
+        "meanLinear": [
+          0.189,
+          0.167,
+          0.15
+        ],
+        "meanColor": "#78726c",
+        "roughness": 0.791,
+        "seams": {
+          "albedo": 1.072,
+          "normal": 1.288
+        },
+        "origin": "generated",
+        "look": "grey to grey-brown, long irregular vertical plates curling away at one edge, shaggy, dark furrows between (an old sugar maple's)",
+        "for": [
+          "Sugar maple"
+        ],
+        "source": "ai_maple_bark"
       }
     ]
   },
@@ -558,8 +762,7 @@
         ],
         "look": "lobed oak leaves",
         "for": [
-          "Oak",
-          "Hawthorn"
+          "Oak"
         ],
         "source": "LeafSet016"
       },
@@ -785,7 +988,6 @@
         ],
         "look": "palmate maple leaves",
         "for": [
-          "California sycamore",
           "Sugar maple"
         ],
         "source": "LeafSet010"
@@ -1042,7 +1244,7 @@
         ],
         "look": "round leaves, toothed",
         "for": [
-          "Black alder"
+          "a host's species (none of the library's now)"
         ],
         "source": "LeafSet009"
       },
@@ -1155,8 +1357,7 @@
         ],
         "look": "triangular leaves on long stalks",
         "for": [
-          "Lombardy poplar",
-          "Silver birch"
+          "a host's species (none of the library's now)"
         ],
         "source": "LeafSet004"
       },
@@ -1269,7 +1470,7 @@
         ],
         "look": "ovate leaves, finely toothed, straight veins",
         "for": [
-          "Silver birch"
+          "a host's species (none of the library's now)"
         ],
         "source": "LeafSet014"
       },
@@ -1706,7 +1907,7 @@
         ],
         "look": "narrow lanceolate leaves",
         "for": [
-          "Weeping willow"
+          "a host's narrow-leaved species (none of the library's now)"
         ],
         "source": "LeafSet013"
       },
@@ -1883,9 +2084,7 @@
           "Scots pine",
           "Monterey pine",
           "Aleppo pine",
-          "Stone pine",
-          "Eastern white pine",
-          "Gorse"
+          "Stone pine"
         ],
         "source": "pine_tree_01"
       },
@@ -2476,6 +2675,970 @@
         "source": "ai_torrey_shoot"
       },
       {
+        "id": "hawthorn",
+        "size": [
+          512,
+          1040
+        ],
+        "lengthCm": 5,
+        "tone": false,
+        "meanLinear": [
+          0.085,
+          0.126,
+          0.029
+        ],
+        "meanColor": "#52642f",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 200,
+            "y": 546,
+            "w": 187,
+            "h": 244,
+            "base": [
+              98,
+              237
+            ],
+            "tip": [
+              94.5,
+              6
+            ],
+            "size": 0.904
+          },
+          {
+            "x": 197,
+            "y": 797,
+            "w": 185,
+            "h": 222,
+            "base": [
+              97,
+              215
+            ],
+            "tip": [
+              93.5,
+              6
+            ],
+            "size": 0.818
+          },
+          {
+            "x": 4,
+            "y": 546,
+            "w": 192,
+            "h": 247,
+            "base": [
+              91,
+              240
+            ],
+            "tip": [
+              98,
+              6
+            ],
+            "size": 0.914
+          },
+          {
+            "x": 4,
+            "y": 276,
+            "w": 187,
+            "h": 266,
+            "base": [
+              85,
+              259
+            ],
+            "tip": [
+              100,
+              6
+            ],
+            "size": 0.989
+          },
+          {
+            "x": 4,
+            "y": 797,
+            "w": 189,
+            "h": 236,
+            "base": [
+              101,
+              230
+            ],
+            "tip": [
+              89,
+              6
+            ],
+            "size": 0.874
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 185,
+            "h": 268,
+            "base": [
+              75,
+              262
+            ],
+            "tip": [
+              94.5,
+              6
+            ],
+            "size": 0.998
+          },
+          {
+            "x": 193,
+            "y": 4,
+            "w": 191,
+            "h": 268,
+            "base": [
+              87.5,
+              262
+            ],
+            "tip": [
+              100.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 195,
+            "y": 276,
+            "w": 191,
+            "h": 262,
+            "base": [
+              91,
+              255
+            ],
+            "tip": [
+              94.5,
+              6
+            ],
+            "size": 0.973
+          }
+        ],
+        "look": "small hawthorn leaves deeply cut into three to seven narrow lobes, a wedge-shaped base",
+        "for": [
+          "Hawthorn"
+        ],
+        "source": "ai_hawthorn_leaves"
+      },
+      {
+        "id": "alder",
+        "size": [
+          512,
+          1136
+        ],
+        "lengthCm": 9,
+        "tone": false,
+        "meanLinear": [
+          0.049,
+          0.076,
+          0.022
+        ],
+        "meanColor": "#3e4e28",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 222,
+            "h": 300,
+            "base": [
+              129.5,
+              294
+            ],
+            "tip": [
+              134.8,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 308,
+            "w": 210,
+            "h": 284,
+            "base": [
+              93.5,
+              277
+            ],
+            "tip": [
+              76.5,
+              6
+            ],
+            "size": 0.941
+          },
+          {
+            "x": 230,
+            "y": 4,
+            "w": 208,
+            "h": 294,
+            "base": [
+              98,
+              288
+            ],
+            "tip": [
+              80,
+              6
+            ],
+            "size": 0.977
+          },
+          {
+            "x": 218,
+            "y": 308,
+            "w": 210,
+            "h": 277,
+            "base": [
+              97,
+              271
+            ],
+            "tip": [
+              82.1,
+              6
+            ],
+            "size": 0.919
+          },
+          {
+            "x": 4,
+            "y": 874,
+            "w": 180,
+            "h": 249,
+            "base": [
+              86.5,
+              243
+            ],
+            "tip": [
+              102.2,
+              6
+            ],
+            "size": 0.822
+          },
+          {
+            "x": 4,
+            "y": 596,
+            "w": 207,
+            "h": 274,
+            "base": [
+              97,
+              268
+            ],
+            "tip": [
+              101.1,
+              6
+            ],
+            "size": 0.908
+          },
+          {
+            "x": 188,
+            "y": 874,
+            "w": 191,
+            "h": 249,
+            "base": [
+              96.5,
+              243
+            ],
+            "tip": [
+              125.5,
+              6
+            ],
+            "size": 0.821
+          },
+          {
+            "x": 215,
+            "y": 596,
+            "w": 194,
+            "h": 264,
+            "base": [
+              88,
+              258
+            ],
+            "tip": [
+              73.5,
+              6
+            ],
+            "size": 0.874
+          }
+        ],
+        "look": "almost round black alder leaves, flat or notched at the tip, double-toothed, straight parallel veins, dark glossy green",
+        "for": [
+          "Black alder"
+        ],
+        "source": "ai_alder_leaves"
+      },
+      {
+        "id": "sycamore",
+        "size": [
+          768,
+          1392
+        ],
+        "lengthCm": 25,
+        "tone": false,
+        "meanLinear": [
+          0.247,
+          0.241,
+          0.069
+        ],
+        "meanColor": "#88874a",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 286,
+            "y": 716,
+            "w": 284,
+            "h": 336,
+            "base": [
+              143,
+              330
+            ],
+            "tip": [
+              149,
+              6
+            ],
+            "size": 0.92
+          },
+          {
+            "x": 4,
+            "y": 716,
+            "w": 278,
+            "h": 337,
+            "base": [
+              135,
+              331
+            ],
+            "tip": [
+              130,
+              6
+            ],
+            "size": 0.922
+          },
+          {
+            "x": 300,
+            "y": 1057,
+            "w": 290,
+            "h": 327,
+            "base": [
+              146.5,
+              321
+            ],
+            "tip": [
+              149,
+              6
+            ],
+            "size": 0.894
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 301,
+            "h": 364,
+            "base": [
+              160,
+              358
+            ],
+            "tip": [
+              156.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 309,
+            "y": 4,
+            "w": 294,
+            "h": 363,
+            "base": [
+              147,
+              357
+            ],
+            "tip": [
+              132.5,
+              6
+            ],
+            "size": 0.995
+          },
+          {
+            "x": 4,
+            "y": 372,
+            "w": 295,
+            "h": 340,
+            "base": [
+              154.5,
+              333
+            ],
+            "tip": [
+              138.5,
+              6
+            ],
+            "size": 0.929
+          },
+          {
+            "x": 303,
+            "y": 372,
+            "w": 290,
+            "h": 339,
+            "base": [
+              143.5,
+              333
+            ],
+            "tip": [
+              145,
+              7
+            ],
+            "size": 0.928
+          },
+          {
+            "x": 4,
+            "y": 1057,
+            "w": 292,
+            "h": 328,
+            "base": [
+              144.5,
+              322
+            ],
+            "tip": [
+              141,
+              7
+            ],
+            "size": 0.897
+          }
+        ],
+        "look": "star-shaped California sycamore leaves, three to five long pointed lobes, a few showing the pale fuzzy underside",
+        "for": [
+          "California sycamore"
+        ],
+        "source": "ai_sycamore_leaves"
+      },
+      {
+        "id": "poplar",
+        "size": [
+          512,
+          864
+        ],
+        "lengthCm": 11,
+        "tone": false,
+        "meanLinear": [
+          0.104,
+          0.16,
+          0.022
+        ],
+        "meanColor": "#5b6f29",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 308,
+            "w": 153,
+            "h": 276,
+            "base": [
+              79.5,
+              270
+            ],
+            "tip": [
+              82.5,
+              6
+            ],
+            "size": 0.915
+          },
+          {
+            "x": 4,
+            "y": 588,
+            "w": 152,
+            "h": 257,
+            "base": [
+              83,
+              251
+            ],
+            "tip": [
+              83.5,
+              6
+            ],
+            "size": 0.85
+          },
+          {
+            "x": 180,
+            "y": 4,
+            "w": 159,
+            "h": 292,
+            "base": [
+              78.5,
+              285
+            ],
+            "tip": [
+              68,
+              6
+            ],
+            "size": 0.969
+          },
+          {
+            "x": 160,
+            "y": 588,
+            "w": 148,
+            "h": 245,
+            "base": [
+              90.5,
+              239
+            ],
+            "tip": [
+              70.5,
+              6
+            ],
+            "size": 0.807
+          },
+          {
+            "x": 161,
+            "y": 308,
+            "w": 152,
+            "h": 265,
+            "base": [
+              65.5,
+              259
+            ],
+            "tip": [
+              75.5,
+              6
+            ],
+            "size": 0.877
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 172,
+            "h": 300,
+            "base": [
+              93,
+              294
+            ],
+            "tip": [
+              72.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 317,
+            "y": 308,
+            "w": 148,
+            "h": 262,
+            "base": [
+              73.5,
+              256
+            ],
+            "tip": [
+              69.5,
+              6
+            ],
+            "size": 0.866
+          },
+          {
+            "x": 343,
+            "y": 4,
+            "w": 163,
+            "h": 282,
+            "base": [
+              73,
+              276
+            ],
+            "tip": [
+              90.5,
+              6
+            ],
+            "size": 0.935
+          }
+        ],
+        "look": "triangular to diamond-shaped Lombardy poplar leaves with a long tapering tip, finely toothed, on long flattened stalks",
+        "for": [
+          "Lombardy poplar"
+        ],
+        "source": "ai_poplar_leaves"
+      },
+      {
+        "id": "birch",
+        "size": [
+          768,
+          592
+        ],
+        "lengthCm": 8,
+        "tone": false,
+        "meanLinear": [
+          0.105,
+          0.161,
+          0.023
+        ],
+        "meanColor": "#5b702a",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 198,
+            "y": 4,
+            "w": 169,
+            "h": 284,
+            "base": [
+              83,
+              278
+            ],
+            "tip": [
+              91,
+              6
+            ],
+            "size": 0.943
+          },
+          {
+            "x": 336,
+            "y": 308,
+            "w": 155,
+            "h": 260,
+            "base": [
+              82,
+              254
+            ],
+            "tip": [
+              87,
+              6
+            ],
+            "size": 0.861
+          },
+          {
+            "x": 495,
+            "y": 308,
+            "w": 154,
+            "h": 254,
+            "base": [
+              80,
+              247
+            ],
+            "tip": [
+              76,
+              6
+            ],
+            "size": 0.838
+          },
+          {
+            "x": 4,
+            "y": 308,
+            "w": 172,
+            "h": 270,
+            "base": [
+              71,
+              263
+            ],
+            "tip": [
+              93,
+              6
+            ],
+            "size": 0.893
+          },
+          {
+            "x": 371,
+            "y": 4,
+            "w": 178,
+            "h": 274,
+            "base": [
+              77,
+              268
+            ],
+            "tip": [
+              91.5,
+              6
+            ],
+            "size": 0.907
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 190,
+            "h": 300,
+            "base": [
+              96.5,
+              294
+            ],
+            "tip": [
+              89,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 180,
+            "y": 308,
+            "w": 152,
+            "h": 268,
+            "base": [
+              73,
+              261
+            ],
+            "tip": [
+              79,
+              7
+            ],
+            "size": 0.886
+          },
+          {
+            "x": 553,
+            "y": 4,
+            "w": 154,
+            "h": 273,
+            "base": [
+              68,
+              267
+            ],
+            "tip": [
+              71,
+              7
+            ],
+            "size": 0.904
+          }
+        ],
+        "look": "silver birch leaves, triangular to diamond-shaped, a long pointed tip, sharply double-toothed, on thin stalks",
+        "for": [
+          "Silver birch"
+        ],
+        "source": "ai_birch_leaves"
+      },
+      {
+        "id": "willow",
+        "size": [
+          768,
+          480
+        ],
+        "lengthCm": 14,
+        "tone": false,
+        "meanLinear": [
+          0.168,
+          0.244,
+          0.081
+        ],
+        "meanColor": "#728850",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 362,
+            "y": 4,
+            "w": 84,
+            "h": 415,
+            "base": [
+              40.5,
+              409
+            ],
+            "tip": [
+              44,
+              6
+            ],
+            "size": 0.898
+          },
+          {
+            "x": 95,
+            "y": 4,
+            "w": 86,
+            "h": 448,
+            "base": [
+              39,
+              441
+            ],
+            "tip": [
+              21,
+              7
+            ],
+            "size": 0.971
+          },
+          {
+            "x": 531,
+            "y": 4,
+            "w": 83,
+            "h": 389,
+            "base": [
+              30.5,
+              383
+            ],
+            "tip": [
+              22,
+              7
+            ],
+            "size": 0.841
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 87,
+            "h": 460,
+            "base": [
+              53,
+              454
+            ],
+            "tip": [
+              51,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 618,
+            "y": 4,
+            "w": 83,
+            "h": 386,
+            "base": [
+              30,
+              379
+            ],
+            "tip": [
+              24,
+              6
+            ],
+            "size": 0.833
+          },
+          {
+            "x": 185,
+            "y": 4,
+            "w": 86,
+            "h": 442,
+            "base": [
+              36,
+              436
+            ],
+            "tip": [
+              50,
+              8
+            ],
+            "size": 0.958
+          },
+          {
+            "x": 450,
+            "y": 4,
+            "w": 77,
+            "h": 397,
+            "base": [
+              43.5,
+              391
+            ],
+            "tip": [
+              46,
+              6
+            ],
+            "size": 0.859
+          },
+          {
+            "x": 275,
+            "y": 4,
+            "w": 83,
+            "h": 422,
+            "base": [
+              54,
+              416
+            ],
+            "tip": [
+              55.5,
+              6
+            ],
+            "size": 0.915
+          }
+        ],
+        "look": "long very narrow weeping willow leaves, finely toothed, two of them showing the pale grey-green underside",
+        "for": [
+          "Weeping willow"
+        ],
+        "source": "ai_willow_leaves"
+      },
+      {
+        "id": "whitePine",
+        "size": [
+          512,
+          480
+        ],
+        "lengthCm": 30,
+        "tone": false,
+        "meanLinear": [
+          0.119,
+          0.135,
+          0.047
+        ],
+        "meanColor": "#61673e",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 218,
+            "h": 460,
+            "base": [
+              84,
+              454
+            ],
+            "tip": [
+              85,
+              7
+            ],
+            "size": 1
+          },
+          {
+            "x": 226,
+            "y": 4,
+            "w": 230,
+            "h": 453,
+            "base": [
+              91.3,
+              446
+            ],
+            "tip": [
+              124,
+              7
+            ],
+            "size": 0.982
+          }
+        ],
+        "look": "eastern white pine shoots: a slender twig ending in a soft feathery brush of fine blue-green needles",
+        "for": [
+          "Eastern white pine"
+        ],
+        "source": "ai_whitepine_shoot"
+      },
+      {
+        "id": "gorse",
+        "size": [
+          768,
+          544
+        ],
+        "lengthCm": 30,
+        "tone": false,
+        "meanLinear": [
+          0.289,
+          0.158,
+          0.015
+        ],
+        "meanColor": "#926f21",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 268,
+            "h": 524,
+            "base": [
+              92,
+              516
+            ],
+            "tip": [
+              69,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 276,
+            "y": 4,
+            "w": 288,
+            "h": 514,
+            "base": [
+              125.5,
+              508
+            ],
+            "tip": [
+              86,
+              7
+            ],
+            "size": 0.98
+          }
+        ],
+        "look": "a spiny gorse sprig, clusters of yellow pea flowers along its upper half",
+        "for": [
+          "Gorse"
+        ],
+        "source": "ai_gorse_sprig"
+      },
+      {
         "id": "frond",
         "size": [
           512,
@@ -2509,7 +3672,8 @@
         ],
         "look": "a whole feather-shaped palm frond",
         "for": [
-          "Canary date palm"
+          "Canary date palm",
+          "Queen palm"
         ],
         "source": "ai_canary_frond"
       },
@@ -2652,7 +3816,8 @@
         ],
         "look": "long narrow blades (a palm's leaflets)",
         "for": [
-          "Mexican fan palm"
+          "Mexican fan palm",
+          "California fan palm"
         ],
         "source": "Foliage001"
       },

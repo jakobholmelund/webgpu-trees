@@ -127,3 +127,78 @@ One flat-topped pad of Monterey cypress (Hesperocyparis macrocarpa) foliage seen
 
 ### Stone pine bark — file: `real-stonepine-bark`
 Mature Italian stone pine (Pinus pinea) trunk bark: thick flat reddish-brown to orange-brown plates separated by deep dark grey-brown vertical fissures, the plate faces paler and flaking at their edges. Fill the whole frame edge to edge, straight-on, even diffuse light, no shadows, no perspective, no trunk edges visible, photographic scan quality.
+
+## The fifth batch: gorse, hawthorn, alder, sycamore, poplar, live oak (added 2026-11-24)
+
+Made by the owner in the Antigravity app with Nano Banana, two variations each (`-1`, `-2`; some PNG, some JPG).
+Each prompt is the subject's own words and then the shared rules for its kind:
+
+- **Cut-outs** (all on magenta): "pure flat magenta #FF00FF background with no gradient and no shadow, the whole
+  subject inside the frame with a clear margin, nothing else in frame, no text, photographic quality, even daylight
+  from above"
+- **Leaf sheets**: "laid flat and photographed from directly above like a botanical herbarium scan, leaves upright,
+  side by side, not touching"
+- **Bark**: "fill the whole frame edge to edge, straight-on, even diffuse light, no shadows, no perspective, no trunk
+  edges visible, photographic scan quality"
+
+### Gorse sprig — file: `real-gorse-sprig` (cut-out)
+One cut sprig of common gorse (Ulex europaeus) laid flat, about 30 cm long: dense dark green rigid spines 1 to 2.5 cm long all along green stems, branching, with clusters of bright yellow pea-like flowers along the upper half.
+
+### Hawthorn leaves — file: `real-hawthorn-leaves` (leaf sheet)
+Ten common hawthorn (Crataegus monogyna) leaves laid flat: small, 3 to 5 cm, glossy mid green, deeply cut into 3 to 7 narrow lobes reaching almost to the midrib, a wedge-shaped base and a short stalk.
+
+### Black alder leaves — file: `real-alder-leaves` (leaf sheet)
+Ten black alder (Alnus glutinosa) leaves laid flat: 5 to 9 cm, almost round with a flat or slightly notched tip, double-toothed edges, dark glossy green, 6 to 8 pairs of straight parallel veins, a short stalk.
+
+### Black alder bark — file: `real-alder-bark` (bark)
+Mature black alder (Alnus glutinosa) trunk bark: dark grey-brown to almost black, broken into small rough square-ish plates by shallow fissures, a few pale lichen spots.
+
+### California sycamore leaves — file: `real-sycamore-leaves` (leaf sheet)
+Six California sycamore (Platanus racemosa) leaves laid flat: 15 to 25 cm, star-shaped, deeply cut into 3 to 5 long pointed lobes reaching halfway to the base, edges mostly smooth with a few teeth, mid green on top with a soft pale fuzzy underside showing on two of them, a stalk with a swollen base.
+
+### Lombardy poplar leaves — file: `real-poplar-leaves` (leaf sheet)
+Ten Lombardy poplar (Populus nigra 'Italica') leaves laid flat: 5 to 8 cm, triangular to diamond-shaped, wider than long, with a long tapering tip, finely and regularly toothed edges, bright glossy green, a long flattened stalk.
+
+### Coast live oak bark — file: `real-liveoak-bark` (bark)
+Mature coast live oak (Quercus agrifolia) trunk bark: smooth light grey to grey-brown, broken by shallow irregular vertical furrows into broad flat ridges, patches of pale green and grey lichen.
+
+## Birch, willow, poplar, Torrey pine, sugar maple, white pine, red oak (added 2026-11-24/25)
+
+Made by the owner in the Antigravity app with Nano Banana, two variations each, from one shared header for its
+kind and the subject's own words:
+
+- **Leaf and shoot images**: "a top-down botanical herbarium scan on a pure flat magenta background with no gradient
+  and no shadow, everything fully inside the frame with a clear margin, nothing else in frame, no text, photographic,
+  even light; leaves laid flat, upright, side by side, not touching"
+- **Bark images**: "a straight-on photographic texture filling the whole square frame edge to edge, even diffuse
+  light, no shadows, no perspective, no trunk edges visible"
+
+### Silver birch leaves — file: `real-birch-leaves`
+Silver birch leaves (square): twelve leaves, each 3 to 6 cm, triangular to diamond-shaped with a long pointed tip and a broad straight base, sharply double-toothed edges, fresh mid green, a thin stalk.
+
+### Silver birch foot bark — file: `real-birch-foot-bark`
+Silver birch bark from the base of an old trunk (square): thick rough blackish-grey bark broken by deep vertical fissures into rugged ridges, with a few small patches of white papery bark showing between the ridges.
+
+### Weeping willow leaves — file: `real-willow-leaves`
+Weeping willow leaves (square): twelve long, very narrow leaves, 8 to 15 cm long and 1 to 2 cm wide, tapering to a fine point, finely toothed edges, bright green on top; three of them upside down showing the paler grey-green underside.
+
+### Weeping willow bark — file: `real-willow-bark`
+Weeping willow bark (square): grey-brown, deeply furrowed into long thick interlacing vertical ridges forming a coarse net-like pattern.
+
+### Lombardy poplar bark — file: `real-poplar-bark`
+Lombardy poplar bark (square): dark grey, deeply and roughly furrowed into thick vertical ridges, with a few rounded burrs.
+
+### Torrey pine bark — file: `real-torreypine-bark`
+Torrey pine bark (square): deeply furrowed into broad flat reddish-brown to grey-brown scaly plates, darker in the furrows.
+
+### Sugar maple bark — file: `real-maple-bark`
+Sugar maple bark (square): grey to grey-brown, broken into long irregular vertical plates that curl away from the trunk at one edge, shaggy, with dark furrows between them.
+
+### Eastern white pine shoot — file: `real-whitepine-shoot` (tall portrait; -1, -2 first, -3, -4 kept)
+The first two (2026-11-25, leaf header): "Eastern white pine shoot (tall portrait): one slender brown twig ending in a soft feathery brush of fine flexible blue-green needles 8 to 12 cm long in bundles of five, the whole shoot about 30 cm long."
+
+The finer, softer two that are used (-3, -4), a prompt of their own:
+A top-down botanical scan of one eastern white pine (Pinus strobus) shoot laid flat on a pure flat magenta background with no gradient and no shadow, tall portrait format: a slender brown twig ending in a loose, soft, drooping brush of very fine, thin, flexible blue-green needles, each needle 8 to 12 cm long and as thin as a hair, in bundles of five, the needles hanging and fanning softly like a feathery tassel, not stiff or bristly, the whole shoot about 30 cm long, fully inside the frame with a margin. No text, photographic, even light.
+
+### Northern red oak bark — file: `real-redoak-bark` (-1 used; -2, -3, -4 kept spare)
+A straight-on photographic texture of mature northern red oak (Quercus rubra) trunk bark, filling the whole square frame edge to edge: dark grey to grey-brown, with long, wide, flat-topped shiny grey ridges running straight up the trunk like ski tracks, separated by shallow darker furrows. Even diffuse light, no shadows, no perspective, no trunk edges visible.

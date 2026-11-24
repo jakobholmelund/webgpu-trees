@@ -65,6 +65,8 @@ const TUFT_BUNDLES_LEAST = 12;
 const TUFT_BUNDLE_SPREAD = 0.1;
 /** The share of a tuft's needles that stand loose between its bundles. */
 const TUFT_LOOSE = 0.45;
+/** A pine's shoot picture laid at a tuft (`ScanLook.tuftPicture`): how long, in its needles' lengths (a white pine's 30 cm shoot, its needles 8–12 cm). */
+const TUFT_SHOOT = 3;
 /** The shortest a pine's shoot that puts out more, in its needles' lengths. */
 const PINE_SHOOT = 2.2;
 /** A pine's big card: how many branches' shoots it carries side by side, and as many more for a dense one; the fan they spread over (rad). */
@@ -102,6 +104,41 @@ interface Layer {
   cover: Float32Array;
   /** How warm each texel of a photograph is beside its sheet's mean (0.5 as warm), where it is kept: a cushion's sunlit yellow-green top, its cool dark underside. */
   warm?: Float32Array;
+  /** How far each texel is a flower (its look's `flowers`: a gorse sprig's yellow pea flowers), 0..1, where it keeps them. */
+  flower?: Float32Array;
+}
+
+/** How far a photograph's texel (sRGB, 0..1) is a yellow or orange flower: red and green both well over blue, red not under green. */
+export function flowerOf(r: number, g: number, b: number): number {
+  return clamp01((Math.min(r, g) - b - 0.2) / 0.2) * clamp01((r / Math.max(g, 0.01) - 0.8) / 0.15);
+}
+
+/**
+ * A sheet's mean lightness (linear) of its leaves and of its flowers apart, for a look that keeps its flowers: each
+ * brought to a leaf's tone against its own kind's mean, so a sprig's dark spines are not darkened beside its bright
+ * flowers, nor its flowers all white.
+ */
+const flowerMeans = new WeakMap<Sheet, { leaf: number; flower: number }>();
+function meansOf(sh: Sheet): { leaf: number; flower: number } {
+  let m = flowerMeans.get(sh);
+  if (m) return m;
+  const d = sh.albedo.data;
+  let leaf = 0;
+  let nl = 0;
+  let flower = 0;
+  let nf = 0;
+  for (let q = 0; q < d.length; q += 4) {
+    if (d[q + 3] < 128) continue;
+    const lum = 0.2126 * LIN[d[q]] + 0.7152 * LIN[d[q + 1]] + 0.0722 * LIN[d[q + 2]];
+    const f = flowerOf(d[q] / 255, d[q + 1] / 255, d[q + 2] / 255);
+    leaf += lum * (1 - f);
+    nl += 1 - f;
+    flower += lum * f;
+    nf += f;
+  }
+  m = { leaf: Math.max(0.02, leaf / Math.max(1, nl)), flower: Math.max(0.02, nf > 0 ? flower / nf : 0.3) };
+  flowerMeans.set(sh, m);
+  return m;
 }
 
 function rng(seed: number): () => number {
@@ -141,6 +178,7 @@ function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: nu
       L.tone[o] = L.tone[o] * (1 - c) + t1 * c;
       L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
+      if (L.flower) L.flower[o] *= 1 - c;
     }
   }
 }
@@ -308,7 +346,8 @@ function leaf(L: Layer, sh: Sheet, l: Lay, shadow: number): void {
   const i1 = Math.min(n - 1 - MARGIN, box.i1);
   const j0 = Math.max(MARGIN, box.j0);
   const j1 = Math.min(n - 1 - MARGIN, box.j1);
-  const meanL = Math.max(0.02, sh.set.meanLinear[0] * 0.2126 + sh.set.meanLinear[1] * 0.7152 + sh.set.meanLinear[2] * 0.0722);
+  const kept = L.flower ? meansOf(sh) : null;
+  const meanL = kept ? kept.leaf : Math.max(0.02, sh.set.meanLinear[0] * 0.2126 + sh.set.meanLinear[1] * 0.7152 + sh.set.meanLinear[2] * 0.0722);
   /** Where on the sheet a texel of the card falls (or null off the leaf's box). */
   const toSheet = (px: number, py: number): [number, number] | null => {
     const a = px * da[0] + py * da[1];
@@ -363,8 +402,11 @@ function leaf(L: Layer, sh: Sheet, l: Lay, shadow: number): void {
       const px = (nx * dc[0] + ny * da[0]) * fl;
       const py = nx * dc[1] + ny * da[1];
       const relief = 1 + 0.35 * (px * 0.35 + py * 0.6);
-      const tone = Math.min(1, LEAF * l.tone * Math.pow(lum / meanL, 0.85) * relief);
+      // (A flower's tone against the flowers' mean, a leaf's against the leaves'.)
+      const bloom = kept ? flowerOf(d[q] / 255, d[q + 1] / 255, d[q + 2] / 255) : 0;
+      const tone = Math.min(1, LEAF * l.tone * Math.pow(lum / (kept ? lerp(kept.leaf, kept.flower, bloom) : meanL), 0.85) * relief);
       const o = j * n + i;
+      if (L.flower) L.flower[o] = L.flower[o] * (1 - c) + bloom * c;
       L.tone[o] = L.tone[o] * (1 - c) + tone * c;
       L.own[o] = L.own[o] * (1 - c) + clamp01(l.own * 0.55 + thin * 0.45) * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
@@ -673,7 +715,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     const more = bigSpray(look, extent, 2 * nearCardHalf(look), rnd, density);
     for (const l of more.leaves) if (rnd() < thick) under.push(l);
   }
-  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
+  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n), ...(look.flowers ? { flower: new Float32Array(n * n) } : {}) };
   // (Metres to texels: a near card at its real size, its foot near its first row; a big card or a palm's
   // leaf fitted inside its cell.)
   let k = n / extent;
@@ -742,16 +784,26 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       own: rnd(),
       brush: l.brush,
     };
+    // (A pine whose pictures are its whole shoots (`ScanLook.tuftPicture`) lays one at each tuft: its brush reaching as
+    // far past the shoot's end as a drawn tuft's needles would, its twig back along the shoot.)
+    const shootPicture = !!l.needles && !!look.tuftPicture;
+    if (shootPicture) {
+      const shoot = lay.len * TUFT_SHOOT;
+      const back = shoot - lay.len * TUFT_STRETCH;
+      lay.x -= Math.cos(lay.ang) * back;
+      lay.y -= Math.sin(lay.ang) * back;
+      lay.len = shoot;
+    }
     // (A leaf that would reach past the card's edge is made smaller, or left off: cut by the edge, it shows a
     // straight line.)
-    const inside = () => (l.needles ? tuftInside(L, lay) : footprint(L, lay).inside);
+    const inside = () => (l.needles && !shootPicture ? tuftInside(L, lay) : footprint(L, lay).inside);
     let fits = whole || inside();
     for (let t = 0; t < 3 && !fits; t++) {
       lay.len *= 0.85;
       fits = inside();
     }
     if (!fits) continue;
-    if (l.needles) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own, l.brush);
+    if (l.needles && !shootPicture) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own, l.brush);
     else leaf(L, sheet, lay, palm ? shadow * 0.5 : shadow);
   }
   // (Where nothing is drawn, the card's mean tone, so its mips' edges do not darken.)
@@ -771,7 +823,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
  * towards the far end: its own light and shade, lit top and dark beneath, kept as its tone. Fitted inside the
  * cell's clear margin.
  */
-export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, cushions: Sheet, pick: number): void {
+export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, cushions: Sheet, pick: number, thick = 0): void {
   const sprites = cushions.set.sprites;
   // (Stood as its picture stands, its base's middle under its top's: the sheet's stalk-to-tip line, from its
   // lowest and highest covered rows' middles, leans on a wide cushion and would turn it aslant.)
@@ -784,8 +836,23 @@ export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, 
   const room = n - 2 * MARGIN - 4;
   // (As wide as the card, or as tall; below its base (twigs under it) as much of the picture as hangs there.)
   const k = Math.min(room / s.w, room / s.h);
-  const lay: Lay = { x: n / 2 + (s.base[0] - s.w / 2) * k, y: MARGIN + 2 + Math.max(0, s.h - s.base[1]) * k, ang: UP, len: sl * k, sprite: s, width: 1, bend: 0, flip: true, tone: 1, own: 0.5 };
-  leaf(L, cushions, lay, 0);
+  // (A pad thinner than its look's pads (`ScanLook.padThick`, its thickness over its width) is laid in layers, each
+  // a little narrower, higher and to one side or the other, the higher ones behind: a shelf as thick as a coastal
+  // cypress's, lumpy and lit along each layer's top, and not one thin disc. Each a little taller than its picture.)
+  const ratio = (s.h * PAD_STRETCH) / s.w;
+  const layers = thick > ratio ? Math.min(PAD_LAYERS, 1 + Math.ceil((thick - ratio) / (ratio * PAD_STEP))) : 1;
+  const stretch = layers > 1 ? PAD_STRETCH : 1;
+  const kk = layers > 1 ? Math.min(k, room / (s.w * (1 + PAD_SHIFT)), room / (s.h * stretch + (thick - ratio) * s.w)) : k;
+  // (The top layer, a little shorter than the bottom one, reaching to the pad's thickness.)
+  const top = s.h * stretch * (1 - PAD_NARROW * 0.5 * (layers - 1));
+  const rise = layers > 1 ? (Math.max(0, thick * s.w - top) * kk) / (layers - 1) : 0;
+  const foot = MARGIN + 2 + Math.max(0, s.h - s.base[1]) * kk * stretch;
+  for (let q = layers - 1; q >= 0; q--) {
+    const narrow = 1 - PAD_NARROW * q;
+    const side = q === 0 ? 0 : (q % 2 ? 1 : -1) * PAD_SHIFT * s.w * kk * (0.5 + 0.5 * hash01(q, pick + 11));
+    const lay: Lay = { x: n / 2 + (s.base[0] - s.w / 2) * kk * narrow + side, y: foot + q * rise, ang: UP, len: sl * kk * stretch * (layers > 1 ? 1 - PAD_NARROW * 0.5 * q : 1), sprite: s, width: narrow / (stretch * (layers > 1 ? 1 - PAD_NARROW * 0.5 * q : 1)), bend: 0, flip: (q + pick) % 2 === 0, tone: 1, own: 0.5 };
+    leaf(L, cushions, lay, 0);
+  }
   const mean = (() => {
     let sum = 0;
     let w = 0;
@@ -797,6 +864,13 @@ export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, 
   })();
   write(out, ox, oy, n, L, mean, false);
 }
+
+/** A pad laid in layers (`drawCushionCard`): each this much taller than its picture, at most this many, each this share of a picture's height above the one below, this much narrower, and to one side by up to this share of its width. */
+const PAD_STRETCH = 1.25;
+const PAD_LAYERS = 4;
+const PAD_STEP = 0.55;
+const PAD_NARROW = 0.1;
+const PAD_SHIFT = 0.06;
 
 /** A drawn cushion's lit top and shaded underside (tone, as a leaf's), and how dark the creases between its lumps. */
 const CUSHION_TOP = 1.6;
@@ -940,8 +1014,9 @@ function write(out: Pixels, ox: number, oy: number, n: number, L: Layer, mean: n
       const t = (tone * 255 + 0.5) | 0;
       out.data[p] = t;
       out.data[p + 1] = cov > 0 ? ((Math.min(1, L.own[o] / L.cover[o]) * 255 + 0.5) | 0) : 128;
-      // (Blue: its tone again, or a photograph's warmth where it keeps it: `Layer.warm`.)
-      out.data[p + 2] = L.warm ? (cov > 0 ? ((Math.min(1, L.warm[o] / L.cover[o]) * 255 + 0.5) | 0) : 128) : t;
+      // (Blue: its tone again, or a photograph's warmth where it keeps it (`Layer.warm`), or how far it is a flower
+      // (`Layer.flower`).)
+      out.data[p + 2] = L.warm ? (cov > 0 ? ((Math.min(1, L.warm[o] / L.cover[o]) * 255 + 0.5) | 0) : 128) : L.flower ? (cov > 0 ? ((Math.min(1, L.flower[o] / L.cover[o]) * 255 + 0.5) | 0) : 0) : t;
       out.data[p + 3] = cov;
     }
   }
@@ -959,13 +1034,13 @@ export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, 
   const near = 2 * nearCardHalf(look) || bigExtent * (0.8 / 1.45);
   for (let c = 0; c < FAR_CARD; c++) {
     const big = c >= BIG_CARD;
-    if (big && look.cushion && cushions && cushions.set.sprites.length > 0) drawCushionCard(out, c * n, row * n, n, cushions, c - BIG_CARD);
+    if (big && look.cushion && cushions && cushions.set.sprites.length > 0) drawCushionCard(out, c * n, row * n, n, cushions, c - BIG_CARD, look.padThick);
     else if (big && look.cushion) drawnCushionCard(out, c * n, row * n, n, look, bigExtent, seed * 31 + c * 7 + 3, density);
     else drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
   }
   for (let c = FAR_CARD; c < FAR_CARD + FAR_CARDS; c++) {
     if (far && far.set.sprites.length > 0) {
-      drawCushionCard(out, c * n, row * n, n, far, c - FAR_CARD);
+      drawCushionCard(out, c * n, row * n, n, far, c - FAR_CARD, look.padThick);
       continue;
     }
     // (Its big card again, copied.)

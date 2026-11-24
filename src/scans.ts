@@ -124,6 +124,29 @@ export interface ScanLook {
    * cushions: a strip of cushions side by side (a stone pine's wide flat crown), laid one to a card.
    */
   cushionFar?: string;
+  /**
+   * How thick its cushions are for their width, where they are pads thinner in their pictures (a Monterey cypress's
+   * shelves, 1–2 m deep on old coastal trees): each picture laid in layers on its card until it is so thick
+   * (sprays.ts `drawCushionCard`).
+   */
+  padThick?: number;
+  /**
+   * A pine whose leaf pictures are its whole shoots (a twig ending in its brush, an eastern white pine's soft fine
+   * needles): its tufts laid from them, one to a shoot's end, and not drawn needle by needle (sprays.ts `needleTuft`).
+   */
+  tuftPicture?: boolean;
+  /**
+   * How many cushion cards to a clump near to, and how big (half width over the clump's radius), where not as closed
+   * as its crown is (engine.ts `closedOf`: four of two radii on a closed crown, one of 1.1 on an open one).
+   */
+  cushionCards?: number;
+  cushionSize?: number;
+  /**
+   * The colour of its flowers (sRGB), where its leaf pictures show them (a gorse sprig's yellow pea flowers): the
+   * cards keep where they are (sprays.ts `Layer.flower`), and the shader colours them so, as far as the style's
+   * `bloom` says (0 out of flower: the flowers gone, its spines left).
+   */
+  flowers?: string;
 }
 
 /** The photographs each of the library's species wears, by name. */
@@ -140,32 +163,39 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6, brush: 1.6, cushion: "scotsPineClump" },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
-  "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
-  "Black alder": { bark: "oak", barkScale: 0.7, leaves: "round", leafCm: 8, spray: "alternate" },
-  "Lombardy poplar": { bark: "ridged", barkScale: 0.8, leaves: "deltoid", leafCm: 8, spray: "alternate" },
-  "Weeping willow": { bark: "ridged", leaves: "lance", leafCm: 10, spray: "weeping", leafWidth: 0.75, hang: 0.95 },
-  Hawthorn: { bark: "oak", barkScale: 0.45, leaves: "oak", leafCm: 4, spray: "alternate", perSpray: 14 },
-  Gorse: { bark: "ridged", barkScale: 0.35, leaves: "pine", leafCm: 12, spray: "tufts" },
+  // (Its own rugged blackish foot giving way to its white upper bark; its own leaves, 3–6 cm and a thin stalk.)
+  "Silver birch": { bark: "birchFoot", barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "birch", leafCm: 6, spray: "weeping", hang: 0.7 },
+  // (Its own leaves, almost round, 5–9 cm and a short stalk; its own dark bark of small squarish plates.)
+  "Black alder": { bark: "alder", leaves: "alder", leafCm: 9, spray: "alternate" },
+  // (Its own leaves, 5–8 cm on a long flattened stalk.)
+  "Lombardy poplar": { bark: "poplar", leaves: "poplar", leafCm: 10, spray: "alternate" },
+  // (Its own leaves, 8–15 cm and as narrow as they grow; its own netted bark.)
+  "Weeping willow": { bark: "willow", leaves: "willow", leafCm: 12, spray: "weeping", hang: 0.95 },
+  // (Its own deeply cut leaves, 3–5 cm with their stalk.)
+  Hawthorn: { bark: "oak", barkScale: 0.45, leaves: "hawthorn", leafCm: 5, spray: "alternate", perSpray: 14 },
+  // (Its own sprigs, spines and yellow flowers, whole: a twig's end of a few of them, the flowers kept yellow.)
+  Gorse: { bark: "ridged", barkScale: 0.35, leaves: "gorse", leafCm: 22, spray: "sprays", flowers: "#f2c230" },
   "Sitka spruce": { bark: "spruce", barkScale: 1.6, leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its long dark needles, 8–16 cm, in brushes at its shoots' ends: the Torrey pine's shoots, tinted dark.)
   "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts", needleCm: 12 },
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
-  "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays", cushion: "cypressPad" },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark" },
+  "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays", cushion: "cypressPad", padThick: 0.45, cushionSize: 2.8 },
+  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 2, cushionSize: 1.5 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
-  "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
+  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
   "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
   "Stone pine": { bark: "stonePine", barkScale: 1, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "stonePineCushion", cushionFar: "stonePineCanopy" },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
   "Queen palm": { bark: "palmRings", barkScale: 0.75, leaves: "frond", leafCm: 400, spray: "whole" },
-  "Coast live oak": { bark: "oak", barkScale: 0.9, leaves: "liveOak", leafCm: 5, spray: "alternate", perSpray: 12 },
-  "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "maple", leafCm: 20, spray: "alternate" },
-  "Sugar maple": { bark: "ridged", barkScale: 0.8, leaves: "maple", leafCm: 12, spray: "opposite" },
-  "Red oak": { bark: "ridged", barkScale: 0.9, leaves: "redOak", leafCm: 17, spray: "alternate" },
-  "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 10 },
+  "Coast live oak": { bark: "liveOak", leaves: "liveOak", leafCm: 5, spray: "alternate", perSpray: 12 },
+  "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "sycamore", leafCm: 24, spray: "alternate" },
+  "Sugar maple": { bark: "maple", leaves: "maple", leafCm: 12, spray: "opposite" },
+  "Red oak": { bark: "redOak", leaves: "redOak", leafCm: 17, spray: "alternate" },
+  // (Its own shoots, soft feathery brushes of fine needles 8–12 cm in fives: its tufts laid from them, `tuftPicture`.)
+  "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "whitePine", leafCm: 26, spray: "tufts", needleCm: 10, tuftPicture: true },
   "White spruce": { bark: "spruce", barkScale: 0.9, leaves: "fir", leafCm: 26, spray: "sprays" },
 };
 
@@ -178,6 +208,11 @@ export function upperColorCode(look: ScanLook): number {
   if (!hex) return 0;
   if (!/^#?[0-9a-f]{6}$/i.test(hex)) throw new Error(`upper bark colour ${hex}: not #rrggbb`);
   return parseInt(hex.replace(/^#/, ""), 16) + 1;
+}
+
+/** A look's flower colour packed as an upper bark colour is (`upperColorCode`); 0 where it has none. */
+export function flowerColorCode(look: ScanLook): number {
+  return look.flowers ? upperColorCode({ ...look, upper: { set: "", from: 0, to: 0, color: look.flowers } }) : 0;
 }
 
 /** The sRGB colour (0..1) an upper bark colour code holds (as the shader reads it), or null for none. */

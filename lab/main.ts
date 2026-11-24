@@ -618,6 +618,7 @@ async function start() {
     leafSize: "longest leaf, m (painterly)",
     structure: "light from the crown's own leaves",
     density: "leaves' thickness to the light",
+    bloom: "in flower",
   };
   for (const [key, r] of Object.entries(STYLE_RANGES) as [keyof TreeStyle, { min: number; max: number; step: number }][]) {
     stylePanel.add(style, key, r.min, r.max, r.step).name(STYLE_NAMES[key]).onChange(save);

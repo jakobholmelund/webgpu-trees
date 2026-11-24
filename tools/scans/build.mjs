@@ -146,7 +146,14 @@ function prepareGenerated(key) {
   } else if (s.key === "magenta") {
     // (Each picture keyed on its own magenta, then set side by side, a gap between, tops aligned: one sheet to
     // cut its leaves from. Where each lies across it is kept, so a whole leaf is one to a picture.)
-    const keyed = files.map((f) => keyMagenta(read(join(raw, key, f), { channels: 3 }), { unmix: !!s.unmix }));
+    // (With `sameScale`, a smaller picture is first brought to the tallest's height: the same leaves at the same
+    // size, whichever picture they came from.)
+    const tallest = s.sameScale ? Math.max(...files.map((f) => sizeOf(join(raw, key, f)).h)) : 0;
+    const readAt = (f) => {
+      const { w: fw, h: fh } = sizeOf(join(raw, key, f));
+      return read(join(raw, key, f), { channels: 3, ...(s.sameScale && fh < tallest ? { resize: [Math.round((fw * tallest) / fh), tallest] } : {}) });
+    };
+    const keyed = files.map((f) => keyMagenta(readAt(f), { unmix: !!s.unmix }));
     const GAP = 16;
     const w = keyed.reduce((sum, k) => sum + k.rgb.w, 0) + GAP * (keyed.length - 1);
     const h = Math.max(...keyed.map((k) => k.rgb.h));
