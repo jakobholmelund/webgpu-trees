@@ -21,11 +21,20 @@
 import * as THREE from "three/webgpu";
 import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
-import { makeLeafAtlas } from "./leaves.ts";
+
+/** The painted look's brush marks' texels (dabs.ts makes them as a texture). */
+function makeDabPixels(): Pixels {
+  const tex = makeDabAtlas();
+  const img = tex.image as { data: Uint8Array; width: number; height: number };
+  tex.dispose();
+  return { data: img.data, width: img.width, height: img.height };
+}
+import { leafAtlasPixels } from "./leaves.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
-import { LEAF_SHARE, LEAF_SIZE_OF, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, painterlyAtlasPixels, sculptedAtlasPixels } from "./marks.ts";
+import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
+import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
-import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, woodPieces } from "./geometry.ts";
+import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { growTree } from "./grow.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
 import { type Stand, standingOf } from "./stand.ts";
@@ -100,8 +109,8 @@ export interface Trees {
   readonly plan: Plan;
   /** The trees as grown, by variant. */
   readonly grown: readonly GrownTree[];
-  /** Each tier's pieces for one tree of each variant, all told: dabs and pieces of wood. */
-  readonly pieces: { dabs: number; wood: number }[];
+  /** Each tier's pieces for one tree of each variant, all told: dabs, pieces of wood, and the triangles of conifers' sheets. */
+  readonly pieces: { dabs: number; wood: number; sheets: number }[];
   /** Once a frame, before rendering. */
   update(renderer: THREE.WebGPURenderer, camera: THREE.PerspectiveCamera, timeS: number): void;
   /** How many trees each tier drew last frame: read back from the graphics card, so not every frame. */
@@ -128,18 +137,35 @@ export interface Trees {
   dispose(): void;
 }
 
-/** The painterly or the sculpted look's marks (marks.ts), as a texture: worked out once a page, then shared. */
-const markPixels: Partial<Record<"painterly" | "sculpted", { data: Uint8Array; width: number; height: number }>> = {};
-function markAtlas(which: "painterly" | "sculpted"): THREE.DataTexture {
-  const px = (markPixels[which] ??= which === "painterly" ? painterlyAtlasPixels() : sculptedAtlasPixels());
-  const tex = new THREE.DataTexture(px.data, px.width, px.height, THREE.RGBAFormat, THREE.UnsignedByteType);
+/**
+ * An atlas of marks as a texture, with its mips made so a far crown keeps as much of its leaves as a near one
+ * (mips.ts): worked out once a page, then shared.
+ */
+const atlasMips: Partial<Record<"painterly" | "sculpted" | "sheets" | "leaves" | "dabs", Pixels[]>> = {};
+function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs", cell = MARK_CELL, from?: Pixels, fill = 0): THREE.DataTexture {
+  const levels = (atlasMips[which] ??= coverageMips(from ?? (which === "painterly" ? painterlyAtlasPixels() : which === "sculpted" ? sculptedAtlasPixels() : which === "sheets" ? sheetAtlasPixels() : leafAtlasPixels()), cell, ALPHA_CUT, fill));
+  const tex = new THREE.DataTexture(levels[0].data, levels[0].width, levels[0].height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.mipmaps = levels as unknown as typeof tex.mipmaps;
   tex.colorSpace = THREE.NoColorSpace;
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.generateMipmaps = true;
+  tex.generateMipmaps = false;
+  // (Sheets and cards are seen aslant, from under a bough: sampled along the slant, they keep their needles.)
+  tex.anisotropy = which === "sheets" ? 4 : 1;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
+}
+
+/**
+ * Which kind of sheet a species' boughs are (marks.ts `SHEET_KINDS`), or -1 if its leaves are dabs or cards:
+ * a needled conifer's a fir's comb, a scaled one's (a cedar's) lace. Only a conifer grown whorl by whorl has
+ * boughs to lay them along: an old pine grown as a broadleaf carries its needles in tufts at its twigs' ends,
+ * which sheets made a crown of fronds, a palm's; a shrub's needles (gorse) a mound.
+ */
+function sheetKindOf(s: TreeSpecies): number {
+  if (s.architecture !== "conifer") return -1;
+  return s.leafKind === "needle" ? 0 : s.leafKind === "small" ? 1 : -1;
 }
 
 function linear(hex: string): THREE.Color {
@@ -200,7 +226,8 @@ export function createTrees(options: TreesOptions): Trees {
   });
   // Four rows a species: its leaves' colour (linear) and how much it varies; its bark's, and how pale it
   // goes up the trunk; the colour of light through its leaves, and its stiffness; how fast its crown
-  // takes the light (per metre).
+  // takes the light (per metre), how deep its leaves go, its kind of leaf, and how much moss its bark
+  // takes (none on a palm's stem, less on pale, peeling bark: a birch's, a eucalyptus's, a plane's).
   const speciesData = new Float32Array(Math.max(1, species.length) * 16);
   const packSpecies = () => {
     species.forEach((s, i) => {
@@ -209,7 +236,7 @@ export function createTrees(options: TreesOptions): Trees {
       // (Leaf area per cubic metre of crown, about 0.3 in an open crown to 1.4 in a dense one, half of it
       // facing any one way: Monsi and Saeki's extinction through a crown, with G = 0.5.)
       const k = 0.5 * (0.3 + (1 - s.openness) * 1.1);
-      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), 0], i * 16);
+      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * 16);
     });
   };
   packSpecies();
@@ -239,7 +266,17 @@ export function createTrees(options: TreesOptions): Trees {
   // (The realistic look's near and mid leaves are cards set in the crown; far off, both looks' are dabs.)
   // (Mid trees too: gathered into broad billboards, the leaf sprays smeared into blots; two large cards a
   // clump keep a crown of leaves at a cost the mid tier can carry.)
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8) : real && t === 1 ? cardPieces(grown, 2, 1.45) : lobed ? withLobes(dabPieces(grown, s), lobes) : dabPieces(grown, s)));
+  // (A conifer's near boughs, in the painterly and the realistic looks, are sheets lying along them, and not
+  // dabs or cards: `sheetPieces`.)
+  const sheetKinds = look === "painterly" || real ? plan.variants.map((v) => sheetKindOf(species[v.species])) : plan.variants.map(() => -1);
+  const sheeted = sheetKinds.map((k) => k >= 0);
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, sheeted) : real && t === 1 ? cardPieces(grown, 2, 1.45, sheeted) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? sheeted : undefined), lobes) : dabPieces(grown, s)));
+  // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
+  // from boughs to blots, pixel by pixel, a speckle over the whole hand-over.)
+  const sheetSets: Pieces[] = TIER_SHAPES.map((_, t) => {
+    const p = sheetPieces(grown, t <= 1 ? sheetKinds : sheetKinds.map(() => -1), t === 1);
+    return lobed ? withLobes(p, lobes) : p;
+  });
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
   const makeArgs = (sets: Pieces[]) => {
@@ -254,9 +291,11 @@ export function createTrees(options: TreesOptions): Trees {
   const dabArgs = makeArgs(dabSets);
   const woodArgs = makeArgs(woodSets);
   const strokeArgs = makeArgs(strokeSets);
+  const sheetArgs = makeArgs(sheetSets);
   const dabArgsStore = storage(dabArgs, "uint", dabArgs.array.length);
   const woodArgsStore = storage(woodArgs, "uint", woodArgs.array.length);
   const strokeArgsStore = storage(strokeArgs, "uint", strokeArgs.array.length);
+  const sheetArgsStore = storage(sheetArgs, "uint", sheetArgs.array.length);
 
   // ---- Uniforms. ----
 
@@ -280,6 +319,8 @@ export function createTrees(options: TreesOptions): Trees {
   const uStyle5 = uniform(new THREE.Vector4(1, 0, 0, 1));
   /** leafSize (m). */
   const uLeafSize = uniform(0.22);
+  /** throughPower, throughWarp, throughVary, moss. */
+  const uThrough = uniform(new THREE.Vector4(4, 0, 0, 0));
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -335,6 +376,7 @@ export function createTrees(options: TreesOptions): Trees {
       dabArgsStore.element(k.mul(5).add(1)).assign(c);
       woodArgsStore.element(k.mul(5).add(1)).assign(c);
       strokeArgsStore.element(k.mul(5).add(1)).assign(c);
+      sheetArgsStore.element(k.mul(5).add(1)).assign(c);
       atomicStore(countStore.element(k), uint(0));
     });
   })().compute(Math.max(1, TIERS * V));
@@ -538,13 +580,38 @@ export function createTrees(options: TreesOptions): Trees {
     Discard(s.lessThan(shares.x).or(s.greaterThanEqual(shares.y)));
   };
 
-  const atlas = real ? makeLeafAtlas() : look === "painterly" ? markAtlas("painterly") : look === "sculpted" ? markAtlas("sculpted") : makeDabAtlas();
+  const atlas = real ? markAtlas("leaves") : look === "painterly" ? markAtlas("painterly") : look === "sculpted" ? markAtlas("sculpted") : markAtlas("dabs", 128, makeDabPixels());
+  // (A painterly conifer's sheets carry boughs of needles of their own; a realistic one's, its needle sprays.)
+  const sheetAtlas = look === "painterly" && sheeted.some((k) => k) ? markAtlas("sheets", SHEET_CELL, undefined, 0.3) : null;
 
   // ---- The dabs. ----
 
-  /** The dabs of a tier: its leaves, or (`stroke`) the far tier's one upright stroke for each trunk. */
-  const dabMaterial = (t: number, stroke: boolean, card = false) => {
+  /**
+   * The light through a leaf, as Barré-Brisebois's model has it (GDC 2011): to an eye looking towards the sun
+   * through it, the sun's light bent a little by the leaf's facing `n` (`throughWarp`), gathered about the sun
+   * as `throughPower` says, and as thin as the leaf is: `own` (0..1) its own number, which `throughVary`
+   * turns into a thickness of its own (each leaf its own, so a backlit crown is not one lime green).
+   */
+  const throughView = (n: Vec3, eye: Vec3, own: Float): Float => throughBent(n, eye).mul(leafThin(own));
+  /** The model's view term alone: how squarely the eye looks into the sun through a leaf facing `n`. */
+  const throughBent = (n: Vec3, eye: Vec3): Float => pow(clamp(dot(eye, uSun.add(n.mul(uThrough.y)).negate()), 0, 1), uThrough.x);
+  /** How thin a leaf is for its own number (0..1), as far as `throughVary` says: 1 on average. */
+  const leafThin = (own: Float): Float => mix(float(1), own.mul(1.3).add(0.35), uThrough.z);
+  /**
+   * How thin the crown is to the sun here, for the light through its leaves: the share of the sun that reaches
+   * a leaf (Monsi and Saeki) and how deep its clump is, and each card or sheet a thickness of its own, as far
+   * as `throughVary` says. With none, the square root of the sun's share, as the looks had it.
+   */
+  const crownThin = (C: Crown, depth: Float, own: Float): Float => mix(sqrt(C.sunIn), pow(C.sunIn, float(0.75)).mul(float(1).sub(depth.mul(0.6))).mul(own.add(0.5)), uThrough.z);
+
+  /**
+   * The dabs of a tier: its leaves, or (`stroke`) the far tier's one upright stroke for each trunk; `card`, the
+   * realistic look's leaf cards; `sheet`, a conifer's boughs as sheets lying along them (geometry.ts
+   * `sheetPieces`): each vertex where it is, the sheet's top and underside lit and drawn each as itself.
+   */
+  const dabMaterial = (t: number, stroke: boolean, card = false, sheet = false) => {
     const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: true });
+    const marks = sheet && sheetAtlas ? sheetAtlas : atlas;
     m.alphaToCoverage = !stroke;
     const aDab = attribute<"vec4">("aDab", "vec4");
     const aNormal = attribute<"vec4">("aNormal", "vec4");
@@ -556,7 +623,11 @@ export function createTrees(options: TreesOptions): Trees {
     let colour: Vec3 = vec3(0);
     let position: Vec3;
     // (A lobed look's dabs are lit pixel by pixel, over their lobe: what the vertex hands on for it.)
-    let lobeLight: { shade: Vec4; lit: Vec4; rim: Vec3; q: Vec3; eye: Vec3; form: Vec3; corner: Vec3 } | null = null;
+    let lobeLight: { shade: Vec4; lit: Vec4; rim: Vec3; q: Vec3; eye: Vec3; form: Vec3; corner: Vec3; through: Vec4 } | null = null;
+    // (The light through the leaves, for the pixel to finish, and a sheet's two sides' colours, where unlobed.)
+    let thruV: { col: Vec4; n: Vec3; eye: Vec3 } | null = null;
+    let sheetCols: { top: Vec3; under: Vec3 } | null = null;
+    let sheetFace: Vec3 | null = null;
     // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
     // (Only on the upper half of its lobe, as sprigs stand on the tops of clay masses: from below they would
     // show as scraps.)
@@ -567,7 +638,10 @@ export function createTrees(options: TreesOptions): Trees {
       let centre = fit.point(positionGeometry);
       const limb = fit.point(aLimb.xyz);
       const onLimb = select(aLimb.y.lessThan(-0.5), float(0), float(1));
-      const blown = windAt(T, centre, limb, onLimb);
+      // (A sheet bends: each of its points moves as the wood there does, and its tip bobs as a bough's does.)
+      const along = aDab.y.mul(0.5).add(0.5);
+      const bob = sheet ? vec3(0, sin(uTime.mul(3.1).add(own.mul(40))).mul(aDab.z.mul(fit.size).mul(0.05).mul(along.mul(along))).mul(clamp(uWind.z.div(6), 0.1, 1.5)), 0) : vec3(0);
+      const blown = windAt(T, centre, limb, onLimb).add(bob);
       // (Its lobe's centre, carried by the same wind as the dab, and how far it reaches: lobes.ts.)
       const aLobe = lobed ? attribute<"vec4">("aLobe", "vec4") : null;
       const lobeAt = aLobe ? toWorld(T, fit.point(aLobe.xyz).add(blown)) : null;
@@ -586,7 +660,13 @@ export function createTrees(options: TreesOptions): Trees {
       // Lobes overlap, and lit each by its own the dabs of two lobes would interleave in a patchwork.)
       let frontAt: Vec3 | null = null;
       let frontR: Float | null = null;
-      if (lobeAt && lobeR) {
+      if (lobeAt && lobeR && sheet) {
+        // (A sheet is lit by its own lobe: it lies along its bough and faces as the bough does, and that, more
+        // than the lobe, is how its light runs; the search over the crown's lobes, for every one of its
+        // vertices, was most of what a conifer cost.)
+        frontAt = lobeAt;
+        frontR = lobeR;
+      } else if (lobeAt && lobeR) {
         // (Statements, so a function of their own: TSL keeps a loop only inside one.)
         const front = Fn(() => {
           const best = vec4(lobeAt, lobeR).toVar();
@@ -623,7 +703,10 @@ export function createTrees(options: TreesOptions): Trees {
       const face0 = dirToWorld(T, fit.normal(aOffset.xyz));
       const face = normalize(mix(face0, toEye, uStyle3.w));
       const seen = face.mul(select(dot(face, toEye).lessThan(0), float(-1), float(1)));
-      const nClump = card ? normalize(mix(seen, dirToWorld(T, fit.normal(aNormal.xyz)), uStyle.z)) : dirToWorld(T, fit.normal(normalize(aNormal.xyz.add(aOffset.xyz.mul(0.6)))));
+      // (A sheet's own facing, its top's side, as fitted; and its clump's, which its light is laid over.)
+      const sheetN = face0;
+      const clumpN = dirToWorld(T, fit.normal(aNormal.xyz));
+      const nClump = card ? normalize(mix(seen, clumpN, uStyle.z)) : sheet ? clumpN : dirToWorld(T, fit.normal(normalize(aNormal.xyz.add(aOffset.xyz.mul(0.6)))));
       const nLit = card ? nClump : normalize(mix(C.form, nClump, uStyle.z));
       const jit = own.sub(0.5).mul(uStyle.w);
       const leaf = T.srow(0);
@@ -631,20 +714,24 @@ export function createTrees(options: TreesOptions): Trees {
       let albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
       // (Deep in the crown the leaves see little sky as well as little sun: the crown's own shade.)
       const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w));
-      // (The sun through the leaves, to an eye looking towards it: strongest where little crown lies between.)
-      const toward = pow(max(dot(toEye.negate(), uSun), float(0)), float(4));
+      // (The sun through the leaves, to an eye looking towards it: its colour, and how thin the crown is here.
+      // The rest is the leaf's, worked out pixel by pixel: `throughView`.)
+      const thin = crownThin(C, aNormal.w, own);
+      const throughCol = (a: Vec3): Vec3 => a.mul(T.srow(2).xyz).mul(uSunTint).mul(uStyle2.y.mul(0.9).mul(C.cloud));
       if (lobed) {
         // (Its colour as rich as the style says: away from its own grey, or towards it.)
         const grey = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
         albedo = max(mix(vec3(grey), albedo, uStyle5.x), vec3(0));
-        const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
         // (The light turned warm and the shade cool, as a painter lays them, each keeping about its brightness:
         // a yellow-green where the sun falls, a teal blue-green where only the sky does. The host's tints
         // stay in charge; the style turns them.)
         const lum = (c: Vec3): Float => dot(c, vec3(0.2126, 0.7152, 0.0722));
         const hueOf = (hue: Vec3, by: Float): Vec3 => mix(albedo, hue.mul(lum(albedo).div(lum(hue))), by);
-        const shade = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8)).mul(uShadeTint).mul(sky).add(through);
-        const lit = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7)).mul(uSunTint).mul(uStyle5.w).add(through);
+        // (Far off, the light through the leaves is laid once a dab, as its crown's form faces: a far dab is a
+        // few pixels, and worked out pixel by pixel it cost more than all the rest of the far crowns' light.)
+        const farThrough = t === 2 ? throughCol(albedo).mul(thin).mul(throughView(nLit, toEye, float(0.5))) : vec3(0);
+        const shade = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8)).mul(uShadeTint).mul(sky).add(farThrough);
+        const lit = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7)).mul(uSunTint).mul(uStyle5.w).add(farThrough);
         // (The rim of a lobe, against the light: the sun through its thin edge, more the more the eye looks
         // towards the sun, and the sky's light round it.)
         const against = float(0.3).add(smoothstep(float(-0.3), float(0.9), dot(toEye.negate(), uSun)).mul(0.9));
@@ -655,20 +742,36 @@ export function createTrees(options: TreesOptions): Trees {
         // (Its corner and where it is on its lobe's ball as the eye sees it: the corner's offset from the lobe's
         // centre, square to the eye, in the lobe's radii. Across the dab this runs linearly, so the pixel's own
         // place on the ball comes out of it exactly.)
-        lobeLight = { shade: vec4(shadeAir, C.sunIn.mul(C.cloud)), lit: vec4(litAir, jit.mul(0.35)), rim: rimAir, q: vec3(0), eye: toEye, form: nLit, corner: vec3(0) };
+        const thruAir = intoAir(throughCol(albedo), at).sub(intoAir(vec3(0), at));
+        lobeLight = { shade: vec4(shadeAir, C.sunIn.mul(C.cloud)), lit: vec4(litAir, jit.mul(0.35)), rim: rimAir, q: vec3(0), eye: toEye, form: nLit, corner: vec3(0), through: vec4(thruAir, thin) };
       } else {
-        const raw = clamp(sunOn(C, nLit, uStyle2.z).add(jit.mul(0.35)), 0, 1);
-        const bands = max(uStyle.y, float(1));
-        const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
-        const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
-        colour = albedo.mul(mix(uShadeTint.mul(sky), uSunTint, lit)).add(through);
-        if (card) {
-          // (A leaf seen from the side away from the sun is lit through: a thin leaf passes on about as much
-          // light as it sends back, greener and warmer (throughTint), by how squarely the sun is behind it.)
-          const behind = max(dot(nLit, uSun).negate(), float(0)).mul(C.sunIn).mul(C.cloud);
-          colour = colour.add(albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(behind.mul(uStyle2.y).mul(0.75)));
+        const litBy = (n: Vec3): Vec3 => {
+          const raw = clamp(sunOn(C, n, uStyle2.z).add(jit.mul(0.35)), 0, 1);
+          const bands = max(uStyle.y, float(1));
+          const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
+          let c = albedo.mul(mix(uShadeTint.mul(sky), uSunTint, lit));
+          if (card || sheet) {
+            // (A leaf seen from the side away from the sun is lit through: a thin leaf passes on about as much
+            // light as it sends back, greener and warmer (throughTint), by how squarely the sun is behind it.)
+            const behind = max(dot(n, uSun).negate(), float(0)).mul(C.sunIn).mul(C.cloud).mul(mix(float(1), thin.div(max(sqrt(C.sunIn), float(0.05))), uThrough.z));
+            c = c.add(albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(behind.mul(uStyle2.y).mul(0.75)));
+          }
+          return intoAir(c, at);
+        };
+        if (sheet) {
+          // (Its top and its underside each lit as itself, as far as `round` turns it from its clump's facing; the
+          // underside a shade darker, its needles' backs. Which shows is the pixel's to say.)
+          const own = float(0.25).add(uStyle.z.mul(0.5));
+          sheetCols = { top: litBy(normalize(mix(nClump, sheetN, own))), under: litBy(normalize(mix(nClump, sheetN.negate(), own))).mul(0.82) };
         }
-        colour = intoAir(colour, at);
+        colour = litBy(nLit);
+        if (t === 2) colour = colour.add(intoAir(throughCol(albedo), at).sub(intoAir(vec3(0), at)).mul(thin).mul(throughView(nLit, toEye, float(0.5))));
+        else {
+          // (The view term once a corner, as the leaf faces (a sheet's side towards the eye): across a card it
+          // hardly changes. The leaf's own thickness is the pixel's.)
+          const nSeen = sheet ? sheetN.mul(select(dot(sheetN, toEye).lessThan(0), float(-1), float(1))) : nLit;
+          thruV = { col: vec4(intoAir(throughCol(albedo), at).sub(intoAir(vec3(0), at)).mul(thin), throughBent(nSeen, toEye)), n: nLit, eye: toEye };
+        }
       }
 
       // The corner: turned to face the eye, and spun to an angle of its own (with a flutter in the wind).
@@ -690,7 +793,15 @@ export function createTrees(options: TreesOptions): Trees {
       const sa = sin(ang);
       const corner = vec2(ca.mul(aDab.x).sub(sa.mul(aDab.y)), sa.mul(aDab.x).add(ca.mul(aDab.y)));
       const size = aDab.z.mul(fit.size).mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig));
-      if (card) {
+      if (sheet) {
+        // (A sheet's point is where it is: nothing turns it to the eye.)
+        position = at;
+        sheetFace = sheetN;
+        if (lobeLight && frontAt && frontR) {
+          const d = position.sub(frontAt);
+          lobeLight.q = d.sub(toEye.mul(dot(d, toEye))).div(frontR);
+        }
+      } else if (card) {
         // (Its twig runs along `aTangent`, fitted and turned as the tree is, and kept square to its face.)
         const aTangent = attribute<"vec4">("aTangent", "vec4");
         const twig0 = dirToWorld(T, normalize(fit.radial(aTangent.xyz).mul(vec3(fit.across, fit.crownUp, fit.across))));
@@ -748,8 +859,25 @@ export function createTrees(options: TreesOptions): Trees {
       const painterlyCell = vec2(floor(own.mul(PAINTERLY_VARIANTS - 0.001)).add(density.mul(PAINTERLY_VARIANTS)), kind);
       const disc = floor(own.mul(7.31).fract().mul(2.999));
       const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
-      const cell = real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
-      const cells = real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
+      // (A sheet: its kind's top in the sheet atlas (its underside is the row above, chosen by the pixel), a
+      // fir one of two by its own number; realistic, its kind's needle or scale spray in the leaf atlas.)
+      const sheetKind = aOffset.w;
+      const sheetCell = real ? vec2(sheetKind.mul(2), 1) : vec2(select(sheetKind.equal(float(0)), floor(own.mul(1.999)), float(2)), 0);
+      const cell = sheet ? sheetCell : real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
+      const cells = sheet && !real ? vec2(SHEET_COLS, SHEET_ROWS) : real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
+      /** A mark's alpha, kept crisp at any distance (see below). */
+      const crisp = (tex: Vec4): Float => {
+        // (Its outline kept crisp: the edge's ramp drawn over one pixel, not over however many a texel spans
+        // close to, nor smeared over a far pixel's many texels. The mips keep each cell's share at or over the
+        // cut as at full size (mips.ts), so a far crown sharpened at the cut keeps the coverage it should, and
+        // its overlapping leaves add up as near ones do: alpha to coverage gives two leaves of the same soft
+        // alpha the same samples, and a crown of soft far leaves showed the sky through.)
+        return clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
+      };
+      // (Which side of a sheet the eye sees: its top or its underside, pixel by pixel.)
+      const vSheetN = sheetFace ? varying(sheetFace, "vTreeSheet") : null;
+      const underOf = (eye: Vec3): Float => (vSheetN ? step(dot(vSheetN, eye), float(0)) : float(0));
+      const sheetUv = (uv: Vec2, under: Float): Vec2 => (sheet && !real ? uv.add(vec2(0, under.div(SHEET_ROWS))) : uv);
       // (Where in the atlas each corner is: linear across the dab, so worked out once a corner.)
       const vUv = varying(cell.add(aDab.xy.mul(0.5).add(0.5)).div(cells), "vTreeUv");
       if (lobeLight) {
@@ -761,19 +889,17 @@ export function createTrees(options: TreesOptions): Trees {
         const vEye = varying(L.eye, "vTreeEye");
         const vForm = varying(L.form, "vTreeForm");
         const vCorner = varying(L.corner, "vTreeCorner");
+        const vThru = t < 2 ? varying(L.through, "vTreeThrough") : null;
         // (Whether its marks are leaves, whose own number lights each leaf its own way.)
         const leafy = look === "painterly" || look === "sculpted" ? 1 : 0;
         m.colorNode = Fn(() => {
           handOver(vShares);
-          const tex = texture(atlas, vUv);
-          // (Its outline kept crisp however near: where a texel covers more than a pixel, the edge's ramp drawn
-          // over one pixel, not over however many a texel spans. Smaller, as the mips have it, so a far crown keeps
-          // the coverage it should.)
-          const sharp = clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
-          const texels = max(fwidth(vUv.x).mul(atlas.image.width), fwidth(vUv.y).mul(atlas.image.height));
-          const mark = vec4(tex.rgb, mix(tex.a, sharp, smoothstep(float(1.2), float(0.6), texels)));
-          Discard(mark.a.lessThan(uAlphaCut));
           const eye = normalize(vEye);
+          const under = underOf(eye);
+          const uv = sheetUv(vUv, under);
+          const tex = texture(marks, uv);
+          const mark = vec4(tex.rgb, crisp(tex));
+          Discard(mark.a.lessThan(uAlphaCut));
           // (A point on a ball seen from the eye, from where it is across the ball's disc in its radii; held
           // just inside the disc's edge, where a dab reaches past its lobe's outline.)
           const ball = (q: Vec3): Vec3 => {
@@ -783,24 +909,45 @@ export function createTrees(options: TreesOptions): Trees {
           };
           const nLobe = ball(vQ);
           const nBulge = ball(vCorner.div(0.9));
-          const n = normalize(mix(mix(normalize(vForm), nLobe, uStyle4.x), nBulge, uStyle4.y));
+          let n = normalize(mix(mix(normalize(vForm), nLobe, uStyle4.x), nBulge, uStyle4.y));
+          // (A sheet's own facing, its top's or its underside's, over its lobe's: neighbouring sheets shade as
+          // one mass, and a bough's top still catches the light its underside does not.)
+          if (vSheetN) n = normalize(mix(n, normalize(vSheetN).mul(float(1).sub(under.mul(2))), float(0.55).add(uStyle.z.mul(0.3))));
           const ownLeaf = mark.g.sub(0.5).mul(uStyle.w).mul(0.5 * leafy);
           const raw = clamp(smoothstep(uStyle2.z.negate(), uStyle3.y, dot(n, uSun)).mul(vShade.w).add(vLit.w).add(ownLeaf), 0, 1);
           const bands = max(uStyle.y, float(1));
           const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
           const edge = pow(float(1).sub(max(dot(n, eye), float(0))), float(2));
           let col = mix(vShade.xyz, vLit.xyz, lit).add(vRim.mul(edge));
+          // (The sun through the leaves, each leaf as thin as its own number makes it.)
+          const ownThin = leafy ? mark.g.mul(0.7).add(0.15) : float(0.5);
+          if (vThru) col = col.add(vThru.xyz.mul(vThru.w).mul(throughView(n, eye, ownThin)));
+          // (A bough's underside, under a sunlit top: the sun through its needles, as a card's back has it.)
+          if (vThru && vSheetN) col = col.add(vThru.xyz.mul(vThru.w).mul(under.mul(max(dot(normalize(vSheetN), uSun), float(0))).mul(0.6).mul(leafThin(ownThin))));
           // (A sprig is a little lighter than the clay it stands on.)
           col = col.mul(float(1).add(mark.b.mul(0.45)));
           return vec4(col.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
         })();
       } else {
         const vCol = varying(colour, "vTreeCol");
+        const vUnder = sheetCols ? varying(sheetCols.under, "vTreeUnder") : null;
+        const vTop = sheetCols ? varying(sheetCols.top, "vTreeTop") : null;
+        const vThru = thruV ? varying(thruV.col, "vTreeThrough") : null;
+        const vEye = sheetCols && thruV ? varying(thruV.eye, "vTreeEye") : null;
+        // (The painted look's marks have no leaves of their own: each mark one thickness.)
+        const ownLeaf = look === "stylized" ? 0 : 1;
         m.colorNode = Fn(() => {
           handOver(vShares);
-          const mark = texture(atlas, vUv);
+          const eye = vEye ? normalize(vEye) : vec3(0, 1, 0);
+          const under = underOf(eye);
+          const uv = sheetUv(vUv, under);
+          const tex = texture(marks, uv);
+          const mark = vec4(tex.rgb, crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
-          return vec4(vCol.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
+          let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
+          base = base.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w));
+          if (vThru) base = base.add(vThru.xyz.mul(vThru.w).mul(leafThin(ownLeaf ? mark.g : float(0.5))));
+          return vec4(base, mark.a);
         })();
       }
     } else {
@@ -850,7 +997,21 @@ export function createTrees(options: TreesOptions): Trees {
     const albedo = mix(mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)), vec3(0.055, 0.047, 0.038), twig.mul(0.85)).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
     // (Darker at its foot, in the grass and its own shade.)
     const foot = mix(float(0.6), float(1), smoothstep(float(0), float(1.2), surface.y));
-    const col = albedo.mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2)))).mul(foot);
+    const light = mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2))).mul(foot);
+    const col = albedo.mul(light);
+    // (Moss: where the wood faces up and holds the wet, on a limb's top; low on the trunk, and in the grooves
+    // between its buttresses, where its surface swells less than round (aRadial shorter than 1); more on its
+    // side away from the sun. None on twigs. As much as the style and the species' bark take.)
+    const facesUp = smoothstep(float(0.3), float(0.85), nWorld.y);
+    const away = smoothstep(float(0.2), float(-0.6), dot(normalize(vec2(nWorld.x, nWorld.z).add(vec2(1e-4, 0))), normalize(vec2(uSun.x, uSun.z).add(vec2(1e-4, 0)))));
+    const low = float(1).sub(smoothstep(float(0.1), float(1.6), surface.y));
+    const groove = smoothstep(float(0.99), float(0.91), length(aRadial.xyz)).mul(low);
+    const mossAmount = clamp(facesUp.mul(mix(float(0.45), float(1), away)).add(low.mul(mix(float(0.3), float(1), away)).mul(0.75)).add(groove.mul(0.8)), 0, 1)
+      .mul(smoothstep(float(0.025), float(0.07), thick))
+      .mul(uThrough.w.mul(T.srow(3).w).mul(1.6));
+    // (A painter's moss a soft yellow-green; a real one darker, olive.)
+    const mossAlbedo = mix(vec3(0.2, 0.3, 0.06), vec3(0.075, 0.1, 0.028), uStyle3.z);
+    const vMoss = varying(vec4(intoAir(mossAlbedo.mul(light), at), mossAmount), "vWoodMoss");
     m.positionNode = at;
     const vCol = varying(intoAir(col, at), "vWoodCol");
     const vShares = varying(sharesFor(t, T), "vWoodShares");
@@ -862,7 +1023,15 @@ export function createTrees(options: TreesOptions): Trees {
       const round = atan(vBark.y, vBark.x);
       const ridge = sin(round.mul(9).add(sin(vBark.z.mul(1.7).add(round.mul(2))).mul(1.4)));
       const furrows = mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z);
-      return vec4(vCol.mul(furrows), 1);
+      // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
+      // in patches, a cheap wobble of the furrows' own coordinates.)
+      const patch = sin(round.mul(7).add(vBark.z.mul(4.3))).mul(sin(round.mul(4).sub(vBark.z.mul(6.1)))).mul(0.22).add(sin(vBark.z.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(vBark.z.mul(27.1)))).mul(0.16)).add(0.5);
+      const inFurrow = float(1).sub(smoothstep(float(-0.4), float(0.7), ridge));
+      const where = patch.mul(0.6).add(inFurrow.mul(0.4));
+      const real = smoothstep(float(1).sub(vMoss.w), float(1.18).sub(vMoss.w), where);
+      const cover = mix(smoothstep(float(0.4), float(0.5), vMoss.w), real, uStyle3.z);
+      const moss = vMoss.xyz.mul(mix(float(1), patch.mul(0.5).add(0.75), uStyle3.z));
+      return vec4(mix(vCol.mul(furrows), moss, cover), 1);
     })();
     m.name = `trees-wood-${t}`;
     return m;
@@ -890,6 +1059,17 @@ export function createTrees(options: TreesOptions): Trees {
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
       mesh.name = m.name;
+      group.add(mesh);
+      geometries.push(g);
+      materials.push(m);
+      meshes.push({ mesh, tier: t, wood: false });
+    }
+    if (sheetSets[t].index.length > 0) {
+      const g = geometryOf(sheetSets[t], sheetArgs, t);
+      const m = dabMaterial(t, false, false, true);
+      const mesh = new THREE.Mesh(g, m);
+      mesh.frustumCulled = false;
+      mesh.name = `trees-sheets-${t}`;
       group.add(mesh);
       geometries.push(g);
       materials.push(m);
@@ -997,7 +1177,7 @@ export function createTrees(options: TreesOptions): Trees {
   const pv = new THREE.Matrix4();
   const size = new THREE.Vector2();
 
-  const pieces = TIER_SHAPES.map((_, t) => ({ dabs: dabSets[t].index.length / 6, wood: woodSets[t].index.length / 3 }));
+  const pieces = TIER_SHAPES.map((_, t) => ({ dabs: dabSets[t].index.length / 6, wood: woodSets[t].index.length / 3, sheets: sheetSets[t].index.length / 3 }));
 
   return {
     object: group,
@@ -1028,6 +1208,7 @@ export function createTrees(options: TreesOptions): Trees {
       uStyle4.value.set(style.lobe, style.bulge, style.warm, style.cool);
       uStyle5.value.set(style.chroma, style.rim, style.sprigs, style.bright);
       uLeafSize.value = style.leafSize;
+      uThrough.value.set(style.throughPower, style.throughWarp, style.throughVary, style.moss);
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);
@@ -1052,10 +1233,11 @@ export function createTrees(options: TreesOptions): Trees {
       // apart from any geometry: none of them is freed unless disposed by name.)
       cull.dispose();
       finish.dispose();
-      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs]) a.dispose();
+      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       atlas.dispose();
+      sheetAtlas?.dispose();
       if (shadeNode.value !== shadeTex) shadeNode.value.dispose();
       shadeTex.dispose();
     },
