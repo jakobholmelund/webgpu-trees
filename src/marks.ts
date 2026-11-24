@@ -78,6 +78,8 @@ interface Leaf {
 }
 
 interface Layer {
+  /** Texels across its square. */
+  size: number;
   /** Tone, number and sprig, each premultiplied by coverage. */
   tone: Float32Array;
   own: Float32Array;
@@ -85,9 +87,9 @@ interface Layer {
   cover: Float32Array;
 }
 
-function layer(): Layer {
-  const n = MARK_CELL * MARK_CELL;
-  return { tone: new Float32Array(n), own: new Float32Array(n), sprig: new Float32Array(n), cover: new Float32Array(n) };
+function layer(size = MARK_CELL): Layer {
+  const n = size * size;
+  return { size, tone: new Float32Array(n), own: new Float32Array(n), sprig: new Float32Array(n), cover: new Float32Array(n) };
 }
 
 function rng(seed: number): () => number {
@@ -99,7 +101,8 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
 /** Draw a leaf over what is in the layer, with its thin shadow on what it lies over. */
 function drawLeaf(L: Layer, f: Leaf): void {
-  const half = MARK_CELL / 2;
+  const CELL = L.size;
+  const half = CELL / 2;
   const px = 1 / half;
   const peak = Math.pow(f.p / (f.p + f.q), f.p) * Math.pow(f.q / (f.p + f.q), f.q);
   const ca = Math.cos(f.ang);
@@ -109,9 +112,9 @@ function drawLeaf(L: Layer, f: Leaf): void {
   const xs = [f.x, f.x + ca * f.len];
   const ys = [f.y, f.y + sa * f.len];
   const i0 = Math.max(0, Math.floor((Math.min(...xs) - pad + 1) * half));
-  const i1 = Math.min(MARK_CELL - 1, Math.ceil((Math.max(...xs) + pad + 1) * half));
+  const i1 = Math.min(CELL - 1, Math.ceil((Math.max(...xs) + pad + 1) * half));
   const j0 = Math.max(0, Math.floor((Math.min(...ys) - pad + 1) * half));
-  const j1 = Math.min(MARK_CELL - 1, Math.ceil((Math.max(...ys) + pad + 1) * half));
+  const j1 = Math.min(CELL - 1, Math.ceil((Math.max(...ys) + pad + 1) * half));
   const shadow = 4 * px;
   for (let j = j0; j <= j1; j++) {
     const y = (j + 0.5) / half - 1;
@@ -126,7 +129,7 @@ function drawLeaf(L: Layer, f: Leaf): void {
       let edge: number;
       if (u <= 0 || u >= 1) edge = -Math.max(-s, s - f.len, 0) - Math.abs(t);
       else edge = (f.wid * Math.pow(u, f.p) * Math.pow(1 - u, f.q)) / peak - Math.abs(t);
-      const o = j * MARK_CELL + i;
+      const o = j * CELL + i;
       const a = clamp01(edge / (RAMP * px) + 0.5);
       if (a <= 0) {
         // (Just outside its edge: its shadow on what it lies over.)
@@ -303,6 +306,7 @@ function bough(seed: number, scale: number): Leaf[] {
 
 /** Write one cell's layer into an atlas at column `col`, row `row` (row 0 is v = 0). */
 function put(data: Uint8Array, width: number, col: number, row: number, L: Layer): void {
+  const CELL = L.size;
   let sum = 0;
   let wsum = 0;
   for (let n = 0; n < L.cover.length; n++) {
@@ -310,11 +314,11 @@ function put(data: Uint8Array, width: number, col: number, row: number, L: Layer
     wsum += L.cover[n];
   }
   const mean = wsum > 0 ? Math.min(1, sum / wsum) : 0.85;
-  for (let j = 0; j < MARK_CELL; j++) {
-    for (let i = 0; i < MARK_CELL; i++) {
-      const n = j * MARK_CELL + i;
+  for (let j = 0; j < CELL; j++) {
+    for (let i = 0; i < CELL; i++) {
+      const n = j * CELL + i;
       const c = L.cover[n];
-      const o = ((row * MARK_CELL + j) * width + col * MARK_CELL + i) * 4;
+      const o = ((row * CELL + j) * width + col * CELL + i) * 4;
       const k = Math.round(clamp01(c) * 255);
       data[o] = Math.round(clamp01(k > 0 ? L.tone[n] / c : mean) * 255);
       data[o + 1] = Math.round(clamp01(k > 0 ? L.own[n] / c : 0.5) * 255);
@@ -337,6 +341,133 @@ export function painterlyAtlasPixels(): { data: Uint8Array; width: number; heigh
       put(data, width, col, row, L);
     }
   });
+  return { data, width, height };
+}
+
+/**
+ * The kinds of conifer bough a sheet carries (geometry.ts `sheetPieces`): a fir's or a spruce's flat comb of
+ * short needles, a cedar's lace of scales.
+ */
+export const SHEET_KINDS = ["fir", "scale"] as const;
+export type SheetKind = (typeof SHEET_KINDS)[number];
+/** The sheet atlas: a column to each top (two firs, a cedar), its underside in the row above. */
+export const SHEET_COLS = 3;
+export const SHEET_ROWS = 2;
+/** A sheet's picture, texels square: a bough a metre or two long is seen close to, under it. */
+export const SHEET_CELL = 512;
+/** A sheet kind's columns, its top's: a fir has two, chosen by a sheet's own number. */
+export const SHEET_COLUMNS: Readonly<Record<SheetKind, readonly number[]>> = { fir: [0, 1], scale: [2] };
+
+/**
+ * A conifer's bough as a painter lays one, seen from above, for a sheet lying along it: its foot at the
+ * bottom of the cell (y -1), its tip at the top. A twig up the middle, side shoots off it reaching forward,
+ * the longest a third of the way out and shorter to a point at its tip, each combed with needles (a fir) or
+ * laced with scales (a cedar); a darker body under the needles,
+ * so a gap between shoots reads as the bough's shade and not the sky. `top` lays the needles over the
+ * body, light; the underside lays the body over the needles, dark, the fringe of needles hanging round it.
+ * Both sides are the same shapes, so a sheet's outline is the same seen from above or below.
+ */
+function sheetBough(kind: SheetKind, seed: number): { body: Leaf[]; needles: Leaf[] } {
+  const rnd = rng(seed);
+  const body: Leaf[] = [];
+  const needles: Leaf[] = [];
+  const foot = -0.92;
+  const reach = 1.8;
+  const ribAt = (s: number) => ({ x: 0.04 * Math.sin(s * 5 + seed), y: foot + reach * s });
+  const needle = (x: number, y: number, ang: number, len: number, tone: number, own: number, wide = 0.09) => {
+    const fit = inside(x, y, ang, len);
+    if (fit <= 0.2) return;
+    needles.push({ x, y, ang, len: len * fit, wid: len * fit * wide, p: 0.35, q: 1, bend: (rnd() - 0.5) * 0.12, tone, own, sprig: 0 });
+  };
+  // (The twig up the middle: a slender dark blade.)
+  body.push({ x: 0, y: foot, ang: Math.PI / 2, len: reach * 0.97, wid: 0.028, p: 0.2, q: 0.6, bend: 0.02, tone: 0.55, own: rnd(), sprig: 0 });
+  // (How far out a shoot reaches at s along the twig: widest a third of the way, to a point at the tip.)
+  const envelope = (s: number) => (s < 0.3 ? 0.55 + 1.5 * s : 1 - 0.95 * ((s - 0.3) / 0.7) ** 1.2);
+  // (A fir's or a cedar's: side shoots alternate off the twig, reaching forward, each combed with needles or
+  // laced with scales; side shoots off the longer ones.)
+  const scale = kind === "scale";
+  const shoots: { x: number; y: number; a: number; len: number; own: number; shade: number }[] = [];
+  shoots.push({ x: 0, y: foot, a: Math.PI / 2, len: reach * 0.95, own: rnd(), shade: 0.95 });
+  let side = rnd() < 0.5 ? 1 : -1;
+  for (let s = 0.05 + rnd() * 0.04; s < 0.9; s += 0.085 + rnd() * 0.035) {
+    const p = ribAt(s);
+    const len = (0.7 + rnd() * 0.25) * envelope(s) * (rnd() < 0.15 ? 0.7 : 1);
+    const a = Math.PI / 2 - side * (0.9 + rnd() * 0.3);
+    const own = rnd();
+    const shade = 0.82 + rnd() * 0.18;
+    shoots.push({ x: p.x, y: p.y, a, len, own, shade });
+    if (len > 0.35) {
+      for (const g of [0.35, 0.65]) {
+        const q = { x: p.x + Math.cos(a) * len * g, y: p.y + Math.sin(a) * len * g };
+        const s2 = rnd() < 0.5 ? 1 : -1;
+        shoots.push({ x: q.x, y: q.y, a: a - s2 * (0.7 + rnd() * 0.3), len: len * (0.32 + rnd() * 0.12), own: Math.min(1, Math.max(0, own + (rnd() - 0.5) * 0.3)), shade: shade * (0.95 + rnd() * 0.08) });
+      }
+    }
+    side = -side;
+  }
+  // (The body: dark strokes along under each shoot, inside the needles' reach, so between shoots is shade.)
+  for (const sh of shoots) {
+    const len = sh.len * 0.92;
+    body.push({ x: sh.x, y: sh.y, ang: sh.a, len, wid: Math.min(0.09, len * 0.16), p: 0.5, q: 0.9, bend: 0, tone: 0.6 + rnd() * 0.06, own: rnd(), sprig: 0 });
+  }
+  for (const sh of shoots) {
+    body.push({ x: sh.x, y: sh.y, ang: sh.a, len: sh.len, wid: 0.016, p: 0.2, q: 0.6, bend: 0, tone: 0.58, own: sh.own, sprig: 0 });
+    const step = scale ? 0.045 : 0.032;
+    for (let s = 0.04; s < 1; s += step * (0.8 + rnd() * 0.4)) {
+      const x = sh.x + Math.cos(sh.a) * sh.len * s;
+      const y = sh.y + Math.sin(sh.a) * sh.len * s;
+      const taper = 1 - 0.5 * s * s;
+      const own = Math.min(1, Math.max(0, sh.own + (rnd() - 0.5) * 0.25));
+      if (scale) {
+        // (A cedar's shoot: small overlapping scales either side, rounded, the spray flat and lacy.)
+        for (const sd of [1, -1]) {
+          const ang = sh.a - sd * (0.5 + rnd() * 0.3);
+          const len = (0.09 + rnd() * 0.03) * taper;
+          const fit = inside(x, y, ang, len);
+          if (fit > 0.3) needles.push({ x, y, ang, len: len * fit, wid: len * fit * 0.34, p: 0.7, q: 1.1, bend: 0, tone: sh.shade * (0.88 + rnd() * 0.12), own, sprig: 0 });
+        }
+      } else {
+        // (A fir's comb: short needles nearly square to the shoot and a little forward, both sides.)
+        for (const sd of [1, -1]) {
+          if (rnd() < 0.06) continue;
+          needle(x, y, sh.a - sd * (0.9 + rnd() * 0.35), (0.11 + rnd() * 0.05) * taper, sh.shade * (0.86 + rnd() * 0.14), own, 0.12);
+        }
+      }
+    }
+    // (A tuft at its tip.)
+    const tx = sh.x + Math.cos(sh.a) * sh.len;
+    const ty = sh.y + Math.sin(sh.a) * sh.len;
+    for (let k = 0; k < 4; k++) needle(tx, ty, sh.a + (k - 1.5) * 0.4 + (rnd() - 0.5) * 0.2, 0.06 + rnd() * 0.025, sh.shade, sh.own, scale ? 0.4 : 0.09);
+  }
+  return { body, needles };
+}
+
+/**
+ * The sheet atlas's texels, RGBA8: each kind of bough's top in the lower row, its underside in the upper,
+ * cell for cell the same outline. The top: needles over the body, light, the shoots each a tone of their
+ * own. The underside: the dark body over the needles, so seen from below a bough is its shade with a fringe
+ * of needles round it, as boughs overhead are.
+ */
+export function sheetAtlasPixels(): { data: Uint8Array; width: number; height: number } {
+  const width = SHEET_CELL * SHEET_COLS;
+  const height = SHEET_CELL * SHEET_ROWS;
+  const data = new Uint8Array(width * height * 4);
+  const cells: [SheetKind, number][] = [
+    ["fir", 0],
+    ["fir", 1],
+    ["scale", 2],
+  ];
+  for (const [kind, col] of cells) {
+    const { body, needles } = sheetBough(kind, 6007 + 389 * col);
+    const top = layer(SHEET_CELL);
+    for (const leaf of body) drawLeaf(top, leaf);
+    for (const leaf of needles) drawLeaf(top, leaf);
+    put(data, width, col, 0, top);
+    const under = layer(SHEET_CELL);
+    for (const leaf of needles) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.74 });
+    for (const leaf of body) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.78 });
+    put(data, width, col, 1, under);
+  }
   return { data, width, height };
 }
 
