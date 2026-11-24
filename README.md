@@ -14,7 +14,7 @@ WebGPU only (three.js r187, `three/webgpu`).
 
 ```
 src/   the package: imports three and nothing else
-lab/   the lab: ground, sky, and the package's trees on it
+lab/   the lab: ground, sky, and the package's trees on it; and its gallery
 ```
 
 `pnpm test` holds the walls: the package imports only three, the lab
@@ -226,6 +226,43 @@ tiers show, how many variants). *Preset* is all of it as JSON; *Measure*
 times the graphics card over fixed views. H puts the panels away, `[` and
 `]` step the scenes. `?scene=`, `?look=`, `?species=`, `?hour=`, `?wind=`, `?eye=`
 and `?fresh` (ignore what the lab kept) set it from the address.
+
+## The gallery
+
+`/lab/gallery.html` (*Gallery* on the lab's bar) is where the trees are
+judged by eye, and where one commit's trees are set beside another's. Every
+species, in one look (or every look of one species), from the same five
+views: the **tee** (side-on from 1.6 m, two and a half crown widths off, or
+further if the tree would not fit), the **fairway** (one tree from 60 m),
+**far** (a group of five from 150 m), **under the crown** looking up (at the
+edge of a crown that comes down to the ground), and the **trunk** close, from
+its foot to a little above its first fork. Same sun, wind and moment for
+every cell, the package's own species and seeds: the same commit draws the
+same pixels. Beside each species are its botanical name, its regions and the
+links in `lab/REFERENCE.md` (with small copies the browser loads from
+Wikimedia Commons; none is kept here).
+
+One renderer off the page draws each cell into a small picture in turn. A
+cell is a piece of a 1080-line, 50 degree screen: the piece the trees fill,
+shrunk to fit the cell, never enlarged beyond the screen's own pixels; the
+trees choose their tier as they would on that screen, and each cell's
+caption says which tier drew them, from how far, at what field of view.
+
+*Save set* downloads one contact sheet, named by the commit (and `-dirty`
+when tracked files differ from it), the look, the hour and the wind:
+`trees-9029955-painterly-h9-w4.png`. *Compare* takes two sheets and shows
+them side by side, flickering, or as their difference (with how many pixels
+differ). `?look=` (or `all` with `?one=`), `?species=`, `?region=`, `?kind=`,
+`?views=`, `?hour=`, `?wind=`, `?cell=` (width in pixels), `?screen=` (lines)
+and `?photos=<address>` (a photograph of your own per species,
+`<address><name>.jpg`, from a folder you serve yourself) set it from the
+address.
+
+For scripts: `await __gallery.render({ look, views, species })` gives every
+cell as a PNG data URL with the tiers drawn; `await __gallery.sheet({...})`
+the contact sheet; and with the dev server started as
+`GALLERY_OUT=<folder> pnpm dev`, `await __gallery.save({...})` writes the
+sheet into that folder and returns where.
 
 ## How a tree grows
 
