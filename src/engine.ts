@@ -773,18 +773,28 @@ export function createTrees(options: TreesOptions): Trees {
         // vertices, was most of what a conifer cost.)
         frontAt = lobeAt;
         frontR = lobeR;
+      } else if (lobeAt && lobeR && t === 2) {
+        // (A far dab is a few pixels, standing for a gathered group of clumps: lit by its own lobe. The search
+        // below, for every vertex of every far crown, cost more than the rest of their light.)
+        frontAt = lobeAt;
+        frontR = lobeR;
       } else if (lobeAt && lobeR) {
         // (Statements, so a function of their own: TSL keeps a loop only inside one.)
+        // (In the tree's leant frame, its turn and its foot undone: the eye and the ray carried in once, so each
+        // lobe needs only fitting and leaning, not the whole way into the world. Turning and moving keep lengths,
+        // so the balls are the same balls and the ray meets them where it did.)
         const front = Fn(() => {
-          const best = vec4(lobeAt, lobeR).toVar();
+          const best = vec4(dirToTree(T, lobeAt.sub(T.r0.xyz)), lobeR).toVar();
           const nearest = float(1e9).toVar();
-          const ray = normalize(at.sub(cameraPosition));
+          const eye = dirToTree(T, cameraPosition.sub(T.r0.xyz));
+          const ray = dirToTree(T, normalize(at.sub(cameraPosition)));
           Loop({ start: uint(0), end: uint(T.vrow1.w), type: "uint", condition: "<" }, ({ i }) => {
             const L = lobesR.element(uint(aLimb.w).mul(MAX_LOBES).add(i));
             If(L.w.greaterThan(0), () => {
-              const c = toWorld(T, fit.point(L.xyz).add(blown));
+              const q = fit.point(L.xyz).add(blown);
+              const c = vec3(q.x.add(T.r3.x.mul(q.y)), q.y, q.z.add(T.r3.y.mul(q.y)));
               const r = L.w.mul(fit.size);
-              const oc = c.sub(cameraPosition);
+              const oc = c.sub(eye);
               const along = dot(oc, ray);
               const miss = dot(oc, oc).sub(along.mul(along));
               const enter = along.sub(sqrt(max(r.mul(r).sub(miss), float(0))));
@@ -796,7 +806,7 @@ export function createTrees(options: TreesOptions): Trees {
           });
           return best;
         })();
-        frontAt = front.xyz;
+        frontAt = T.r0.xyz.add(dirToWorld(T, front.xyz));
         frontR = max(front.w, float(0.05));
       }
 
@@ -956,7 +966,7 @@ export function createTrees(options: TreesOptions): Trees {
       const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
       // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
       // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
-      const markSize = aDab.z.mul(fitOf(T).size).mul(uStyle2.x);
+      const markSize = aDab.z.mul(fit.size).mul(uStyle2.x);
       let share: Float = float(LEAF_SHARE.broad);
       let allowed: Float = float(LEAF_SIZE_OF.broad);
       MARK_KINDS.forEach((k, row) => {
