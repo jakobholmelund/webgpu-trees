@@ -827,7 +827,10 @@ upper crowns to Rautiainen's exponents.
 - **Three tiers, chosen on the graphics card.** A compute pass puts every
   tree in view on the list of the tier its size in the picture calls for:
   near (all its wood, down to the twigs, and three dabs to a clump of
-  leaves, one more over any of its twigs they leave out), mid (its limbs
+  leaves, one more over any of its twigs they leave out; a clump finer than
+  its kind's, a narrow or young crown's, fewer and bigger, by its area, so a
+  crown's near dabs follow the crown and not how finely it is divided:
+  `GrownTree.clumpShare`, `dabsOf`), mid (its limbs
   and branches, its clumps gathered into at most 56 broad dabs), far (16
   dabs and a stroke for its trunk). A conifer's boughs, near and mid, are
   sheets (see *Boughs*). Each tier is one mesh holding every variant, drawn
@@ -1321,6 +1324,35 @@ spoil). Where the owner gave a picture again at 2048 pixels, that one is used.
   sampled four times a pixel. On the graphics card: the bark set's layers
   (1024 square, mipmapped, two textures) about 11 MB each, and the cards 4
   MB a species row (512 texels a card for up to six species, 256 beyond).
+
+## What the trees cost, offline
+
+`tools/cost/course.ts` counts what a course's trees cost the graphics card
+from its 1st tee, without drawing or timing anything (the shared graphics
+card's timings are for agreed windows): the trees the game hands over for a
+hole, each its species as the game chooses it (read from a worldgolf
+checkout, `--game`, as its `scripts/tree-mix.mjs` reads a course), planned and
+grown as `createTrees` grows them, and put through the engine's cull and tiers
+from the game's bench camera (4 m behind the tee looking at the pin, 48°, a
+2880×1800 picture). For each tier: the trees it draws, its cards (dabs),
+vertices (the dabs', the wood's, the fronds'), and pixels: the dabs' quads
+clipped to the picture, summed over every layer (overdraw), a tree being
+handed over split between its two tiers as their pattern splits it.
+`--lib <checkout>` counts another commit's trees, `--mix-lib <checkout>` holds
+the mix to another's species:
+
+```
+node tools/cost/course.ts c01 c10 --species
+node tools/cost/course.ts c01 --lib ../old-checkout --mix-lib .
+```
+
+On Riviera's 1st hole (2026-11-25), whole hole in view: a66c411 as the game
+had it 7.5k near cards, 876k vertices, 26.2 Mpx; 3afffb6 (finer clumps for
+the courses' sizes) 14.5k, 1,011k, 28.5 Mpx; fewer dabs to a finer clump
+8.2k, 985k, 26.0 Mpx. Near, the wood is most of the vertices (850k of the
+985k: every twig, each vertex marching the light box as a dab's does), and
+the dabs most of the pixels (a near crown's dabs cover it 5 to 15 times).
+`test/cost.test.ts` holds a fitted tree's near cards under a bound.
 
 ## Left out, for now
 

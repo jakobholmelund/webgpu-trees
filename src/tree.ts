@@ -163,4 +163,10 @@ export interface GrownTree {
   palm?: PalmCrown;
   /** Its leaves' area, one side (m²), where it is known (a palm's, frond by frond); else its species' leaf area index makes it. */
   leafArea?: number;
+  /**
+   * How big its clumps are beside its kind's at its height (0..1; left out, 1): a narrow or young crown's are
+   * finer than its specimen's (grow.ts `CLUMP_NARROW`), more of them. Its near dabs follow its crown, not its
+   * clumps: fewer to a finer clump (geometry.ts `dabPieces`).
+   */
+  clumpShare?: number;
 }

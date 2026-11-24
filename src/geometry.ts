@@ -136,7 +136,8 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
         const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
         const r = cl.radius[c];
         // (A clump deep in the crown is mostly hidden by those outside it: one dab is all of it that shows.)
-        const dabs = cl.depth[c] > 0.65 ? 1 : shape.dabsPerClump;
+        // (And a finer clump than its kind's, fewer: as many dabs over the crown as its kind's clumps would lay.)
+        const dabs = cl.depth[c] > 0.65 ? 1 : dabsOf(shape.dabsPerClump, tree.clumpShare ?? 1, hash01(c * 31, v * 977 + 5));
         const laid: number[][] = [];
         for (let d = 0; d < dabs; d++) {
           const own = hash01(c * 31 + d, v * 977 + 3);
@@ -151,7 +152,7 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
             off = off.map((q) => q / l);
           }
           const reach = dabs > 1 ? r * 0.5 : 0;
-          const size = dabs > 1 ? shape.dabSize : 1.45;
+          const size = dabs >= shape.dabsPerClump ? shape.dabSize : dabs > 1 ? DAB_TWO : 1.45;
           const at = [centre[0] + off[0] * reach, centre[1] + off[1] * reach, centre[2] + off[2] * reach];
           laid.push([...at, r * size * (0.85 + own * 0.3)]);
           quad(at, laid[d][3], own, n, cl.depth[c], off, 0, limbOf(cl.node[c]), v);
@@ -174,6 +175,20 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
     b.end();
   });
   return b.done();
+}
+
+/** Two dabs to a clump: each this big beside it, between three's (`TierShape.dabSize`) and one's (1.45). */
+const DAB_TWO = 1.2;
+
+/**
+ * How many dabs a clump takes, of `most`, its clump this share of its kind's size (`GrownTree.clumpShare`):
+ * as many as cover the same share of the crown, `most` times its area, at least one; a fraction made up by
+ * the clump's own number `u`.
+ */
+export function dabsOf(most: number, share: number, u: number): number {
+  const want = Math.max(1, most * Math.min(1, share) ** 2);
+  const n = Math.floor(want);
+  return Math.min(most, n + (u < want - n ? 1 : 0));
 }
 
 function trunkHalfWidth(tree: GrownTree): number {

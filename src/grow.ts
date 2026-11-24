@@ -606,6 +606,9 @@ export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?:
   // CLUMP_OF_COLUMN. A conifer's boughs are laid whorl by whorl, as long as its crown is wide, whatever its shape.)
   const ofCrown = budGrown && sz.crownRadius / Math.max(0.01, sz.height - sz.crownBase) < NARROW ? CLUMP_OF_COLUMN : CLUMP_OF_CROWN;
   const clumpR = species.architecture === "palm" ? own : Math.min(own, ofCrown * sz.crownRadius);
+  // (How fine that is beside its kind's clump at its height, as a crown of its kind's width would have them.)
+  const kinds = Math.min(0.5 * species.clumpSize * Math.sqrt(sz.height / species.height), CLUMP_OF_CROWN * sz.crownRadius);
+  const clumpShare = budGrown ? Math.min(1, clumpR / Math.max(1e-6, kinds)) : 1;
   // (Its form at the foot, from its own seed: one stem, a forked trunk, or a clump of stems.)
   const form = species.architecture === "broadleaf" ? formOf(species, seed, st) : { stems: 1, fork: 1, clump: false, join: 0 };
   let hung: Hung;
@@ -629,7 +632,8 @@ export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?:
   const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st);
   const habit = { sprayHang: species.sprayHang, pads: species.pads, clusters: species.clusters };
   const said = Object.values(habit).some((v) => v !== undefined && v > 0);
-  return species.buttress || said ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}) } : tree;
+  const fine = clumpShare < 1 - 1e-6;
+  return species.buttress || said || fine ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}), ...(fine ? { clumpShare } : {}) } : tree;
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */
