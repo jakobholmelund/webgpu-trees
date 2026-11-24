@@ -192,12 +192,15 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    shoots on bare, branching limbs, its inside shed as it shades.
 4. **Leaves** hang in clumps on the lit shoots near their twigs' ends (the
    deeper the species keeps its leaves, `foliageDepth`, the further back),
-   bigger the more light they have.
+   bigger the more light they have, and never more than a fifth of the
+   crown's radius round (a crown grown narrow in a wood is many sprays, not
+   a few balls on a stick).
 5. **The wood made good**: smoothed (twice, forks held), bowed by its
    weight (thin wood more, `bend` down more), and its straight runs joined
    into single pieces. A tree that weeps then hangs its whips.
 6. **Conifers** grow whorl by whorl instead: a leader to the top and
-   `whorl` boughs to each of `whorlsPerMetre`, each as long as the outline
+   `whorl` boughs to each of `whorlsPerMetre` (closer in a narrow crown,
+   for its interwhorl branches), each as long as the outline
    lets it be (some missing, some broken short), with side shoots along
    their leafy parts; then smoothed and bowed. **Palms** grow a head of
    fronds on one stem.
@@ -210,7 +213,16 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    branch's cross-section to the 2.4 carries all the twigs beyond it, the
    branches it has shed and the pipes its own length has outlived, so at a
    fork d^Δ = Σ dᵢ^Δ with Δ near 2.1 (measured trees: 1.8 to 2.3, Eloy
-   2011); scaled so the trunk has its measured radius at breast height.
+   2011). A bole under a crown that starts above breast height has a taper
+   of its own instead: its radius goes as the length of stem above it to
+   the 0.6 (between a cone and a paraboloid, as measured boles are), with
+   its roots flaring at its foot, at its measured radius at breast height;
+   the crown's wood is scaled to meet it where the crown starts. (The pipe
+   model alone, reckoned in a small crown's short internodes, swelled a
+   long clean bole to many times its top's thickness: a thread under the
+   crown.) A species that keeps them (`boleStubs`: birch, oak, alder) has
+   dead stubs and the odd small twig along a long bole, more just under
+   the crown; leafless.
 
 `test/structure.test.ts` holds the wood to what measured trees are: every
 species' forks to Leonardo's rule, a broadleaf's great limbs straight

@@ -120,6 +120,12 @@ export interface TreeSpecies {
    * each of its pieces of wood to be kept (Takenaka 1994). Left out: from `openness` and `branchiness`.
    */
   shed?: number;
+  /**
+   * How many dead branch stubs and small twigs a long clean bole keeps, 0..1: the lower branches a tree
+   * grown in a wood has lost, broken off short, and the odd shoot from a dormant bud on its stem (a
+   * birch's, an oak's, an alder's). A pine or a beech prunes itself clean: 0 or left out, none.
+   */
+  boleStubs?: number;
 
   // The leaves, gathered into clumps: a twig's spray, a branchlet's.
   leafKind: LeafKind;
@@ -191,6 +197,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorlsPerMetre: 0,
     branchiness: 0.8,
     scaffolds: 8,
+    boleStubs: 0.8,
     leafKind: "broad",
     clumpSize: 1.6,
     clumpSpread: 0.35,
@@ -430,6 +437,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.5,
+    boleStubs: 0.7,
     leafKind: "small",
     clumpSize: 0.8,
     clumpSpread: 0.35,
@@ -465,6 +473,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.8,
+    boleStubs: 0.6,
     leafKind: "broad",
     clumpSize: 1.2,
     clumpSpread: 0.3,
@@ -1130,6 +1139,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     whorl: 0,
     whorlsPerMetre: 0,
     branchiness: 0.85,
+    boleStubs: 0.5,
     leafKind: "broad",
     clumpSize: 1.7,
     clumpSpread: 0.3,
@@ -1239,6 +1249,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.lobes !== undefined && !(s.lobes >= 0 && s.lobes <= 1)) out.push("lobes must be 0..1");
   if (s.scaffolds !== undefined && !(Number.isInteger(s.scaffolds) && s.scaffolds >= 0 && s.scaffolds <= 12)) out.push("scaffolds must be a whole number 0..12");
   if (s.shed !== undefined && !(s.shed >= 0 && s.shed <= 1)) out.push("shed must be 0..1");
+  if (s.boleStubs !== undefined && !(s.boleStubs >= 0 && s.boleStubs <= 1)) out.push("boleStubs must be 0..1");
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
   if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {

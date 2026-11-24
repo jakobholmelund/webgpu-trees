@@ -38,7 +38,10 @@
 // Then the same for all: clumps that crowd each other are thinned, the tree is
 // fitted to its size (a survey measured it, and a ball meets it there), and the
 // radii come from the pipe model: a branch carries the wood of all it bears,
-// of the branches it has shed, and of the twigs it once bore.
+// of the branches it has shed, and of the twigs it once bore. A bole under a
+// high crown has its own taper (its growth over years, not its crown's
+// twigs), and the crown's wood meets it; a species that keeps them has dead
+// stubs and the odd twig along a long clean bole.
 //
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
@@ -167,6 +170,12 @@ const SHOOT_ANGLE = 55 * DEG;
 const BOUGH_BROKEN = 0.2;
 /** How far a conifer sags under its weight, as a share of what a broadleaf of its bend does. */
 const CONIFER_SAG = 0.5;
+/**
+ * The furthest apart a conifer's whorls are, as a share of its crown's radius: a crown grown narrow in a
+ * wood has short boughs, and between its whorls the interwhorl branches a forest fir or spruce carries
+ * fill it, where a year's whorls alone would leave it a few tufts on a pole.
+ */
+const WHORL_OF_CROWN = 0.3;
 
 // Palms.
 /** How far a frond leaves the crown from the level: the youngest, nearly upright ... */
@@ -232,6 +241,8 @@ const PALM_THIN = 0.75;
 /** How far one clump's size strays from the species' (as shares of it), at the most. */
 const CLUMP_MIN = 0.55;
 const CLUMP_MAX = 1.6;
+/** The largest a clump's radius may be, as a share of the crown's radius: five clumps across it at the least. */
+const CLUMP_OF_CROWN = 0.2;
 
 // Fitting to size.
 /** How far the outermost clump reaches, as a share of the crown radius. */
@@ -250,6 +261,34 @@ const PIPE = 2.4;
  * leaves it once carried and lost. Each internode of wood carries this share more pipes than it hands on.
  */
 const DISUSED = 0.08;
+
+/**
+ * A bole's taper: its radius goes as the length of stem above to this power (a cone is 1, a paraboloid 0.5;
+ * measured boles between the butt and the crown are near 0.5 to 0.7).
+ */
+const BOLE_TAPER = 0.6;
+/** How much thicker a stem is at the ground than its taper alone, where its roots flare out. */
+const FLARE = 0.3;
+/** How far up the flare reaches (m, its e-folding height): this, and this much more for each metre of trunk radius. */
+const FLARE_FROM = 0.15;
+const FLARE_PER_RADIUS = 1.2;
+/** Where a bole is cut near its foot, in flare heights, to draw the flare's curve. */
+const FLARE_CUTS = [0.4, 1, 2];
+/** The longest piece of bole above the flare (m). */
+const BOLE_PIECE = 0.6;
+
+// Stubs on a clean bole.
+/** Stubs on a metre of bole, at boleStubs 1. */
+const STUBS_PER_METRE = 1.1;
+/** The lowest a stub is (m, or breast height if higher), and the highest, as a share of the crown's base. */
+const STUB_FROM = 1;
+const STUB_TOP = 0.96;
+/** A stub's least radius, as a share of the trunk's at its foot: thin enough to be a stub, thick enough to be drawn close to. */
+const STUB_THINNEST = 0.08;
+/** The share of stubs that a living twig goes on from. */
+const STUB_TWIG = 0.3;
+/** The longest a stub is (m): what is left of a dead branch once the wind has had the rest. */
+const STUB_LONGEST = 0.6;
 
 /** Where a trunk's radius is measured (m): breast height. */
 export const BREAST_HEIGHT = 1.3;
@@ -275,8 +314,10 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number): Gr
   const rng = new Random(seed);
   const wood = newWood();
   // The species' clump, scaled by the tree's height against the species' own (a younger tree's twigs
-  // are smaller, but less so than the tree).
-  const clumpR = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height);
+  // are smaller, but less so than the tree). No more than a share of the crown's radius, though: a crown
+  // grown narrow in a wood is still a crown of many sprays, not two or three balls on a stick.
+  const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height);
+  const clumpR = species.architecture === "palm" ? own : Math.min(own, CLUMP_OF_CROWN * sz.crownRadius);
   let hung: Hung;
   switch (species.architecture) {
     case "conifer":
@@ -290,7 +331,7 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number): Gr
       hung = palm(species, sz, rng.fork(), wood, clumpR);
       break;
   }
-  return finish(species, sz, wood, hung);
+  return boleStubs(species, finish(species, sz, wood, hung), rng.fork());
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */
@@ -587,7 +628,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const depth = Math.max(0.01, H - base);
   const crown = Math.cbrt(R * R * depth);
   let L = crown / INTERNODES;
-  const voxels = (l: number) => (Math.ceil((2 * R) / l) + 7) ** 2 * (Math.ceil(H / l) + 6);
+  // (The grid starts a few layers under the crown: shadow falls only downwards, and nothing on the bare
+  // trunk below grows, so a tall clean bole costs it no voxels and its crown no fineness.)
+  const under = (l: number) => Math.max(0, Math.floor(base / l) - 4);
+  const voxels = (l: number) => (Math.ceil((2 * R) / l) + 7) ** 2 * (Math.ceil(H / l) + 6 - under(l));
   while (voxels(L) > MAX_VOXELS) L *= 1.08;
   const weep = weepOf(sp);
   const target = Math.round(FINE_NODES * (1 - WHIP_NODES * weep));
@@ -611,10 +655,11 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const vs = L;
   const nx = Math.ceil((2 * R) / vs) + 7;
   const nz = nx;
-  const ny = Math.ceil(H / vs) + 6;
+  const skip = under(vs);
+  const ny = Math.ceil(H / vs) + 6 - skip;
   const ox = -0.5 * nx * vs;
   const oz = ox;
-  const oy = -2 * vs;
+  const oy = (skip - 2) * vs;
   const shadow = new Float64Array(nx * ny * nz);
   const room = new Uint8Array(nx * ny * nz);
   for (let iy = 0; iy < ny; iy++) {
@@ -1440,7 +1485,7 @@ function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const depth = Math.max(0.01, H - base);
   const profile = profileOf(sp);
   const profileAt = (y: number) => profile((y - base) / depth) * R;
-  const spacing = 1 / Math.max(0.05, sp.whorlsPerMetre);
+  const spacing = Math.min(1 / Math.max(0.05, sp.whorlsPerMetre), WHORL_OF_CROWN * R);
   const top = H - 1.1 * clumpR;
   const segLen = Math.max(0.05, BOUGH_STEP * R);
   const h = newHung();
@@ -1726,6 +1771,7 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
   const keep = thin(sp, env, hung);
   fit(size, w, hung, keep);
   if (sp.architecture !== "palm") keepToOutline(env, w, hung);
+  if (!w.radius) refineBoles(size, w, hung);
 
   // A clump keeps to its twig: its centre within its radius of the node it hangs on.
   for (const c of keep) {
@@ -1861,6 +1907,109 @@ function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
     clumps.node[k] = to[cl.node[c]];
   });
   return { size, skeleton, clumps };
+}
+
+/**
+ * Dead stubs and small twigs on a long clean bole, as many as the species keeps (`boleStubs`): the lower
+ * branches a tree grown in a wood once had, died back in the shade above and broken off short, and the odd
+ * shoot from a dormant bud. More of them high on the bole, under the crown, where they died last; the
+ * low ones have long since rotted off and healed over. Wood only: no leaves below the crown's base.
+ */
+function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
+  const amount = Math.min(1, Math.max(0, sp.boleStubs ?? 0));
+  const sk = tree.skeleton;
+  if (amount <= 0 || sp.architecture !== "broadleaf" || Math.round(sp.stems) > 1) return tree;
+  // The bole: the first stem's nodes from its foot to the first that bears a branch.
+  const bole = [0];
+  for (;;) {
+    const at = bole[bole.length - 1];
+    let next = -1;
+    let kids = 0;
+    for (let i = at + 1; i < sk.count; i++) {
+      if (sk.parent[i] !== at) continue;
+      kids++;
+      if (sk.order[i] === 0) next = i;
+    }
+    if (next < 0 || kids > 1) break;
+    bole.push(next);
+  }
+  const top = sk.y[bole[bole.length - 1]];
+  const from = Math.max(STUB_FROM, breastHeight(tree.size));
+  const length = STUB_TOP * Math.min(top, tree.size.crownBase) - from;
+  const room = MAX_NODES + 100 - sk.count;
+  const count = Math.min(Math.floor(room / 2), Math.round(amount * STUBS_PER_METRE * length));
+  if (count < 1) return tree;
+  const foot = sk.radius[0];
+  const x: number[] = [];
+  const y: number[] = [];
+  const z: number[] = [];
+  const radius: number[] = [];
+  const parent: number[] = [];
+  let n = sk.count;
+  for (let k = 0; k < count; k++) {
+    // (Squared towards the top: most stubs are just under the crown.)
+    const want = from + length * Math.sqrt(rng.next());
+    let at = bole[0];
+    for (const b of bole) if (Math.abs(sk.y[b] - want) < Math.abs(sk.y[at] - want)) at = b;
+    if (sk.y[at] < from - 0.3) continue;
+    const rb = sk.radius[at];
+    const r0 = Math.min(0.6 * rb, Math.max(STUB_THINNEST * foot, rb * rng.range(0.2, 0.38)));
+    const len = Math.min(STUB_LONGEST, rb * rng.range(3, 8)) * (0.6 + 0.4 * ((sk.y[at] - from) / Math.max(0.01, length)));
+    // Off at the species' angle and a little lower: a dead branch has stopped turning to the light.
+    const angle = Math.min(100 * DEG, (sp.branchAngle + rng.range(5, 35)) * DEG);
+    const d = cone([0, 1, 0], angle, rng.range(0, 2 * Math.PI));
+    const ax = sk.x[at] + d[0] * len;
+    const ay = sk.y[at] + d[1] * len;
+    const az = sk.z[at] + d[2] * len;
+    x.push(ax);
+    y.push(ay);
+    z.push(az);
+    radius.push(r0);
+    parent.push(at);
+    const stub = n++;
+    // Now and then a living twig goes on from it, thinner, turning up.
+    if (rng.chance(STUB_TWIG)) {
+      const t = norm([d[0], d[1] + 0.9, d[2]]);
+      const tl = len * rng.range(0.5, 1);
+      x.push(ax + t[0] * tl);
+      y.push(ay + t[1] * tl);
+      z.push(az + t[2] * tl);
+      radius.push(0.6 * r0);
+      parent.push(stub);
+      n++;
+    }
+  }
+  const m = x.length;
+  if (m === 0) return tree;
+  const grow = <A extends Float32Array | Int32Array | Uint8Array>(a: A, make: (k: number) => A) => {
+    const b = make(sk.count + m);
+    b.set(a);
+    return b;
+  };
+  const out: Skeleton = {
+    count: sk.count + m,
+    x: grow(sk.x, (k) => new Float32Array(k)),
+    y: grow(sk.y, (k) => new Float32Array(k)),
+    z: grow(sk.z, (k) => new Float32Array(k)),
+    radius: grow(sk.radius, (k) => new Float32Array(k)),
+    parent: grow(sk.parent, (k) => new Int32Array(k)),
+    order: grow(sk.order, (k) => new Uint8Array(k)),
+    limb: grow(sk.limb, (k) => new Int32Array(k)),
+    along: grow(sk.along, (k) => new Float32Array(k)),
+  };
+  for (let k = 0; k < m; k++) {
+    const i = sk.count + k;
+    const p = parent[k];
+    out.x[i] = x[k];
+    out.y[i] = y[k];
+    out.z[i] = z[k];
+    out.radius[i] = radius[k];
+    out.parent[i] = p;
+    out.order[i] = 1;
+    out.limb[i] = out.order[p] === 0 ? i : out.limb[p];
+    out.along[i] = out.along[p] + Math.hypot(out.x[i] - out.x[p], out.y[i] - out.y[p], out.z[i] - out.z[p]);
+  }
+  return { size: tree.size, skeleton: out, clumps: tree.clumps };
 }
 
 /** How close two clumps may be, as a share of their radii summed. */
@@ -2050,17 +2199,121 @@ function unitOf(size: TreeSize): number {
 }
 
 /**
- * The radii (m): the pipe model's, each stem then scaled so its radius at breast height is the size's
- * trunk radius (a shrub's stems all have it).
+ * A stem's bole: its nodes from its foot up its own axis to the first that bears a branch (the lowest live
+ * limb, where the crown starts), that node last.
+ */
+function boleOf(w: Wood, foot: number): number[] {
+  const out = [foot];
+  let at = foot;
+  for (;;) {
+    const kids = w.kids[at];
+    const next = kids.find((c) => w.cont[c]);
+    if (next === undefined || kids.length > 1) return out;
+    at = next;
+    out.push(at);
+  }
+}
+
+/** How far up a stem its root flare reaches (m): its e-folding height, more for a thicker trunk, under breast height. */
+function flareHeight(size: TreeSize): number {
+  return Math.min(0.4 * breastHeight(size), FLARE_FROM + FLARE_PER_RADIUS * size.trunkRadius);
+}
+
+/**
+ * The shape of a bole's taper, as a radius at a height to be scaled: a power of the length of stem still
+ * above (Behre's and Kozak's taper curves are near this between the butt and the crown), swollen at its
+ * foot where the roots flare out.
+ */
+function boleShape(size: TreeSize, y: number): number {
+  const H = Math.max(0.1, size.height);
+  const above = Math.max(0.02, (H - y) / H);
+  return above ** BOLE_TAPER * (1 + FLARE * Math.exp(-Math.max(0, y) / flareHeight(size)));
+}
+
+/**
+ * A bole's long bare pieces cut shorter, and more finely near its foot, where the root flare swells it: so
+ * its taper is drawn as a smooth curve and not as cones stacked on cones. The new nodes lie on the pieces
+ * they cut, so nothing moves; a clump keeps to its node.
+ */
+function refineBoles(size: TreeSize, w: Wood, h: Hung): void {
+  const n = w.x.length;
+  const bh = breastHeight(size);
+  const hf = flareHeight(size);
+  /** For each node, the heights at which to cut the piece under it. */
+  const cuts = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    if (w.parent[i] >= 0) continue;
+    const bole = boleOf(w, i);
+    if (w.y[bole[bole.length - 1]] <= bh) continue;
+    for (let k = 1; k < bole.length; k++) {
+      const c = bole[k];
+      const y0 = w.y[bole[k - 1]];
+      const y1 = w.y[c];
+      const ys: number[] = [];
+      for (const f of FLARE_CUTS) if (f * hf > y0 + 0.05 && f * hf < y1 - 0.05) ys.push(f * hf);
+      const from = ys.length > 0 ? ys[ys.length - 1] : y0;
+      const pieces = Math.ceil((y1 - from) / BOLE_PIECE - 1e-9);
+      for (let m = 1; m < pieces; m++) ys.push(from + ((y1 - from) * m) / pieces);
+      if (ys.length > 0) cuts.set(c, ys);
+    }
+  }
+  if (cuts.size === 0) return;
+  const out = newWood();
+  const shed: number[] = [];
+  const remap = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = w.parent[i];
+    let parent = p < 0 ? -1 : remap[p];
+    const ys = cuts.get(i);
+    if (ys && p >= 0) {
+      for (const y of ys) {
+        const f = (y - w.y[p]) / Math.max(1e-9, w.y[i] - w.y[p]);
+        parent = addNode(out, w.x[p] + (w.x[i] - w.x[p]) * f, y, w.z[p] + (w.z[i] - w.z[p]) * f, parent, true);
+        out.stem[parent] = w.stem[i];
+        shed.push(0);
+      }
+    }
+    remap[i] = addNode(out, w.x[i], w.y[i], w.z[i], parent, w.cont[i]);
+    out.stem[remap[i]] = w.stem[i];
+    shed.push(w.shed ? w.shed[i] : 0);
+  }
+  for (let c = 0; c < h.node.length; c++) h.node[c] = remap[h.node[c]];
+  w.x = out.x;
+  w.y = out.y;
+  w.z = out.z;
+  w.parent = out.parent;
+  w.cont = out.cont;
+  w.kids = out.kids;
+  w.stem = out.stem;
+  w.shed = shed;
+}
+
+/**
+ * The radii (m). A stem whose crown starts above breast height has a bole: it is given its taper
+ * (`boleShape`), scaled to the size's trunk radius at breast height, and its crown the pipe model's radii,
+ * scaled to meet the bole where the crown starts. The pipe model alone would make the bole of the wood a
+ * small crown has carried and lost: a long clean bole under a narrow crown, reckoned in that crown's short
+ * internodes, swells to many times its top's thickness, a thread under the crown. A real bole's taper is
+ * its own growth over years, not its crown's twigs. A stem whose crown starts low (a shrub's) is the pipe
+ * model's, scaled so its radius at breast height is the trunk radius.
  */
 function pipeRadii(size: TreeSize, w: Wood): Float64Array {
   const n = w.x.length;
   const r = pipeUnits(w, unitOf(size));
-  // Each stem's radius at breast height, along its axis from its foot.
   const bh = breastHeight(size);
   const scale = new Float64Array(w.stems).fill(1);
+  const boleR = new Float64Array(n).fill(-1);
   for (let i = 0; i < n; i++) {
     if (w.parent[i] >= 0) continue;
+    const bole = boleOf(w, i);
+    const top = bole[bole.length - 1];
+    if (w.y[top] > bh) {
+      const at = (y: number) => (size.trunkRadius * boleShape(size, y)) / boleShape(size, bh);
+      for (const b of bole) boleR[b] = at(w.y[b]);
+      scale[w.stem[i]] = boleR[top] / r[top];
+      continue;
+    }
+    // Each stem's radius at breast height, along its axis from its foot.
     let at = i;
     let measured = r[i];
     for (;;) {
@@ -2078,6 +2331,6 @@ function pipeRadii(size: TreeSize, w: Wood): Float64Array {
     }
     scale[w.stem[i]] = size.trunkRadius / measured;
   }
-  for (let i = 0; i < n; i++) r[i] *= scale[w.stem[i]];
+  for (let i = 0; i < n; i++) r[i] = boleR[i] >= 0 ? boleR[i] : r[i] * scale[w.stem[i]];
   return r;
 }
