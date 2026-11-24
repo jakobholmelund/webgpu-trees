@@ -623,7 +623,13 @@ export function createTrees(options: TreesOptions): Trees {
     const onLimb = select(aWood.y.greaterThan(0.5), float(1), float(0));
     const moved = centre.add(windAt(T, centre, limb, onLimb));
     const radial = fit.radial(aRadial.xyz);
-    const surface = moved.add(radial.mul(aRadial.w).mul(fit.wood));
+    // (A twig thinner than half a pixel in the picture is shrunk away: it shows only as a line blinking in and
+    // out between pixels as the eye moves. The trunk and limbs never are.)
+    const r0 = aRadial.w.mul(fit.wood);
+    const atCentre = toWorld(T, moved);
+    const pxAcross = r0.mul(2).mul(uPxPerM).div(max(length(cameraPosition.sub(atCentre)), float(0.1)));
+    const keepThin = smoothstep(float(0.25), float(0.6), pxAcross);
+    const surface = moved.add(radial.mul(r0.mul(keepThin)));
     const at = toWorld(T, surface);
     const nWorld = dirToWorld(T, radial);
     const C = crownAt(T, at);
@@ -712,6 +718,7 @@ export function createTrees(options: TreesOptions): Trees {
   shadeTex.needsUpdate = true;
   const shadeNode = texture(shadeTex);
   const uShadeArea = uniform(new THREE.Vector4(0, 0, 1, 1));
+  let warnedDepth = false;
   const bakeShade = (area: { x0: number; z0: number; width: number; depth: number; cell: number }) => {
     const nx = Math.max(1, Math.ceil(area.width / area.cell));
     const nz = Math.max(1, Math.ceil(area.depth / area.cell));
@@ -794,6 +801,10 @@ export function createTrees(options: TreesOptions): Trees {
     pieces,
     show,
     update(renderer, camera, timeS) {
+      if (!warnedDepth && !renderer.reversedDepthBuffer) {
+        warnedDepth = true;
+        console.warn("webgpu-trees: the renderer's depth is not reversed (reversedDepthBuffer: true): neighbouring crowns' leaves will flicker, their dabs lying closer in depth than it can tell apart.");
+      }
       uTime.value = timeS;
       camera.updateMatrixWorld();
       uCam.value.setFromMatrixPosition(camera.matrixWorld);

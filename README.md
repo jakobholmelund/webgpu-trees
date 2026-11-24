@@ -31,6 +31,16 @@ scene.add(trees.object);
 trees.update(renderer, camera, timeSeconds);
 ```
 
+- **The renderer should keep depth reversed**
+  (`new WebGPURenderer({ reversedDepthBuffer: true })`). Neighbouring
+  crowns grow into each other, and their leaves' dabs, all facing the eye,
+  can lie closer in depth than an ordinary depth buffer tells apart a few
+  dozen metres off: which is in front then changes from frame to frame as
+  they sway, and leaves flicker, at every distance and with the eye still.
+  Reversed depth tells them apart to a fraction of a millimetre at any
+  distance. In the lab's grove, 1609 pixels flickering over a dozen frames
+  became 191 (scattered edge pixels), and the near plane no longer matters.
+  `update` says so once on the console if it is not.
 - **A tree on the ground** is a place and the four numbers a survey
   measures of it: height, crown radius, the height of its crown's base, its
   trunk's radius (all optional; left out, they are its species'). A yaw and

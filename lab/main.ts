@@ -149,7 +149,7 @@ async function start() {
   if (!("gpu" in navigator)) fail("This page needs WebGPU, which this browser does not have.");
   // (Timestamps: the graphics card times its own passes, for Measure. Not see-through: a far dab is drawn
   // with less than its whole pixel, and on a canvas that keeps its alpha the page shows through it.)
-  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, alpha: false, trackTimestamp: true });
+  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, alpha: false, trackTimestamp: true, reversedDepthBuffer: true });
   try {
     await renderer.init();
   } catch (err) {
