@@ -6,3 +6,4 @@ dist-file
 
 # AI-generated sources (raw); only processed assets are committed
 tools/ai-textures/raw/
+tools/ai-references/raw/
