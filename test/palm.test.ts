@@ -79,6 +79,9 @@ test("however it is pruned, a palm keeps to its envelope: its height, its crown'
         assert.ok(top >= size.height - 0.05, `${tag}: its top ${top.toFixed(2)} short of its height ${size.height}`);
         assert.ok(reach <= size.crownRadius + 0.02, `${tag}: reaches ${reach.toFixed(2)} past its crown's radius ${size.crownRadius}`);
         assert.ok(low >= size.crownBase - 0.05, `${tag}: green leaves down to ${low.toFixed(2)}, below its crown's base ${size.crownBase}`);
+        // (And it fills it: out to most of its radius, or down to near its base.)
+        const depth = size.height - size.crownBase;
+        assert.ok(reach >= 0.7 * size.crownRadius || low <= size.crownBase + 0.25 * depth, `${tag}: reaches ${reach.toFixed(2)} of ${size.crownRadius}, down to ${low.toFixed(2)} of ${size.crownBase}`);
         if (p.ball) assert.ok(p.ball.radius < size.crownRadius && p.ball.y0 > size.crownBase * 0.3, tag);
         if (p.skirt) assert.ok(p.skirt.bottom >= 0.3 && p.skirt.top <= p.heart[1] && p.skirt.outTop < 0.5 * size.crownRadius + 0.3, tag);
         // (Its skeleton and clumps within it too: what the rest of the library reads.)

@@ -33,9 +33,9 @@ interface PalmTier {
 }
 
 export const PALM_TIERS: readonly PalmTier[] = [
-  { segs: 12, rays: 25, rings: 4, stalk: 4, panels: 9, plumose: true, spears: true },
-  { segs: 5, rays: 11, rings: 2, stalk: 2, panels: 6, plumose: true, spears: true },
-  { segs: 2, rays: 7, rings: 1, stalk: 1, panels: 4, plumose: false, spears: false },
+  { segs: 12, rays: 19, rings: 3, stalk: 3, panels: 9, plumose: true, spears: true },
+  { segs: 5, rays: 9, rings: 1, stalk: 1, panels: 6, plumose: true, spears: true },
+  { segs: 2, rays: 5, rings: 1, stalk: 1, panels: 4, plumose: false, spears: false },
 ];
 
 const sub = (a: number[], b: number[]) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -197,8 +197,10 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
     return { r, x: st.x[k], z: st.z[k] };
   };
   const tall = sk.top - sk.bottom;
-  const rowH = Math.min(2.6, Math.max(1.2, tall));
-  const rows = Math.max(1, Math.ceil((tall - rowH) / (0.7 * rowH)) + 1);
+  // (Rows of shingles each half over the one below, the upper's foot outside the lower's head, so the skirt
+  // reads as one thatch; each row's head tucked in against the stem.)
+  const rowH = Math.min(3, Math.max(1.2, tall));
+  const rows = Math.max(1, Math.ceil((tall - rowH) / (0.5 * rowH)) + 1);
   const cell = PALM_CELL.skirt;
   for (let row = 0; row < rows; row++) {
     const top = rows === 1 ? sk.top : sk.top - (row * (tall - rowH)) / (rows - 1);
@@ -207,26 +209,29 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
     const P = T.panels;
     for (let q = 0; q < P; q++) {
       const a0 = turn + (q / P) * Math.PI * 2;
-      const span = ((Math.PI * 2) / P) * 1.55;
+      const span = ((Math.PI * 2) / P) * 1.5;
       const cols = 3;
       const vr = 3;
       const grid: number[][] = [];
-      const shade = 0.85 + 0.3 * hash01(q + row * 31, v * 7 + 1);
+      const shade = 0.88 + 0.24 * hash01(q + row * 31, v * 7 + 1);
+      // (Each panel its own piece of the picture across, so neighbours do not repeat.)
+      const u0 = 0.04 + 0.3 * hash01(q + row * 7, v + 3);
       for (let j = 0; j <= vr; j++) {
         const fj = j / vr;
         const y = top - rowH * fj;
-        const kk = k0 + (rowH / Math.max(tall, 1e-3)) * fj;
-        const out = sk.outTop + (sk.outBottom - sk.outTop) * Math.min(1, kk);
-        // (Each panel bellies out a little below its top: the leaves fall from their stalks against the stem and splay.)
+        const kk = Math.min(1, k0 + (rowH / Math.max(tall, 1e-3)) * fj);
+        const out = sk.outTop + (sk.outBottom - sk.outTop) * kk;
         const { r, x: cx, z: cz } = radiusAt(Math.max(0, y));
-        const rr = r + out * (0.55 + 0.45 * Math.sin(Math.PI * Math.min(1, fj * 0.8 + 0.2))) + 0.05 * (row % 2);
+        const rr = r + out * (0.72 + 0.28 * fj);
         const line: number[] = [];
         for (let i = 0; i <= cols; i++) {
           const a = a0 - span / 2 + (span * i) / cols;
           const p = [cx + Math.cos(a) * rr, Math.max(0.05, y), cz + Math.sin(a) * rr];
-          const n = norm([Math.cos(a), 0.25, Math.sin(a)]);
-          const uv = cellUv(cell, 0.04 + (0.92 * i) / cols, 0.985 - 0.97 * fj);
-          line.push(put(b, { own: hash01(q, row * 17 + v), dead: 1, tone: shade, flex: 0.3 + 0.4 * fj, length: rowH }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, top, cz], t: [0, -1, 0] }, v));
+          const n = norm([Math.cos(a), 0.3, Math.sin(a)]);
+          // (The picture's leaves, not their stalks: those are under the row above.)
+          const uv = cellUv(cell, u0 + (0.62 * i) / cols, 0.7 - 0.69 * fj);
+          // (Older, lower down, greyer and darker.)
+          line.push(put(b, { own: hash01(q, row * 17 + v), dead: 1, tone: shade * (1 - 0.32 * kk), flex: 0.3 + 0.4 * fj, length: rowH }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, top, cz], t: [0, -1, 0] }, v));
         }
         grid.push(line);
       }

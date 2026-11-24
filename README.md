@@ -256,7 +256,9 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 6.5 | 3 |
 | Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 10.5 | 5 |
 | Canary date palm | *Phoenix canariensis* | a big round head of arching fronds on a thick trunk | california | 15 | 5 | 7 |
-| Mexican fan palm | *Washingtonia robusta* | a tall thin pole with a small tight head of fan leaves | california | 22 | 2.2 | 18 |
+| Mexican fan palm | *Washingtonia robusta* | a tall thin pole flared at its foot, a small tight head of fan leaves | california | 22 | 2.2 | 18 |
+| California fan palm | *Washingtonia filifera* | a stout grey column, a head of grey-green fans; in the wild a skirt of dead leaves to the ground | california | 12 | 2.8 | 9 |
+| Queen palm | *Syagrus romanzoffiana* | a smooth grey ringed pole, a few soft plumose fronds arching over | california | 10 | 3.2 | 5.5 |
 | Coast live oak | *Quercus agrifolia* | a low, broad, dark evergreen dome | california | 11 | 8.5 | 1.8 |
 | California sycamore | *Platanus racemosa* | open and crooked, pale bark | california | 18 | 7 | 3.5 |
 | Sugar maple | *Acer saccharum* | a dense oval | ontario | 20 | 6.5 | 3 |
@@ -282,11 +284,8 @@ broadleaf's `scaffolds` are its great limbs (4, and one more for every
 third of `leader`, if left out), and `shed` (0..1) how readily it drops its
 shaded branches (from `openness` and `branchiness` if left out).
 
-A palm (`architecture: "palm"`) is one stem, as thick at its top as at
-breast height and swollen at its foot, with a head of `whorl` fronds round
-its top by the golden angle: the young ones upright, the old ones hanging,
-each arching over by `bend` as far as the crown lets it reach; its leaves
-hang along each frond's outer four fifths. A broadleaf or a shrub that
+A palm (`architecture: "palm"`) is grown as a palm (`palm.ts`; see *Palms*).
+A broadleaf or a shrub that
 weeps (`weep`, 0..1) hangs whips from that share of its outer twigs: a short
 arch out, then straight down to as low as the crown's base, leaved all
 along (the willow's curtain, the birch's tresses).
@@ -294,7 +293,61 @@ along (the willow's curtain, the birch's tresses).
 What the grower cannot do yet, so those rows come as close as their data
 allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
 most 3 degrees), several trunks from one foot (a sycamore's, a coast live
-oak's), and a fan palm's skirt of dead leaves under its head.
+oak's).
+
+## Palms
+
+A palm is a monocot: it does not branch. Its one stem grows from one tip, as
+thick at its top as near its foot (a fan palm's tapers a little and swells at
+its foot, `buttress`), and its crown is its leaves: `whorl` green fronds set
+round that tip one after another by the golden angle (137.5 degrees), each
+standing as its age has it. The pale unopened spear stands upright in the
+middle, the young leaves rise, the mature ones arch out, the old droop, and the
+dead hang against the stem. So a palm is not grown as the other trees are
+(`palm.ts`, beside the grower): each frond is laid out as data the drawing reads
+directly (its rachis, the frame of its leaf along it, its length, width, age
+and colour), and the crown is fitted to the tree's envelope (its height, its
+crown's radius and base, what a ball meets) by how long its fronds are and how
+far they droop together: a crown wider than deep holds its leaves flatter, a
+deep narrow one lets them hang.
+
+- **Leaves** (`palmLeaf`): a feather palm's frond is a ribbon along its
+  rachis, folded up in a V (`fold`, a Canary palm's stiff leaflets), a queen
+  palm's (`plumose`) a second, drooping rank under it, its leaflets in
+  several planes; a fan palm's is a pleated fan at the end of a long stalk,
+  folded up along its costa, its segments split past the middle and drooping
+  at their tips (`fanDroop`). Their pictures are whole leaves, one atlas for
+  all palms (`palmAtlas.ts`): AI-generated photographs for the realistic look,
+  painted ones for the others, drawn ones until they come; each picture's
+  light and shade over the frond's own colour (its species' green, paler when
+  young, going to `deadColor`).
+- **Pruning** (`pruning`, by species, or by tree: `TreeInstance.pruning`, or
+  `prunings` beside a packed list): `natural`, every leaf it has, the dead
+  hanging under the green (a fan palm's skirt as far down its stem as `skirt`
+  says); `skirt`, cut back to a short skirt; `skinned`, the dead and drooping
+  leaves cut and its stem cleaned, a collar of boots (old leaf bases) left
+  under a fan palm's crown; `pineapple`, cut back to the leaves above the level,
+  its leaf bases trimmed into a ball under the crown. Left out, as courses keep
+  them: a Canary palm pineapple cut, the others skinned. Trees kept otherwise
+  than their species are their own variants.
+- **Drawn**: near, every frond in twelve pieces and every fan in nineteen
+  rays; mid, five and nine; far, two and five, a star of fronds round the
+  stem. A skirt is shingles of dead leaves round the stem, each row half over
+  the one below. The stem wears its bark (a Canary palm's lattice, a fan
+  palm's rings), its boots and a pineapple's trimmed bases; where the look
+  paints bark flat, their pattern is still drawn faintly. Its leaves' area is
+  its fronds' own, which its box of light takes (`GrownTree.leafArea`).
+- **Wind**: the stem bends further than a tree's trunk and its crown follows a
+  moment late, the bend running up it; the crown tilts as the stem's top does.
+  Each frond streams downwind in the gusts, flaps and twists on its own beat
+  as its age lets it (a dead one swings freely, a spear hardly moves), and its
+  leaflets shimmer.
+- **Cost**, a grove of 400 palms of one kind at 1104 x 1868 (graphics card's
+  time for the frame, before and after): Canary palms, realistic, 0.83 to
+  0.61 ms in the clearing and 1.15 to 0.97 from outside; painterly 0.98 to
+  0.63 and 0.92 to 0.99; Mexican fan palms, realistic, 0.45 to 0.45-0.58 and
+  0.56 to 0.78-0.83 (a tall palm is drawn near from far off: its tier goes by
+  its height in the picture, its crown a small part of it).
 
 ## Species morphology
 
@@ -696,7 +749,9 @@ and leans its own way.
 The realistic look wears photographs: scanned bark and scanned leaves, CC0
 from [ambientCG](https://ambientcg.com) and [Poly Haven](https://polyhaven.com),
 and, where no scan exists, a few AI-generated pictures (a silver birch's bark,
-a Canary palm's trunk and frond, a blue gum's sickle leaves), all credited in
+a Canary palm's trunk and frond, a blue gum's sickle leaves, the palms' fans,
+queen palm frond, dead skirt and pineapple cut, and the painted fronds and fans
+of the other looks), all credited in
 `assets/SOURCES.md` (the generated ones marked so: they are not CC0).
 `tools/scans/fetch.mjs` downloads the sources, `tools/scans/build.mjs` makes
 `assets/` from them (`tools/scans/recipe.mjs` lists both, and how each is cut).
@@ -746,8 +801,7 @@ spoil).
 
 ## Left out, for now
 
-- The photographs: a birch's dark diamonds and a Canary palm's pineapple
-  knob are not drawn; the leaves' own colour is used only as lightness (the
+- The photographs: a birch's dark diamonds are not drawn; the leaves' own colour is used only as lightness (the
   species gives the hue); the cards are composed on the page's thread, a row
   of cards a task (a worker would keep a busy page smoother); a set's tile
   repeats along a tall straight stem.

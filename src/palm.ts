@@ -286,7 +286,7 @@ function layFrond(p: FrondPlan, foot: number[], L: number, form: LeafForm, sp: T
     const t = tangent[Math.max(1, end)];
     const n = up[Math.max(1, end)];
     const a = across[Math.max(1, end)];
-    const tilt = p.cls === "dead" ? -55 * DEG : p.cls === "spear" ? 5 * DEG : 28 * DEG - 20 * DEG * Math.max(0, p.age - 0.5);
+    const tilt = p.cls === "dead" ? -55 * DEG : p.cls === "spear" ? 5 * DEG : 12 * DEG - 26 * DEG * Math.max(0, p.age - 0.5);
     fr.hastula = h;
     fr.bladeDir = rotate(t, a, -tilt);
     fr.bladeUp = rotate(n, a, -tilt);
