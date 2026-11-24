@@ -100,9 +100,9 @@ const CORNERS = [
  * its size (m, across half of it) and a number of its own; `aNormal` its clump's outward normal and how
  * deep in the crown it is; `aOffset` which way it lies from its clump's centre and what it is (0 leaves,
  * 1 a stroke for the trunk, whose half-width is in `aNormal.x`); `aLimb` the foot of the limb it is on, and
- * its variant.
+ * its variant. A variant `skip` says is left without leaves (its range is empty).
  */
-export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "leaves" | "stroke" = "leaves"): Pieces {
+export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "leaves" | "stroke" = "leaves", skip?: readonly boolean[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aLimb: 4 });
   const quad = (c: number[], size: number, own: number, n: number[], depth: number, off: number[], kind: number, limb: number[], variant: number) => {
     let f = -1;
@@ -125,6 +125,8 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
         const top = tree.size.crownBase + (tree.size.height - tree.size.crownBase) * 0.25;
         quad([0, top / 2, 0], top / 2, 0.5, [trunkHalfWidth(tree), 0, 0], 0, [0, 0, 0], 1, [0, -1, 0], v);
       }
+    } else if (skip?.[v]) {
+      // (Its leaves are drawn otherwise: a conifer's near boughs as sheets, `sheetPieces`.)
     } else if (shape.dabsPerClump > 0) {
       const twigs = clumpTwigs(tree);
       for (let c = 0; c < cl.count; c++) {
@@ -848,6 +850,242 @@ function shootOf(sk: GrownTree["skeleton"], lines: WoodLines, node: number, most
   };
 }
 
+/** How a conifer's sheet is shaped: rows along it, columns across it (a sheet is (ROWS-1) (COLS-1) quads). */
+export const SHEET_ALONG = 4;
+export const SHEET_ACROSS = 3;
+/** The most sheets a clump of its own is laid with: one along its own twig, and one along another of its twigs that reaches out of the first. */
+export const SHEETS_PER_CLUMP = 2;
+/** A clump's own sheet: its length, and its half width, in the clump's radii; how far back along the wood its foot is. */
+const SHEET_LENGTH = 3.6;
+const SHEET_HALF = 1.4;
+const SHEET_BACK = 0.75;
+/** A bough's sheets: each this many of its clumps' radii long, the next starting this share of it on. */
+const BOUGH_PIECE = 3.2;
+const BOUGH_STEP = 0.62;
+
+/**
+ * A conifer's near foliage as sheets: curved strips lying along its boughs, a comb of needles (Koerye's
+ * foliage-mass study found these read as tiered boughs from every side, where loose leaves gave spiky balls
+ * and closed blocks cushions). Each bough is laid with a run of them along its own wood, from its first
+ * clump to its tip, overlapping, each as wide as its clumps reach either side of it; a clump off its bough's
+ * line, or on the leader, a sheet or two of its own along its twig. Each sheet's foot is on the wood. It is lifted there and droops to its tip, its edges falling
+ * away either side of its middle, a little twisted, so seen from the side it is a bough hanging its fringe
+ * and from below a bough's shade.
+ *
+ * `kinds[v]` says what kind of sheet each variant's clumps are laid with (an index into marks.ts
+ * `SHEET_KINDS`: 0 fir, 1 cedar), or -1 for none (its clumps are dabs). Each vertex: `position` where
+ * it is (its variant's frame); `aDab` where it is on the sheet's picture (x across, y along its length, each
+ * -1..1), half the sheet's length (m), and a number of the sheet's own; `aNormal` its clump's outward normal
+ * and depth; `aOffset` the sheet's own normal there (its top's side) and its kind; `aLimb` the foot of its
+ * limb and its variant.
+ */
+export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[], coarse = false): Pieces {
+  const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aLimb: 4 });
+  trees.forEach((tree, v) => {
+    b.begin();
+    const kind = kinds[v] ?? -1;
+    if (kind >= 0) {
+      const { clumps: cl, skeleton: sk } = tree;
+      const lines = woodLines(tree, TIER_SHAPES[0]);
+      const covered = new Uint8Array(cl.count);
+      boughSheets(b, tree, lines, kind, v, covered, coarse);
+      const twigs = clumpTwigs(tree);
+      for (let c = 0; c < cl.count; c++) {
+        if (covered[c]) continue;
+        const r = cl.radius[c];
+        const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
+        // (Along its own twig first, then along the twig of it that reaches farthest from that sheet's line.)
+        const laid: { foot: number[]; dir: number[]; length: number }[] = [];
+        // (Mid, only the leader's: a bough's own sheets, wider there, cover its side shoots' clumps well enough
+        // from where a mid tree is seen.)
+        if (coarse && sk.order[cl.node[c]] > 0) continue;
+        const most = cl.depth[c] > 0.65 || coarse ? 1 : SHEETS_PER_CLUMP;
+        const order = [...twigs[c]].sort((p, q) => (p === cl.node[c] ? -1 : q === cl.node[c] ? 1 : 0));
+        for (const t of order) {
+          if (laid.length >= most) break;
+          const tip = [sk.x[t], sk.y[t], sk.z[t]];
+          if (laid.some((s) => offLine(tip, s.foot, s.dir, s.length) < r * 0.7)) continue;
+          const k = c * 53 + laid.length;
+          const shoot = shootOf(sk, lines, t, r * SHEET_BACK * 1.5);
+          const foot = shoot.at(Math.min(shoot.length, r * SHEET_BACK)).p;
+          // (Along its limb more than along its own twig, out from the trunk, and nearer level than either:
+          // sprays lie flat and turn up only a little.)
+          const d0 = shoot.at(0).d;
+          const l = sk.limb[t];
+          const limb = sk.order[t] === 0 ? d0 : norm([tip[0] - sk.x[l], tip[1] - sk.y[l], tip[2] - sk.z[l]]);
+          const out = norm([tip[0], 0, tip[2]]);
+          const run = add(add(scale(limb, 0.6), scale(d0, 0.4)), scale(out, 0.2));
+          // (On the leader, upright: a conifer's top is a spire, not a flag.)
+          const dir = sk.order[t] === 0 ? norm([d0[0] * 0.3, 1, d0[2] * 0.3]) : norm([run[0], run[1] * 0.45 + 0.03, run[2]]);
+          const length = r * SHEET_LENGTH * (0.85 + 0.3 * hash01(k, 12)) * (coarse ? 1.2 : 1);
+          const half = r * SHEET_HALF * (0.85 + 0.3 * hash01(k, 13)) * (coarse ? 1.15 : 1) * (sk.order[t] === 0 ? 0.3 : 1);
+          laid.push({ foot, dir, length });
+          const a = hash01(k, 14);
+          sheet(b, foot, dir, length, half, { lift: 0.1 + 0.08 * a, droop: 0.26 + 0.22 * a, arch: 0.55 + 0.35 * hash01(k, 15), twist: (hash01(k, 16) - 0.5) * 0.7 }, hash01(k, v * 389 + 11), n, cl.depth[c], kind, limbOf(sk, t), v, coarse ? 2 : SHEET_ALONG);
+        }
+      }
+    }
+    b.end();
+  });
+  return b.done();
+}
+
+/**
+ * A fir's boughs: each limb's clumps that lie along its own wood, laid as a run of overlapping sheets on that
+ * wood from its first clump to past its last, each as wide as those clumps reach either side of it. The
+ * clumps it covers are marked in `covered`; one off its line is left to a sheet of its own.
+ */
+function boughSheets(b: Builder, tree: GrownTree, lines: WoodLines, kind: number, v: number, covered: Uint8Array, coarse: boolean): void {
+  const { clumps: cl, skeleton: sk } = tree;
+  const byLimb = new Map<number, number[]>();
+  for (let c = 0; c < cl.count; c++) {
+    const node = cl.node[c];
+    if (sk.order[node] === 0) continue;
+    const l = sk.limb[node];
+    if (!byLimb.has(l)) byLimb.set(l, []);
+    byLimb.get(l)!.push(c);
+  }
+  let piece = 0;
+  for (const [l, list] of byLimb) {
+    // (The bough's wood as drawn: its centre line from where it leaves the trunk, on through its thickest child.)
+    const pts: number[][] = [];
+    for (let i = l; i >= 0 && lines.line[i]; i = lines.main[i]) {
+      const line = lines.line[i]!;
+      for (let o = 0; o < line.length; o += LINE_STRIDE) {
+        const p = [line[o], line[o + 1], line[o + 2]];
+        const last = pts[pts.length - 1];
+        if (!last || Math.hypot(p[0] - last[0], p[1] - last[1], p[2] - last[2]) > 1e-4) pts.push(p);
+      }
+    }
+    if (pts.length < 2) continue;
+    const along = [0];
+    for (let q = 1; q < pts.length; q++) along.push(along[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1], pts[q][2] - pts[q - 1][2]));
+    const total = along[along.length - 1];
+    const at = (s: number): number[] => {
+      const t = Math.min(total, Math.max(0, s));
+      let q = 1;
+      while (q < pts.length - 1 && along[q] < t) q++;
+      const f = (t - along[q - 1]) / Math.max(1e-9, along[q] - along[q - 1]);
+      return [pts[q - 1][0] + (pts[q][0] - pts[q - 1][0]) * f, pts[q - 1][1] + (pts[q][1] - pts[q - 1][1]) * f, pts[q - 1][2] + (pts[q][2] - pts[q - 1][2]) * f];
+    };
+    // (Where each clump lies along the bough, and how far off it.)
+    const on: { c: number; s: number; off: number }[] = [];
+    for (const c of list) {
+      const p = [cl.x[c], cl.y[c], cl.z[c]];
+      let best = { s: 0, off: Infinity };
+      for (let q = 1; q < pts.length; q++) {
+        const a = pts[q - 1];
+        const d = sub(pts[q], a);
+        const l2 = dot(d, d);
+        const f = l2 > 0 ? Math.min(1, Math.max(0, dot(sub(p, a), d) / l2)) : 0;
+        const off = Math.hypot(p[0] - a[0] - d[0] * f, p[1] - a[1] - d[1] * f, p[2] - a[2] - d[2] * f);
+        if (off < best.off) best = { s: along[q - 1] + f * (along[q] - along[q - 1]), off };
+      }
+      on.push({ c, ...best });
+    }
+    const rMean = on.reduce((sum, o) => sum + cl.radius[o.c], 0) / on.length;
+    // (A clump far off the bough's line is a side shoot of its own: its own sheet.)
+    const near = on.filter((o) => o.off < cl.radius[o.c] * 2.2 + rMean * (coarse ? 1.5 : 0.5));
+    if (near.length === 0) continue;
+    // (From its first clump, or from a third of the way out if that is nearer the trunk: a bough is leafy
+    // along most of its length, and the grower's clumps keep to its outer part.)
+    const s0 = Math.max(0, Math.min(total * 0.3, ...near.map((o) => o.s - cl.radius[o.c] * 1.2)));
+    const s1 = Math.min(total + rMean, Math.max(...near.map((o) => o.s + cl.radius[o.c] * 1.4)));
+    // (Mid, longer pieces, fewer of them: a bough or two to a sheet.)
+    const length = rMean * BOUGH_PIECE * (coarse ? 2.8 : 1);
+    const count = Math.max(1, Math.ceil((s1 - s0 - length) / (length * BOUGH_STEP)) + 1);
+    const step = count > 1 ? (s1 - s0 - length) / (count - 1) : 0;
+    for (const o of near) covered[o.c] = 1;
+    for (let k = 0; k < count; k++) {
+      const sa = s0 + step * k;
+      const sb = sa + length;
+      const foot = at(sa);
+      // (Its clumps: those it lies over, for how wide it is, which way they face, how deep they are.)
+      const mine = near.filter((o) => o.s > sa - cl.radius[o.c] && o.s < sb + cl.radius[o.c]);
+      const use = mine.length ? mine : near;
+      const half = Math.max(rMean * 1.3, Math.max(...use.map((o) => o.off + cl.radius[o.c])) * 1.15) * (coarse ? 1.15 : 1);
+      const nn = norm(use.reduce((m, o) => [m[0] + cl.nx[o.c], m[1] + cl.ny[o.c], m[2] + cl.nz[o.c]], [0, 0, 0]));
+      const depth = use.reduce((m, o) => m + cl.depth[o.c], 0) / use.length;
+      // (Along the bough's chord over its length, nearer level: past the bough's tip, on as it ran.)
+      const end = sb <= total ? at(sb) : add(at(total), scale(norm(sub(at(total), at(Math.max(0, total - length * 0.5)))), sb - total));
+      const chord = norm(sub(end, foot));
+      const dir = norm([chord[0], chord[1] * 0.5 + 0.02, chord[2]]);
+      // (The last of a bough's sheets hangs most, as its tip does; those along it lie as the wood does.)
+      const tipward = sb >= s1 - 1e-6 ? 1 : 0.35;
+      const h = piece * 31 + v * 7;
+      sheet(b, foot, dir, length * (0.95 + 0.1 * hash01(h, 21)), half, { lift: 0.06, droop: (0.12 + 0.12 * hash01(h, 22)) * (0.5 + tipward) * (coarse ? 0.7 : 1), arch: 0.55 + 0.3 * hash01(h, 23), twist: (hash01(h, 24) - 0.5) * 0.4 }, hash01(h, v * 389 + 11), nn, depth, kind, [sk.x[l], sk.y[l], sk.z[l]], v, coarse ? 2 : SHEET_ALONG);
+      piece++;
+    }
+  }
+}
+
+/** How far a point lies from a sheet's line (its foot, the way it runs, its length): 0 on it. */
+function offLine(p: number[], foot: number[], dir: number[], length: number): number {
+  const d = sub(p, foot);
+  const s = Math.min(length, Math.max(0, dot(d, dir)));
+  return Math.hypot(d[0] - dir[0] * s, d[1] - dir[1] * s, d[2] - dir[2] * s);
+}
+
+function limbOf(sk: GrownTree["skeleton"], node: number): number[] {
+  const l = sk.limb[node];
+  return sk.order[node] === 0 ? [0, -1, 0] : [sk.x[l], sk.y[l], sk.z[l]];
+}
+
+/** How a sheet curves: lifted at its foot and drooping to its tip (shares of its length), its edges falling (a share of its half width), and twisted (rad). */
+interface SheetShape {
+  lift: number;
+  droop: number;
+  arch: number;
+  twist: number;
+}
+
+/**
+ * One sheet: `rows` rows of `SHEET_ACROSS` points from its foot along `dir`, `length` long and `half`
+ * wide either side at its widest, curved as `shape` says.
+ */
+function sheet(b: Builder, foot: number[], dir: number[], length: number, half: number, shape: SheetShape, own: number, n: number[], depth: number, kind: number, limb: number[], v: number, rows = SHEET_ALONG): void {
+  const up = [0, 1, 0];
+  let side = cross(up, dir);
+  if (Math.hypot(side[0], side[1], side[2]) < 0.2) side = basis(dir)[0];
+  side = norm(side);
+  const top = norm(cross(dir, side));
+  const { lift, droop, arch, twist } = shape;
+  const point = (u: number, s: number): number[] => {
+    // (Its middle line: on along the bough, up a little at first, then down to its tip as it hangs.)
+    const h = length * (lift * u * (1 - u) * 2 - droop * u * u);
+    const c = [foot[0] + dir[0] * length * u, foot[1] + dir[1] * length * u + h, foot[2] + dir[2] * length * u];
+    // (Across it, turned about its length by its twist, more towards its tip; narrower at its foot and its tip.)
+    const t = twist * u;
+    const sd = add(scale(side, Math.cos(t)), scale(top, Math.sin(t)));
+    const tp = sub(scale(top, Math.cos(t)), scale(side, Math.sin(t)));
+    const wide = half * (0.62 + 0.38 * Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.95)));
+    return add(add(c, scale(sd, s * wide)), scale(tp, -arch * wide * s * s));
+  };
+  let first = -1;
+  for (let j = 0; j < rows; j++) {
+    const u = j / (rows - 1);
+    for (let i = 0; i < SHEET_ACROSS; i++) {
+      const s = (i / (SHEET_ACROSS - 1)) * 2 - 1;
+      const p = point(u, s);
+      // (Its normal, from the way it runs along and across here: its top's side.)
+      const e = 1e-3;
+      const du = sub(point(Math.min(1, u + e), s), point(Math.max(0, u - e), s));
+      const ds = sub(point(u, Math.min(1, s + e)), point(u, Math.max(-1, s - e)));
+      let nrm = norm(cross(du, ds));
+      if (dot(nrm, top) < 0) nrm = scale(nrm, -1);
+      const k = b.vertex({ position: p, aDab: [s, u * 2 - 1, length / 2, own], aNormal: [...n, depth], aOffset: [...nrm, kind], aLimb: [...limb, v] });
+      if (first < 0) first = k;
+    }
+  }
+  for (let j = 0; j + 1 < rows; j++) {
+    for (let i = 0; i + 1 < SHEET_ACROSS; i++) {
+      const q = first + j * SHEET_ACROSS + i;
+      // (Wound so its top faces the way its normal does.)
+      b.index.push(q, q + SHEET_ACROSS, q + SHEET_ACROSS + 1, q, q + SHEET_ACROSS + 1, q + 1);
+    }
+  }
+}
+
 /**
  * The realistic look's near leaves: each clump as `perClump` cards (close to, at least one for each of its
  * twigs), each a spray of leaves growing from the tree's own wood, its foot on one of the clump's
@@ -855,12 +1093,18 @@ function shootOf(sk: GrownTree["skeleton"], lines: WoodLines, node: number, most
  * out of the crown and a little up, as leaves turn to the light, each its own way about that. Each card:
  * `position` its centre; `aDab` its corner, its size (m, across half of it), a number of its own;
  * `aNormal` its clump's outward normal and depth; `aOffset` its own facing (unit) and 0; `aTangent` the
- * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant.
+ * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant. A variant
+ * `skip` says is left without cards.
  */
-export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number): Pieces {
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
   trees.forEach((tree, v) => {
     b.begin();
+    if (skip?.[v]) {
+      // (Its leaves are drawn as sheets: `sheetPieces`.)
+      b.end();
+      return;
+    }
     const { clumps: cl, skeleton: sk } = tree;
     const twigs = clumpTwigs(tree);
     const lines = woodLines(tree, TIER_SHAPES[0]);

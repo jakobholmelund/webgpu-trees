@@ -15,12 +15,12 @@
 //   bent, lighter along the midrib and on the side that faces up, darker at
 //   its rim, and casting a soft shadow on what it lies over.
 //
-// Channels: red, green and blue are one grey tone (the shader multiplies the
-// species' colour by it); alpha is coverage, antialiased by distance to the
-// shape's edge. No spray comes within a few texels of its cell's border, so
+// Channels: red and blue are one grey tone (the shader multiplies the
+// species' colour by it); green is a number of each shape's own, 0..1, so the
+// shader can tell one leaf from the next (how thin it is, against the light);
+// alpha is coverage, antialiased by distance to the shape's edge. No spray comes within a few texels of its cell's border, so
 // the mips of one cell do not bleed into the next.
 
-import * as THREE from "three/webgpu";
 import { hash01 } from "./variants.ts";
 
 /** The kinds of leaf the atlas holds, by index (the same as `LEAF_KIND_ROWS` in species.ts). */
@@ -602,9 +602,10 @@ function fit(shapes: Shape[]): void {
   }
 }
 
-/** One cell's picture as it is drawn: tone premultiplied by coverage, and coverage. */
+/** One cell's picture as it is drawn: tone and each shape's own number premultiplied by coverage, and coverage. */
 interface Layer {
   tone: Float32Array;
+  own: Float32Array;
   cover: Float32Array;
 }
 
@@ -612,7 +613,7 @@ function box(cx0: number, cy0: number, cx1: number, cy1: number): [number, numbe
   return [Math.max(0, Math.floor(cx0)), Math.max(0, Math.floor(cy0)), Math.min(CELL - 1, Math.ceil(cx1)), Math.min(CELL - 1, Math.ceil(cy1))];
 }
 
-function drawStroke(L: Layer, s: Stroke): void {
+function drawStroke(L: Layer, s: Stroke, own: number): void {
   const r = Math.max(s.ra, s.rb) + RAMP;
   const [i0, j0, i1, j1] = box(Math.min(s.ax, s.bx) - r, Math.min(s.ay, s.by) - r, Math.max(s.ax, s.bx) + r, Math.max(s.ay, s.by) + r);
   const dx = s.bx - s.ax;
@@ -637,6 +638,7 @@ function drawStroke(L: Layer, s: Stroke): void {
       const tone = s.tone * (1 + s.lit * 0.3 * light) * (1 + 0.1 * t * s.lit);
       const o = j * CELL + i;
       L.tone[o] = L.tone[o] * (1 - c) + tone * c;
+      L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
     }
   }
@@ -719,7 +721,7 @@ function bladeRow(j: number, ox: number, oy: number, cx: number, cy: number, len
   clip(-cy, py * cx, -reach, reach, ox);
 }
 
-function drawBlade(L: Layer, b: Blade): void {
+function drawBlade(L: Layer, b: Blade, own: number): void {
   const cx = Math.cos(b.ang);
   const cy = Math.sin(b.ang);
   // (Its left side, +v: does it face up?)
@@ -780,26 +782,31 @@ function drawBlade(L: Layer, b: Blade): void {
       if (d < 2.2) tone *= 0.88 + 0.12 * clamp01(d / 2.2);
       const o = j * CELL + i;
       L.tone[o] = L.tone[o] * (1 - c) + tone * c;
+      L.own[o] = L.own[o] * (1 - c) + own * c;
       L.cover[o] = L.cover[o] * (1 - c) + c;
     }
   }
 }
 
-/** The atlas's texels, RGBA8 (row 0 is v = 0): what `makeLeafAtlas` puts in its texture. Pure, so it runs anywhere. */
+/** The atlas's texels, RGBA8 (row 0 is v = 0): the realistic look's texture (engine.ts makes it, with its mips: mips.ts). Pure, so it runs anywhere. */
 export function leafAtlasPixels(): { data: Uint8Array; width: number; height: number } {
   const data = new Uint8Array(WIDTH * HEIGHT * 4);
-  const L: Layer = { tone: new Float32Array(CELL * CELL), cover: new Float32Array(CELL * CELL) };
+  const L: Layer = { tone: new Float32Array(CELL * CELL), own: new Float32Array(CELL * CELL), cover: new Float32Array(CELL * CELL) };
   for (let kind = 0; kind < LEAF_KINDS.length; kind++) {
     for (let v = 0; v < 2; v++) {
       const rnd = rng(7919 * (kind + 1) + 131 * v + 17);
       const shapes = [broadSpray, narrowSpray, needleSpray, smallSpray, frondSpray][kind](v, rnd);
       fit(shapes);
       L.tone.fill(0);
+      L.own.fill(0);
       L.cover.fill(0);
-      for (const s of shapes) {
-        if (s.t === "stroke") drawStroke(L, s);
-        else drawBlade(L, s);
-      }
+      // (Each shape's own number from where it is in the list, not from the spray's run of numbers, which
+      // laid the spray as it is.)
+      shapes.forEach((s, n) => {
+        const own = hash01(n, 7919 * (kind + 1) + 131 * v + 29);
+        if (s.t === "stroke") drawStroke(L, s, own);
+        else drawBlade(L, s, own);
+      });
       // (Where nothing is drawn, the spray's mean tone, so the mips' edges do not darken.)
       const T = L.tone;
       const C = L.cover;
@@ -821,7 +828,7 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
           const tone = k > 0 ? Math.min(1, T[n] / a) : mean;
           const t = (tone * 255 + 0.5) | 0;
           data[o] = t;
-          data[o + 1] = t;
+          data[o + 1] = k > 0 ? ((Math.min(1, L.own[n] / a) * 255 + 0.5) | 0) : 128;
           data[o + 2] = t;
           data[o + 3] = k;
         }
@@ -836,22 +843,10 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
     const oy = Math.floor(k / 2) * CELL;
     for (let j = 0; j < CELL; j++) {
       for (let o = ((oy + j) * WIDTH + ox) * 4, end = o + CELL * 4; o < end; o += 4) {
-        data[o] = data[o + 1] = data[o + 2] = t;
+        data[o] = data[o + 2] = t;
+        data[o + 1] = 128;
       }
     }
   }
   return { data, width: WIDTH, height: HEIGHT };
-}
-
-/** The leaf cards' atlas: five kinds of spray, two kinds to a row, two sprays of each side by side (see `leafCell`). */
-export function makeLeafAtlas(): THREE.DataTexture {
-  const { data, width, height } = leafAtlasPixels();
-  const tex = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
-  tex.colorSpace = THREE.NoColorSpace;
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.generateMipmaps = true;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  return tex;
 }

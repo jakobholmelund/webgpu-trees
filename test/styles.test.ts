@@ -26,6 +26,18 @@ test("every look has a style, and every style keeps to the ranges", () => {
   for (const r of Object.values(STYLE_RANGES)) assert.ok(r.min < r.max && r.step > 0);
 });
 
+test("light through the leaves varies through every crown, gathered about the sun; the wood takes moss", () => {
+  for (const look of TREE_LOOKS) {
+    const s = LOOK_STYLES[look];
+    // (Some variation in every look: with none, every backlit leaf glows the same lime green.)
+    assert.ok(s.throughVary > 0, `${look}: the light through varies`);
+    assert.ok(s.throughPower >= 2 && s.throughWarp < 0.5, `${look}: gathered about the sun, bent a little by the leaf`);
+    assert.ok(s.moss > 0, `${look}: moss`);
+  }
+  assert.ok(REAL_STYLE.throughVary >= 0.6 && LOOK_STYLES.painterly.throughVary >= 0.5, "the realistic and painterly looks vary most");
+  assert.ok(REAL_STYLE.moss > DEFAULT_STYLE.moss, "a real trunk carries more moss than a painted one");
+});
+
 test("a style out of its range is said to be", () => {
   assert.equal(checkStyle({ ...DEFAULT_STYLE, lobe: 1.5 }).length, 1);
   assert.equal(checkStyle({ ...DEFAULT_STYLE, chroma: Number.NaN }).length, 1);
