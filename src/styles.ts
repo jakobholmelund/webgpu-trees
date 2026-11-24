@@ -56,6 +56,11 @@ export interface TreeStyle {
   sprigs: number;
   /** How bright the sunlit side of a crown is beside its shade, 1 as the sun gives it: a painter's light is brighter. */
   bright: number;
+  /**
+   * The painterly look: how long a broad leaf is at most, in metres (other kinds keep to theirs beside it, a
+   * palm's fronds far longer). A dab whose leaves would be longer carries smaller ones, more of them.
+   */
+  leafSize: number;
 }
 
 /**
@@ -72,7 +77,7 @@ export type TreeLook = "stylized" | "painterly" | "sculpted" | "real";
 export const TREE_LOOKS: readonly TreeLook[] = ["stylized", "painterly", "sculpted", "real"];
 
 /** The painted look's style (and every look's, for the numbers it does not use). */
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1 };
+export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1, leafSize: 0.22 };
 
 /** The realistic look's style: light as the sun gives it, the crown's shade, light through the leaves, furrowed bark. */
 // (selfShade a half, as the painted look's: the crown's own shade taken in full, through a whole leafy
@@ -114,6 +119,7 @@ export const STYLE_RANGES: Readonly<Record<keyof TreeStyle, { min: number; max: 
   rim: { min: 0, max: 1, step: 0.01 },
   sprigs: { min: 0, max: 0.5, step: 0.01 },
   bright: { min: 0.5, max: 2.5, step: 0.01 },
+  leafSize: { min: 0.05, max: 1.5, step: 0.01 },
 };
 
 /** What is wrong with a style: every number there, finite, and in its range. Empty if nothing. */

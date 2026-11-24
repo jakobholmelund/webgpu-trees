@@ -2,12 +2,13 @@
 // here by arithmetic from nothing (no picture is loaded).
 //
 // Painterly: a cluster of small leaves, as a painter of stylized trees lays a
-// clump: five to thirty crisp leaves of the species' kind fanned out from a
-// middle, each its own tone and folded along its midrib (one half a little
-// darker), casting a thin shadow on those under it, their tips standing out
-// of the cluster's outline one by one. One row of the atlas to a kind of
-// leaf (`LEAF_KINDS`): three clusters, and a fourth of many smaller leaves for
-// the broad dabs a mid or far crown is gathered into.
+// clump: a few sprays of crisp leaves of the species' kind running out from a
+// middle, each leaf its own tone and folded along its midrib (one half a
+// little darker), casting a thin shadow on those under it, the sprays' leaves
+// making a ragged, lobed outline. One row of the atlas to a kind of leaf
+// (`LEAF_KINDS`): three clusters at each of three densities, the leaves
+// smaller and more at each, so a dab carries leaves of about the same size in
+// metres however big it is (`leafSize`).
 //
 // Sculpted: three soft lumpy discs, nearly flat in tone (the light is laid
 // over them by their lobe, in the shader), and a sprig of two or three
@@ -28,8 +29,25 @@ import { hash01 } from "./variants.ts";
 const KINDS = ["broad", "narrow", "needle", "small", "frond"] as const;
 
 export const MARK_CELL = 256;
-/** The painterly atlas: four clusters to a kind across, a kind to a row. */
-export const PAINTERLY_COLS = 4;
+/**
+ * How the painterly atlas's clusters are scaled, coarsest first: each density has three clusters across,
+ * the leaves of each smaller (and more of them) than the one before. A dab picks the coarsest whose leaves
+ * stay under the style's `leafSize` in metres (a big crown's big dabs carry many small leaves, not a few
+ * leaves the size of a hand spread wide).
+ */
+export const PAINTERLY_DENSITIES = [1, 0.6, 0.36] as const;
+/** Clusters of one density across. */
+export const PAINTERLY_VARIANTS = 3;
+/** The painterly atlas: three clusters to a density, three densities, across; a kind to a row. */
+export const PAINTERLY_COLS = PAINTERLY_VARIANTS * PAINTERLY_DENSITIES.length;
+/**
+ * A kind's leaf at the coarsest density, as a share of its mark's half width: its length, the mean over its
+ * cluster (a needle's is a bough's hanging needles').
+ */
+export const LEAF_SHARE: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 0.42, narrow: 0.5, needle: 0.45, small: 0.245, frond: 0.675 };
+/** A kind's leaf beside a broad leaf (`leafSize` is a broad leaf's): a frond is a palm's, metres long. */
+export const LEAF_SIZE_OF: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 1, narrow: 1.1, needle: 1.2, small: 0.6, frond: 5 };
+export { KINDS as MARK_KINDS };
 export const PAINTERLY_ROWS = KINDS.length;
 /** The sculpted atlas: two by two. */
 export const SCULPTED_COLS = 2;
@@ -142,57 +160,85 @@ const SHAPES: Record<(typeof KINDS)[number], { rim: number; fill: number; len: [
 };
 
 /**
- * A cluster of `kind` leaves, `scale` their size (the fourth column's are smaller and more). The rim's leaves
- * first, each pointing out with its tip near the mark's edge, so the cluster's outline is leaf tips; then
- * the middle filled with leaves pointing every way, some of the rim's laid again over them.
+ * A cluster of `kind` leaves, `scale` their size (below 1, smaller and more of them). Laid as a painter lays
+ * one: an uneven mass of three to five round lobes, off its middle and of their own sizes, darker under the
+ * leaves; leaves over it, each pointing out from its lobe's middle give or take, the outer ones laid last so
+ * the outline is their tips standing a little out of the mass, all round. Lumpy and leafy at any density,
+ * never a ring of tips pointing out like a star.
  */
 function cluster(kind: (typeof KINDS)[number], seed: number, scale: number): Leaf[] {
   if (kind === "needle") return bough(seed, scale);
   const sh = SHAPES[kind];
   const rnd = rng(seed);
-  const many = scale < 1 ? 0.75 / (scale * scale) : 1;
-  const leafOf = (x: number, y: number, ang: number, len: number, tone: number): Leaf => ({ x, y, ang, len, wid: len * sh.wide, p: sh.p, q: sh.q, bend: (rnd() - 0.5) * 2 * sh.bend, tone, own: rnd(), sprig: 0 });
-  // (Its body: a few broad, darker shapes under the leaves, from its middle, so the cluster is a mass with
-  // leaves on it and not a scatter: the leaves deeper in, in their own shade.)
-  const back: Leaf[] = [];
-  const bodies = 6;
-  for (let k = 0; k < bodies; k++) {
-    const ang = ((k + rnd() * 0.6) / bodies) * Math.PI * 2;
-    const len = REACH * (scale < 1 ? 0.78 : 0.7) * (0.85 + rnd() * 0.15);
-    back.push({ x: 0, y: 0, ang, len, wid: len * 0.42, p: 0.6, q: 1.1, bend: (rnd() - 0.5) * 0.2, tone: 0.66 + rnd() * 0.08, own: rnd(), sprig: 0 });
-  }
-  const rim = Math.round(sh.rim * many);
-  const rimLeaves: Leaf[] = [];
-  for (let k = 0; k < rim; k++) {
-    const len = (sh.len[0] + rnd() * (sh.len[1] - sh.len[0])) * scale;
-    const at = ((k + rnd() * 0.8) / rim) * Math.PI * 2;
-    const ang = at + (rnd() - 0.5) * 0.7;
-    // (Its tip out near the edge, a little in or out of it.)
-    const tip = REACH * (scale < 1 ? 0.55 + rnd() * 0.42 : 0.8 + rnd() * 0.2);
-    const x = Math.cos(at) * tip - Math.cos(ang) * len;
-    const y = Math.sin(at) * tip - Math.sin(ang) * len;
-    rimLeaves.push(leafOf(x, y, ang, len, 0.8 + rnd() * 0.2));
-  }
-  const fill = Math.round(sh.fill * many);
-  const middle: Leaf[] = [];
-  for (let k = 0; k < fill; k++) {
-    const len = (sh.len[0] + rnd() * (sh.len[1] - sh.len[0])) * scale * 0.9;
-    const at = rnd() * Math.PI * 2;
-    const r = Math.sqrt(rnd()) * Math.max(0, REACH * (scale < 1 ? 0.8 : 0.72) - len);
-    const ang = r > 0.05 ? at + (rnd() - 0.5) * 1.6 : rnd() * Math.PI * 2;
-    middle.push(leafOf(Math.cos(at) * r, Math.sin(at) * r, ang, len, 0.82 + rnd() * 0.18));
-  }
-  // (Each group laid in no order of its own; a third of the rim's leaves over the middle's.)
-  const shuffle = (list: Leaf[]) => {
-    for (let i = list.length - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1));
-      [list[i], list[j]] = [list[j], list[i]];
-    }
-    return list;
+  const leafLen = () => (sh.len[0] + rnd() * (sh.len[1] - sh.len[0])) * scale;
+  const meanLen = 0.5 * (sh.len[0] + sh.len[1]) * scale;
+  const leafOf = (x: number, y: number, ang: number, len: number, tone: number): Leaf => {
+    const fit = inside(x, y, ang, len);
+    return { x, y, ang, len: len * fit, wid: len * fit * sh.wide, p: sh.p, q: sh.q, bend: (rnd() - 0.5) * 2 * sh.bend, tone, own: rnd(), sprig: 0 };
   };
-  shuffle(rimLeaves);
-  const over = rimLeaves.splice(0, Math.floor(rimLeaves.length / 3));
-  return [...back, ...rimLeaves, ...shuffle(middle), ...over];
+  // (The mass: its lobes, each kept inside the mark with room for the leaves standing out of it.)
+  const edge = REACH * (scale < 1 ? 0.86 : 1) - meanLen * 0.55;
+  const lobes: { x: number; y: number; r: number }[] = [];
+  const count = 3 + Math.floor(rnd() * 3);
+  const turn = rnd() * Math.PI * 2;
+  for (let k = 0; k < count; k++) {
+    const a = turn + ((k + (rnd() - 0.5) * 0.7) / count) * Math.PI * 2;
+    const r = edge * (0.42 + rnd() * 0.16);
+    const d = Math.min(edge - r, edge * (0.22 + rnd() * 0.25));
+    lobes.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r });
+  }
+  // (And one in the middle, so the lobes are one mass.)
+  lobes.push({ x: 0, y: 0, r: edge * 0.45 });
+  const lobeAt = (x: number, y: number): number => {
+    let best = -1;
+    let most = 0;
+    lobes.forEach((l, k) => {
+      const inside = 1 - Math.hypot(x - l.x, y - l.y) / l.r;
+      if (inside > most) {
+        most = inside;
+        best = k;
+      }
+    });
+    return best;
+  };
+  // (Its body: each lobe a round, darker shape under the leaves: where they leave it bare it shows as shade.)
+  const back: Leaf[] = lobes.map((l) => {
+    const ang = rnd() * Math.PI * 2;
+    const len = l.r * 1.9;
+    return { x: l.x - Math.cos(ang) * len * 0.5, y: l.y - Math.sin(ang) * len * 0.5, ang, len, wid: l.r * 0.88, p: 1, q: 1, bend: 0, tone: 0.66 + rnd() * 0.08, own: rnd(), sprig: 0 };
+  });
+  // (The leaves over it: as many as cover it about twice over, a leaf's area being its length by its width.)
+  const area = (() => {
+    let inside = 0;
+    const n = 48;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (lobeAt(((i + 0.5) / n) * 2 - 1, ((j + 0.5) / n) * 2 - 1) >= 0) inside++;
+    return (inside / (n * n)) * 4;
+  })();
+  const leafArea = meanLen * meanLen * sh.wide * 1.1;
+  const total = Math.round(Math.min(700, (2 * area) / leafArea));
+  const placed: { leaf: Leaf; out: number }[] = [];
+  for (let k = 0; k < total; k++) {
+    // (A point in the mass, by trying.)
+    let x = 0;
+    let y = 0;
+    let lobe = -1;
+    for (let tries = 0; tries < 24 && lobe < 0; tries++) {
+      x = rnd() * 2 - 1;
+      y = rnd() * 2 - 1;
+      lobe = lobeAt(x, y);
+    }
+    if (lobe < 0) continue;
+    const l = lobes[lobe];
+    const from = Math.atan2(y - l.y, x - l.x);
+    const out = Math.hypot(x - l.x, y - l.y) / l.r;
+    // (Pointing out of its lobe, the more nearly the further out it is; near the middle, any way.)
+    const ang = from + (rnd() - 0.5) * (2.6 - 1.6 * out);
+    const len = leafLen() * (0.85 + 0.25 * out);
+    placed.push({ leaf: leafOf(x - Math.cos(ang) * len * 0.35, y - Math.sin(ang) * len * 0.35, ang, len, 0.8 + rnd() * 0.2), out });
+  }
+  // (Inner ones first, the outer laid over them: give or take, so no ring shows.)
+  placed.sort((a, b) => a.out + (rnd() - 0.5) * 0.5 - (b.out + (rnd() - 0.5) * 0.5));
+  return [...back, ...placed.map((p) => p.leaf)];
 }
 
 /** How much of `len` a leaf from (x, y) pointing at `ang` may have and keep its tip (and a little bend) inside the mark's reach. */
@@ -278,7 +324,7 @@ function put(data: Uint8Array, width: number, col: number, row: number, L: Layer
   }
 }
 
-/** The painterly atlas's texels, RGBA8: a row to each kind of leaf, three clusters and one of smaller leaves. */
+/** The painterly atlas's texels, RGBA8: a row to each kind of leaf, three clusters at each density. */
 export function painterlyAtlasPixels(): { data: Uint8Array; width: number; height: number } {
   const width = MARK_CELL * PAINTERLY_COLS;
   const height = MARK_CELL * PAINTERLY_ROWS;
@@ -286,7 +332,8 @@ export function painterlyAtlasPixels(): { data: Uint8Array; width: number; heigh
   KINDS.forEach((kind, row) => {
     for (let col = 0; col < PAINTERLY_COLS; col++) {
       const L = layer();
-      for (const leaf of cluster(kind, 4099 * (row + 1) + 173 * col + 11, col === 3 ? 0.55 : 1)) drawLeaf(L, leaf);
+      const density = PAINTERLY_DENSITIES[Math.floor(col / PAINTERLY_VARIANTS)];
+      for (const leaf of cluster(kind, 4099 * (row + 1) + 173 * col + 11, density)) drawLeaf(L, leaf);
       put(data, width, col, row, L);
     }
   });

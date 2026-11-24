@@ -23,7 +23,7 @@ import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribu
 import { makeDabAtlas } from "./dabs.ts";
 import { makeLeafAtlas } from "./leaves.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
-import { PAINTERLY_COLS, PAINTERLY_ROWS, SCULPTED_COLS, SCULPTED_ROWS, painterlyAtlasPixels, sculptedAtlasPixels } from "./marks.ts";
+import { LEAF_SHARE, LEAF_SIZE_OF, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, painterlyAtlasPixels, sculptedAtlasPixels } from "./marks.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, woodPieces } from "./geometry.ts";
 import { growTree } from "./grow.ts";
@@ -258,6 +258,8 @@ export function createTrees(options: TreesOptions): Trees {
   const uStyle4 = uniform(new THREE.Vector4(0, 0, 0, 0));
   /** chroma, rim, sprigs, bright. */
   const uStyle5 = uniform(new THREE.Vector4(1, 0, 0, 1));
+  /** leafSize (m). */
+  const uLeafSize = uniform(0.22);
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -670,7 +672,20 @@ export function createTrees(options: TreesOptions): Trees {
       const kind = T.srow(3).z;
       const realCell = vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
       const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
-      const painterlyCell = vec2(t === 0 ? floor(own.mul(2.999)) : float(3), kind);
+      // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
+      // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
+      const markSize = aDab.z.mul(fitOf(T).size).mul(uStyle2.x);
+      let share: Float = float(LEAF_SHARE.broad);
+      let allowed: Float = float(LEAF_SIZE_OF.broad);
+      MARK_KINDS.forEach((k, row) => {
+        share = select(kind.equal(float(row)), float(LEAF_SHARE[k]), share);
+        allowed = select(kind.equal(float(row)), float(LEAF_SIZE_OF[k]), allowed);
+      });
+      const want = uLeafSize.mul(allowed).div(max(markSize.mul(share), float(1e-4)));
+      let density: Float = float(PAINTERLY_DENSITIES.length - 1);
+      for (let d = PAINTERLY_DENSITIES.length - 2; d >= 0; d--) density = select(want.greaterThanEqual(float(PAINTERLY_DENSITIES[d])), float(d), density);
+      if (t > 0) density = max(density, float(1));
+      const painterlyCell = vec2(floor(own.mul(PAINTERLY_VARIANTS - 0.001)).add(density.mul(PAINTERLY_VARIANTS)), kind);
       const disc = floor(own.mul(7.31).fract().mul(2.999));
       const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
       const cell = real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
@@ -952,6 +967,7 @@ export function createTrees(options: TreesOptions): Trees {
       uStyle3.value.set(style.selfShade, style.fullLight, style.bark, style.faceEye);
       uStyle4.value.set(style.lobe, style.bulge, style.warm, style.cool);
       uStyle5.value.set(style.chroma, style.rim, style.sprigs, style.bright);
+      uLeafSize.value = style.leafSize;
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);

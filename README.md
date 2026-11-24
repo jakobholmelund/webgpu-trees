@@ -81,7 +81,7 @@ replaces them.
 | Look | Its crowns | Its light |
 | --- | --- | --- |
 | `stylized` (painted) | brush marks, a few dabs to a clump | the crown's form and each clump's, in flat bands |
-| `painterly` | clusters of 10 to 60 small crisp leaves of the species' kind (`marks.ts`): ovate fans for broadleaves, round leaves for small-leaved trees, level boughs with hanging needles for conifers, curved leaflets for palms | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
+| `painterly` | lumpy clusters of small crisp leaves of the species' kind (`marks.ts`), never longer than `leafSize` metres however big the crown: ovate leaves for broadleaves, round leaves for small-leaved trees, level boughs with hanging needles for conifers, curved leaflets for palms | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
 | `sculpted` | soft lumpy clay discs, and sprigs of two or three leaves on the tops of its lobes | the lobes as clay balls, each dab a small ball on its lobe |
 | `real` | leaf cards set in the crown, each a spray of the species' leaves | as the sun gives it, with light through the leaves |
 
@@ -104,6 +104,16 @@ side brighter beside the shade. `rim` lights a lobe's edge against the sun.
 Mid and far trees are lit the same way over the same lobes, with the
 look's own marks (a cluster of smaller leaves for a gathered dab), so a
 tree keeps its colours as it passes from tier to tier.
+
+**Leaf size.** A painterly cluster's leaves are a share of its dab, and a
+big crown's dabs are a metre and more across: drawn so, its leaves were
+the size of a tray beside a golfer. The atlas holds each kind's clusters
+at three densities (`PAINTERLY_DENSITIES`, the leaves smaller and more at
+each), and each dab takes the coarsest whose leaves stay under `leafSize`
+(0.22 m for a broad leaf; a palm's fronds are allowed five times that).
+A cluster is a lumpy mass of a few round lobes, darker under its leaves,
+the leaves pointing out from their lobe, so its outline is ragged leaf
+tips all round and no ring of tips pointing out like a star.
 
 **Marks.** All drawn by arithmetic, no picture loaded. A painterly leaf is
 an outline about its midrib, folded (one half a little darker), lighter
