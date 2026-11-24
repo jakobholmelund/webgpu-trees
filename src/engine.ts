@@ -284,6 +284,27 @@ function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs
 /** The painterly look's painted marks' mips (paintedMarks.ts), once they came: worked out once a page. */
 let paintedMips: { painterly: Pixels[]; sheets: Pixels[] } | null = null;
 
+/**
+ * The bark sets' texture (`size` texels square, `count` layers), and the one texel standing in for it until the
+ * photographs come. Both sampled alike: the shader is built from whichever is there when the wood is first drawn
+ * (a host drawing before `ready`, as the lab does), and three builds a texture with nearest filtering on both sides
+ * as a load of one texel and its wrapping into the code. Built from the stand-in, the photographs were read texel by
+ * texel at the edge of the tile wherever the bark ran past it: long streaks up every stem close to.
+ */
+export function barkLayers(data: Uint8Array, size: number, count: number): THREE.DataArrayTexture {
+  const tex = new THREE.DataArrayTexture(data, size, size, count);
+  tex.format = THREE.RGBAFormat;
+  tex.type = THREE.UnsignedByteType;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /** An atlas's texture from its mips (`coverageMips`). */
 function atlasTexture(levels: Pixels[], anisotropy: number): THREE.DataTexture {
   const tex = new THREE.DataTexture(levels[0].data, levels[0].width, levels[0].height, THREE.RGBAFormat, THREE.UnsignedByteType);
@@ -1745,11 +1766,7 @@ export function createTrees(options: TreesOptions): Trees {
 
   // (The photographs' bark: every set the trees here wear, one layer each, colour and relief; a texel each
   // until they come, and `uBarkOn` 0.)
-  const placeholder = (): THREE.DataArrayTexture => {
-    const tex = new THREE.DataArrayTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, 1);
-    tex.needsUpdate = true;
-    return tex;
-  };
+  const placeholder = (): THREE.DataArrayTexture => barkLayers(new Uint8Array([128, 128, 255, 255]), 1, 1);
   let barkAlbedo = placeholder();
   let barkNormal = placeholder();
   const uBarkOn = uniform(0);
@@ -2217,17 +2234,7 @@ export function createTrees(options: TreesOptions): Trees {
           const layers = (pick: (s: (typeof sets)[number]) => Pixels): THREE.DataArrayTexture => {
             const data = new Uint8Array(size * size * 4 * sets.length);
             sets.forEach((s, i) => data.set(pick(s).data.subarray(0, size * size * 4), i * size * size * 4));
-            const tex = new THREE.DataArrayTexture(data, size, size, sets.length);
-            tex.format = THREE.RGBAFormat;
-            tex.type = THREE.UnsignedByteType;
-            tex.colorSpace = THREE.NoColorSpace;
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-            tex.magFilter = THREE.LinearFilter;
-            tex.minFilter = THREE.LinearMipmapLinearFilter;
-            tex.generateMipmaps = true;
-            tex.anisotropy = 4;
-            tex.needsUpdate = true;
-            return tex;
+            return barkLayers(data, size, sets.length);
           };
           if (sets.length > 0) {
             const albedo = layers((s) => s.albedo);
