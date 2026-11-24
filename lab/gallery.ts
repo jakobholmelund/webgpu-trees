@@ -22,8 +22,12 @@
 //                             a forked trunk or a clump instead of one stem, where its species has them
 //   ?photos=<address>         also a photograph of your own per species, <address><name>.jpg, from a
 //                             folder outside the repository that you serve yourself
+//   ?refs=1                   the reference row: each species' AI-generated reference pictures
+//                             (lab/references) over ours from the same four views, framed as they are
+//                             (tee25, fairway60, up, foot), in their light: 8:00 with the sun on the left
+//   ?sun=left                 the sun mirrored to the eye's left (the reference pictures' light)
 //
-// For scripts: `await __gallery.render({ look, views, species })` gives every cell as a PNG data URL;
+// For scripts: `await __gallery.render({ look, views, species, refs })` gives every cell as a PNG data URL;
 // `await __gallery.sheet({...})` the contact sheet; `await __gallery.saveCells({...}, prefix)` writes each cell to
 // the GALLERY_OUT folder; `await __gallery.save({...})` writes the sheet to the
 // folder the dev server was started with (GALLERY_OUT=<folder> pnpm dev).
@@ -31,15 +35,19 @@
 import * as THREE from "three/webgpu";
 import { ALL_SPECIES, type Architecture, DEFAULT_DETAIL, DEFAULT_VARIANT_OPTIONS, LOOK_STYLES, REGION_ROWS, type Region, TREE_LOOKS, type TreeInstance, type TreeLook, type TreeSpecies, type TreeStyle, type Trees, cloneSpecies, createTrees } from "../src/index";
 import referenceText from "./REFERENCE.md?raw";
+import { type RefSet, readManifest, setsFor, speciesWithReferences } from "./referenceRow";
 import { type Reference, readReferences } from "./references";
-import { SKY, makeGround, makeSky, sunAt, tintsFor } from "./stage";
-import { GROUP, REFERENCE_SCREEN, type Screen, type Shot, type Standing, VIEWS, VIEW_NAMES, type ViewName, detailScale, groupSpacing, shotFor } from "./views";
+import manifestText from "./references/manifest.json?raw";
+import { SKY, makeGround, makeSky, sunAt, sunFromLeft, tintsFor } from "./stage";
+import { ALL_VIEWS, GROUP, REFERENCE_SCREEN, REF_VIEWS, REF_VIEW_NAMES, type Screen, type Shot, type Standing, VIEWS, VIEW_NAMES, type ViewName, aspectOf, detailScale, groupSpacing, shotFor } from "./views";
 import { measured } from "./world";
 
 declare const __COMMIT__: string;
 
 const LOOK_LABELS: Record<TreeLook, string> = { stylized: "Painted", painterly: "Painterly", sculpted: "Sculpted", real: "Real" };
-const HOURS: [string, number][] = [["Dawn", 6], ["Morning", 9], ["Noon", 13], ["Evening", 18]];
+const HOURS: [string, number][] = [["Dawn", 6], ["Early", 8], ["Morning", 9], ["Noon", 13], ["Evening", 18]];
+/** The reference pictures' hour: a clear morning, the sun low (34 degrees) and, mirrored, on the left. */
+const REF_HOUR = 8;
 const WINDS: [string, number][] = [["Still", 0], ["Breeze", 4], ["Wind", 9], ["Gale", 16]];
 const KINDS: Architecture[] = ["broadleaf", "conifer", "shrub", "palm"];
 const REGION_LABELS: Record<Region, string> = {
@@ -72,6 +80,10 @@ interface Settings {
   day: number | null;
   /** Numbers of the style over the look's own (for scripts: one style beside another). */
   style?: Partial<TreeStyle>;
+  /** The reference row: each species' reference pictures over ours, from the reference views. */
+  refs: boolean;
+  /** The sun mirrored to the eye's left. */
+  sunLeft: boolean;
 }
 
 /** One picture: a species in a look from a view. */
@@ -102,13 +114,26 @@ interface RenderAsk {
   kind?: Architecture | "all";
   /** Numbers of the style over the look's own. */
   style?: Partial<TreeStyle>;
+  /** The reference row (its views, its light, unless asked otherwise). */
+  refs?: boolean;
+  sunLeft?: boolean;
 }
 
 const query = new URLSearchParams(location.search);
 const species: TreeSpecies[] = ALL_SPECIES.map((s) => cloneSpecies(s));
 const references = new Map<string, Reference>(readReferences(referenceText).map((r) => [r.name, r]));
+const refManifest = readManifest(manifestText);
+const refSpecies = speciesWithReferences(refManifest);
+/** The reference pictures' addresses, by file name (Vite hands out each one's). */
+const refUrls = new Map(Object.entries(import.meta.glob("./references/*.avif", { eager: true, query: "?url", import: "default" }) as Record<string, string>).map(([k, v]) => [k.replace(/^.*\//, ""), v]));
 const cellW = Math.max(120, Math.min(1200, Number(query.get("cell")) || 400));
 const cellH = Math.round(cellW * 1.25);
+/** A cell's size for a view: a reference view's as wide as its picture is for the cell's height. */
+const isRef = (view: ViewName) => (REF_VIEW_NAMES as readonly string[]).includes(view);
+const sizeOf = (view: ViewName) => {
+  const a = aspectOf(view, cellW / cellH);
+  return a === cellW / cellH ? { w: cellW, h: cellH } : { w: Math.round(cellH * a), h: cellH };
+};
 const screen: Screen = { lines: Math.max(200, Number(query.get("screen")) || REFERENCE_SCREEN.lines), fov: REFERENCE_SCREEN.fov };
 const photosAt = query.get("photos");
 /** Another set of trees (`?seed`), for every species or by species: its seed for a row. */
@@ -154,7 +179,8 @@ function rowOf(v: number | string): number {
 
 function settingsFromQuery(): Settings {
   const look = query.get("look");
-  const views = (query.get("views") ?? "").split(",").filter((v): v is ViewName => (VIEW_NAMES as string[]).includes(v));
+  const refs = query.get("refs") === "1";
+  const views = (query.get("views") ?? "").split(",").filter((v): v is ViewName => ((refs ? REF_VIEW_NAMES : VIEW_NAMES) as string[]).includes(v));
   const only = (query.get("species") ?? "").split(",").filter(Boolean).map(rowOf).filter((r) => r >= 0);
   const region = query.get("region") as Region | null;
   const kind = query.get("kind") as Architecture | null;
@@ -167,23 +193,26 @@ function settingsFromQuery(): Settings {
     only: only.length > 0 ? only : null,
     region: region && REGION_ROWS.includes(region) ? region : "all",
     kind: kind && KINDS.includes(kind) ? kind : "all",
-    views: views.length > 0 ? views : [...VIEW_NAMES],
-    hour: query.has("hour") && Number.isFinite(hour) ? hour : 9,
+    views: views.length > 0 ? views : refs ? [...REF_VIEW_NAMES] : [...VIEW_NAMES],
+    hour: query.has("hour") && Number.isFinite(hour) ? hour : refs ? REF_HOUR : 9,
     wind: query.has("wind") && Number.isFinite(wind) ? wind : 4,
     day: query.has("day") && Number.isFinite(day) ? day : null,
+    refs,
+    sunLeft: query.has("sun") ? query.get("sun") === "left" : refs,
   };
 }
 
 /** The rows a setting draws: species in a look, or the looks of one species. */
 function rowsOf(s: Settings): { row: number; look: TreeLook }[] {
   if (s.look === "all") return TREE_LOOKS.map((look) => ({ row: s.one, look }));
-  const rows = s.only ?? species.map((_, i) => i).filter((i) => (s.region === "all" || (species[i].regions ?? []).includes(s.region as Region)) && (s.kind === "all" || species[i].architecture === s.kind));
+  const rows = s.only ?? species.map((_, i) => i).filter((i) => (s.region === "all" || (species[i].regions ?? []).includes(s.region as Region)) && (s.kind === "all" || species[i].architecture === s.kind) && (!s.refs || refSpecies.has(species[i].name)));
   return rows.map((row) => ({ row, look: s.look as TreeLook }));
 }
 
 /** A setting's picture of the trees, as a file name: the commit, the look, the light, and what was left out. */
 function setName(s: Settings, commit: string): string {
-  const parts = ["trees", commit, s.look === "all" ? `${slug(species[s.one].name)}-all-looks` : s.look, `h${s.hour}`, `w${s.wind}`];
+  const parts = ["trees", commit, s.look === "all" ? `${slug(species[s.one].name)}-all-looks` : s.look, `h${s.hour}${s.sunLeft ? "left" : ""}`, `w${s.wind}`];
+  if (s.refs) parts.splice(2, 0, "refs");
   if (s.look !== "all") {
     if (s.only && s.only.length < species.length) parts.push(s.only.length <= 4 ? s.only.map((r) => slug(species[r].name)).join("+") : `${s.only.length}-species`);
     else {
@@ -191,7 +220,7 @@ function setName(s: Settings, commit: string): string {
       if (s.kind !== "all") parts.push(s.kind);
     }
   }
-  if (s.views.length < VIEW_NAMES.length) parts.push(s.views.join("+"));
+  if (s.views.length < (s.refs ? REF_VIEW_NAMES : VIEW_NAMES).length) parts.push(s.views.join("+"));
   if (cellW !== 400) parts.push(`c${cellW}`);
   if (screen.lines !== REFERENCE_SCREEN.lines) parts.push(`s${screen.lines}`);
   return parts.join("-") + ".png";
@@ -278,9 +307,18 @@ async function start() {
   const sunNow = new THREE.Vector3();
   /** Draw one cell. Nothing else may draw meanwhile (see `exclusive`). */
   const drawCell = async (stand: Stand, row: number, look: TreeLook, view: ViewName, s: Settings): Promise<Cell> => {
-    const shot = shotFor({ view, trees: stand.standing, forkY: stand.forkY, aspect: cellW / cellH, cellLines: cellH, screen });
+    const { w, h } = sizeOf(view);
+    const shot = shotFor({ view, trees: stand.standing, forkY: stand.forkY, aspect: w / h, cellLines: h, screen });
+    // (A reference view, through a phone's wide lens, drawn at the screen's own pixels for its field and shrunk
+    // into the cell, as a screenshot of the game would be: drawn at the cell's few pixels, a pine's needles
+    // were mipped down into a broad leaf's blot a player never sees. The tiers as on the screen.)
+    const ss = isRef(view) ? Math.min(4, Math.max(1, (screen.lines * Math.tan((shot.fov * Math.PI) / 360)) / Math.tan((screen.fov * Math.PI) / 360) / h)) : 1;
+    const rw = Math.round(w * ss);
+    const rh = Math.round(h * ss);
+    renderer.setSize(rw, rh, false);
+    if (grab.width !== w || grab.height !== h) Object.assign(grab, { width: w, height: h });
     camera.fov = shot.fov;
-    camera.aspect = cellW / cellH;
+    camera.aspect = rw / rh;
     camera.position.set(...shot.eye);
     camera.lookAt(...shot.target);
     camera.updateProjectionMatrix();
@@ -290,7 +328,7 @@ async function start() {
     scene.add(t.object);
     ground.mesh.material = stand.groundMat;
     // The light, as the lab sets it.
-    sunNow.copy(sunAt(s.hour));
+    sunNow.copy(s.sunLeft ? sunFromLeft(s.hour) : sunAt(s.hour));
     tintsFor(sunNow, ground.uSunTint.value, ground.uShadeTint.value);
     ground.uSun.value.copy(sunNow);
     t.environment.sun.copy(sunNow);
@@ -299,13 +337,14 @@ async function start() {
     const heading = THREE.MathUtils.degToRad(WIND_HEADING);
     t.environment.wind.set(Math.cos(heading), Math.sin(heading), s.wind);
     t.environment.day = s.day;
-    if (stand.shadeHour !== s.hour) {
+    const shadeKey = s.sunLeft ? -s.hour : s.hour;
+    if (stand.shadeHour !== shadeKey) {
       const side = stand.shadeSide;
       t.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: 0.4 });
-      stand.shadeHour = s.hour;
+      stand.shadeHour = shadeKey;
     }
     // (The tiers by the tree's size on the screen the cell is a piece of, not on the cell.)
-    const k = detailScale(cellH, shot.fov, screen);
+    const k = detailScale(rh, shot.fov, screen);
     t.detail.nearPx = DEFAULT_DETAIL.nearPx * k;
     t.detail.farPx = DEFAULT_DETAIL.farPx * k;
     // (Twice: whatever the first frame of new trees has still to set up, the second has.)
@@ -313,7 +352,9 @@ async function start() {
       t.update(renderer, camera, TIME_S);
       renderer.render(scene, camera);
     }
-    grabCtx.drawImage(renderer.domElement, 0, 0);
+    grabCtx.imageSmoothingEnabled = true;
+    grabCtx.imageSmoothingQuality = "high";
+    grabCtx.drawImage(renderer.domElement, 0, 0, w, h);
     scene.remove(t.object);
     ground.mesh.material = plainGround;
     const tiers = await t.countDrawn(renderer);
@@ -321,7 +362,7 @@ async function start() {
     return { key: cellKey(row, look, view, s), row, look, view, blob, url: URL.createObjectURL(blob), tiers, shot };
   };
 
-  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}|${s.wind}|${s.day}${s.style ? `|${JSON.stringify(s.style)}` : ""}`;
+  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}${s.sunLeft ? "L" : ""}|${s.wind}|${s.day}${s.style ? `|${JSON.stringify(s.style)}` : ""}`;
   const cells = new Map<string, Cell>();
 
   /** One thing at a time on the renderer: what asks next waits for what asked before. */
@@ -379,12 +420,36 @@ async function start() {
   };
   const caption = (c: Cell) => `${tierText(c.tiers)} · ${Math.hypot(c.shot.eye[0], c.shot.eye[2]).toFixed(c.view === "trunk" || c.view === "under" ? 1 : 0)} m · ${c.shot.fov.toFixed(0)}°`;
 
+  /** A reference picture, decoded, by file name (kept: the same few are drawn into many sheets). */
+  const refBitmaps = new Map<string, Promise<ImageBitmap | null>>();
+  const refBitmap = (file: string) => {
+    let p = refBitmaps.get(file);
+    if (!p) {
+      const url = refUrls.get(file);
+      p = url
+        ? fetch(url)
+            .then((r) => r.blob())
+            .then((b) => createImageBitmap(b))
+            .catch(() => null)
+        : Promise.resolve(null);
+      refBitmaps.set(file, p);
+    }
+    return p;
+  };
+  /** A species' reference sets, when the setting shows the reference row. */
+  const refSetsOf = (s: Settings, row: number): RefSet[] => (s.refs && s.look !== "all" ? setsFor(refManifest, species[row].name) : []);
+  /** The reference picture a reference view's cell sits under. */
+  const refPicture = (set: RefSet, view: ViewName) => set.pictures.get(REF_VIEWS.find((v) => v.name === view)?.ref ?? "");
+
   const makeSheet = async (s: Settings, list: Cell[], commit: string): Promise<Blob> => {
     const rows = rowsOf(s);
     const n = s.views.length;
-    const w = SHEET.pad * 2 + SHEET.label + n * cellW + n * SHEET.gap;
+    const colW = s.views.map((v) => sizeOf(v).w);
+    const colX = colW.map((_, i) => colW.slice(0, i).reduce((a, b) => a + b + SHEET.gap, 0));
+    const w = SHEET.pad * 2 + SHEET.label + colW.reduce((a, b) => a + b, 0) + n * SHEET.gap;
     const rowH = cellH + SHEET.caption + SHEET.gap;
-    const h = SHEET.pad * 2 + SHEET.head + SHEET.colHead + rows.length * rowH;
+    const refRows = rows.reduce((a, r) => a + refSetsOf(s, r.row).length, 0);
+    const h = SHEET.pad * 2 + SHEET.head + SHEET.colHead + (rows.length + refRows) * rowH;
     const canvas = make("canvas", { width: w, height: h });
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#f6f1e4";
@@ -396,22 +461,49 @@ async function start() {
     ctx.textBaseline = "top";
     ctx.fillStyle = ink;
     ctx.font = `600 22px ${serif}`;
-    const title = s.look === "all" ? `${species[s.one].name}, every look` : `${LOOK_LABELS[s.look]} look`;
+    const title = s.look === "all" ? `${species[s.one].name}, every look` : `${LOOK_LABELS[s.look]} look${s.refs ? ", under its reference pictures (AI-generated)" : ""}`;
     ctx.fillText(`webgpu-trees ${commit} · ${title}`, SHEET.pad, SHEET.pad);
     ctx.fillStyle = soft;
     ctx.font = `13px ${sans}`;
     const hourLabel = HOURS.find(([, v]) => v === s.hour)?.[0];
-    ctx.fillText(`${hourLabel ? `${hourLabel}, ` : ""}${s.hour}:00 · wind ${s.wind} m/s · cells ${cellW}×${cellH}, pieces of a ${screen.lines}-line, ${screen.fov}° screen (tiers as on it) · time ${TIME_S} s`, SHEET.pad, SHEET.pad + 30);
+    ctx.fillText(`${hourLabel ? `${hourLabel}, ` : ""}${s.hour}:00${s.sunLeft ? ", the sun on the left" : ""} · wind ${s.wind} m/s · cells ${cellW}×${cellH}, pieces of a ${screen.lines}-line, ${screen.fov}° screen (tiers as on it) · time ${TIME_S} s`, SHEET.pad, SHEET.pad + 30);
     const x0 = SHEET.pad + SHEET.label;
     const y0 = SHEET.pad + SHEET.head;
     ctx.font = `600 12px ${sans}`;
     ctx.fillStyle = soft;
-    s.views.forEach((v, i) => ctx.fillText(VIEWS.find((x) => x.name === v)!.label.toUpperCase(), x0 + i * (cellW + SHEET.gap), y0 + 6));
+    s.views.forEach((v, i) => ctx.fillText(ALL_VIEWS.find((x) => x.name === v)!.label.toUpperCase(), x0 + colX[i], y0 + 6));
     const byKey = new Map(list.map((c) => [c.key, c]));
+    let line = 0;
     for (let r = 0; r < rows.length; r++) {
       const { row, look } = rows[r];
-      const y = y0 + SHEET.colHead + r * rowH;
       const sp = species[row];
+      // (Its reference pictures first, a row a set, each over the view of ours framed as it is.)
+      for (const set of refSetsOf(s, row)) {
+        const y = y0 + SHEET.colHead + line++ * rowH;
+        ctx.fillStyle = ink;
+        ctx.font = `600 17px ${serif}`;
+        ctx.fillText(sp.name, SHEET.pad, y + 2, SHEET.label - 12);
+        ctx.font = `italic 13px ${serif}`;
+        ctx.fillStyle = soft;
+        ctx.fillText(`Reference, AI-generated (${set.set})`, SHEET.pad, y + 24, SHEET.label - 12);
+        ctx.font = `12px ${sans}`;
+        wrapText(ctx, set.note, SHEET.pad, y + 44, SHEET.label - 14, 16);
+        for (let i = 0; i < n; i++) {
+          const pic = refPicture(set, s.views[i]);
+          const bmp = pic ? await refBitmap(pic.file) : null;
+          if (!bmp) continue;
+          const { w: cw, h: ch } = sizeOf(s.views[i]);
+          // (Cover the cell: the picture's own shape is the cell's, to a pixel or two.)
+          const k = Math.max(cw / bmp.width, ch / bmp.height);
+          const sw = cw / k;
+          const sh = ch / k;
+          ctx.drawImage(bmp, (bmp.width - sw) / 2, (bmp.height - sh) / 2, sw, sh, x0 + colX[i], y, cw, ch);
+          ctx.fillStyle = soft;
+          ctx.font = `11px ${sans}`;
+          ctx.fillText(`${pic!.file} · AI-generated`, x0 + colX[i], y + cellH + 3, cw);
+        }
+      }
+      const y = y0 + SHEET.colHead + line++ * rowH;
       ctx.fillStyle = ink;
       ctx.font = `600 17px ${serif}`;
       ctx.fillText(s.look === "all" ? LOOK_LABELS[look] : sp.name, SHEET.pad, y + 2, SHEET.label - 12);
@@ -424,14 +516,14 @@ async function start() {
       wrapText(ctx, regions, SHEET.pad, y + 62, SHEET.label - 14, 16);
       for (let i = 0; i < n; i++) {
         const c = byKey.get(cellKey(row, look, s.views[i], s));
-        const x = x0 + i * (cellW + SHEET.gap);
+        const x = x0 + colX[i];
         if (!c) continue;
         const bmp = await createImageBitmap(c.blob);
         ctx.drawImage(bmp, x, y);
         bmp.close();
         ctx.fillStyle = soft;
         ctx.font = `11px ${sans}`;
-        ctx.fillText(caption(c), x, y + cellH + 3, cellW);
+        ctx.fillText(caption(c), x, y + cellH + 3, colW[i]);
       }
     }
     return new Promise<Blob>((done, no) => canvas.toBlob((b) => (b ? done(b) : no(new Error("the sheet could not be made"))), "image/png"));
@@ -466,8 +558,10 @@ async function start() {
     if (settings.only) q.set("species", settings.only.join(","));
     if (settings.region !== "all") q.set("region", settings.region);
     if (settings.kind !== "all") q.set("kind", settings.kind);
-    if (settings.views.length < VIEW_NAMES.length) q.set("views", settings.views.join(","));
-    if (settings.hour !== 9) q.set("hour", String(settings.hour));
+    if (settings.views.length < (settings.refs ? REF_VIEW_NAMES : VIEW_NAMES).length) q.set("views", settings.views.join(","));
+    if (settings.refs) q.set("refs", "1");
+    if (settings.hour !== (settings.refs ? REF_HOUR : 9)) q.set("hour", String(settings.hour));
+    if (settings.sunLeft !== settings.refs) q.set("sun", settings.sunLeft ? "left" : "right");
     if (settings.wind !== 4) q.set("wind", String(settings.wind));
     if (settings.day !== null) q.set("day", String(settings.day));
     for (const key of ["cell", "screen", "photos", "thumbs", "seed"]) if (query.has(key)) q.set(key, query.get(key)!);
@@ -495,7 +589,31 @@ async function start() {
     void show();
   };
   segment(el("look"), [...TREE_LOOKS.map((l) => [LOOK_LABELS[l], l] as [string, LookChoice]), ["All looks", "all"] as [string, LookChoice]], () => settings.look, (l) => ((settings.look = l), changed()));
-  segment(el("hour"), HOURS, () => settings.hour, (h) => ((settings.hour = h), changed()));
+  const refreshHour = segment(el("hour"), HOURS, () => settings.hour, (h) => ((settings.hour = h), changed()));
+  // (The reference row: its views and its light, the sun on the left at 8:00; off, the gallery's own.)
+  const refsButton = el("refs");
+  const sunButton = el("sunleft");
+  const refreshToggles = () => {
+    refsButton.setAttribute("aria-pressed", String(settings.refs));
+    sunButton.setAttribute("aria-pressed", String(settings.sunLeft));
+    refreshHour();
+  };
+  refsButton.addEventListener("click", () => {
+    settings.refs = !settings.refs;
+    settings.views = settings.refs ? [...REF_VIEW_NAMES] : [...VIEW_NAMES];
+    settings.hour = settings.refs ? REF_HOUR : 9;
+    settings.sunLeft = settings.refs;
+    settings.only = null;
+    if (settings.refs && settings.look === "all") settings.look = "real";
+    refreshToggles();
+    changed();
+  });
+  sunButton.addEventListener("click", () => {
+    settings.sunLeft = !settings.sunLeft;
+    refreshToggles();
+    changed();
+  });
+  refreshToggles();
   segment(el("wind"), WINDS, () => settings.wind, (w) => ((settings.wind = w), changed()));
   const oneBox = el<HTMLSelectElement>("one");
   oneBox.append(...species.map((sp, i) => make("option", { value: String(i), textContent: sp.name })));
@@ -576,10 +694,12 @@ async function start() {
   const buildGrid = () => {
     const rows = rowsOf(settings);
     grid.style.setProperty("--cols", String(settings.views.length));
+    // (Reference views are as wide as their pictures: the columns in proportion to them.)
+    grid.style.setProperty("--tracks", settings.views.map((v) => `minmax(0, ${sizeOf(v).w}fr)`).join(" "));
     slots = new Map();
     const head = make("div", { className: "grow head" }, make("div", { textContent: settings.look === "all" ? "Look" : "Species" }));
     for (const v of settings.views) {
-      const info = VIEWS.find((x) => x.name === v)!;
+      const info = ALL_VIEWS.find((x) => x.name === v)!;
       head.append(make("div", {}, info.label, make("span", { className: "note", textContent: info.note })));
     }
     const out: HTMLElement[] = [head];
@@ -588,9 +708,26 @@ async function start() {
       out.push(top);
     }
     for (const { row, look } of rows) {
+      for (const set of refSetsOf(settings, row)) {
+        const who = make("div", { className: "who" }, make("h2", { textContent: species[row].name }), make("div", { className: "latin", textContent: `Reference, AI-generated (${set.set})` }), make("div", { className: "facts", textContent: set.note }));
+        const line = make("div", { className: "grow ref" }, who);
+        for (const v of settings.views) {
+          const p = refPicture(set, v);
+          const pic = make("div", { className: "pic" });
+          pic.style.aspectRatio = `${sizeOf(v).w} / ${sizeOf(v).h}`;
+          if (p) {
+            const img = make("img", { src: refUrls.get(p.file) ?? "", alt: `${species[row].name}, reference (AI-generated), ${p.view}`, title: `${p.file}, from ${p.source}: AI-generated (lab/references/SOURCES.md)` });
+            img.addEventListener("click", () => window.open(img.src, "_blank"));
+            pic.append(img);
+          }
+          line.append(make("figure", { className: "cell" }, pic, make("figcaption", { textContent: p ? `${p.file} · AI-generated` : "no picture of this view" })));
+        }
+        out.push(line);
+      }
       const line = make("div", { className: "grow" }, whoOf(row, settings.look === "all" ? look : null));
       for (const v of settings.views) {
         const pic = make("div", { className: "pic waiting" });
+        pic.style.aspectRatio = `${sizeOf(v).w} / ${sizeOf(v).h}`;
         const cap = make("figcaption", { textContent: " " });
         line.append(make("figure", { className: "cell" }, pic, cap));
         slots.set(cellKey(row, look, v, settings), { pic, cap });
@@ -604,12 +741,12 @@ async function start() {
     const slot = slots.get(c.key);
     if (!slot) return;
     const sp = species[c.row];
-    const img = make("img", { src: c.url, alt: `${sp.name}, ${LOOK_LABELS[c.look]}, ${c.view}`, width: cellW, height: cellH });
+    const img = make("img", { src: c.url, alt: `${sp.name}, ${LOOK_LABELS[c.look]}, ${c.view}`, width: sizeOf(c.view).w, height: sizeOf(c.view).h });
     img.addEventListener("click", () => openZoom(c));
     slot.pic.classList.remove("waiting");
     slot.pic.replaceChildren(img);
     slot.cap.textContent = caption(c);
-    slot.cap.title = `${VIEWS.find((v) => v.name === c.view)!.note}; eye at ${c.shot.eye.map((n) => n.toFixed(1)).join(", ")}, looking at ${c.shot.target.map((n) => n.toFixed(1)).join(", ")}`;
+    slot.cap.title = `${ALL_VIEWS.find((v) => v.name === c.view)!.note}; eye at ${c.shot.eye.map((n) => n.toFixed(1)).join(", ")}, looking at ${c.shot.target.map((n) => n.toFixed(1)).join(", ")}`;
   };
 
   let showing = 0;
@@ -641,14 +778,14 @@ async function start() {
   const zoomImg = el<HTMLImageElement>("zoom-img");
   const openZoom = (c: Cell) => {
     zoomImg.src = c.url;
-    zoomImg.width = cellW * (zoomImg.classList.contains("px") ? 2 : 1);
-    el("zoom-note").textContent = `${species[c.row].name} · ${LOOK_LABELS[c.look]} · ${VIEWS.find((v) => v.name === c.view)!.label} · ${caption(c)}`;
+    zoomImg.width = sizeOf(c.view).w * (zoomImg.classList.contains("px") ? 2 : 1);
+    el("zoom-note").textContent = `${species[c.row].name} · ${LOOK_LABELS[c.look]} · ${ALL_VIEWS.find((v) => v.name === c.view)!.label} · ${caption(c)}`;
     zoom.showModal();
   };
   el("zoom-close").addEventListener("click", () => zoom.close());
   el("zoom-px").addEventListener("click", () => {
     const on = zoomImg.classList.toggle("px");
-    zoomImg.width = cellW * (on ? 2 : 1);
+    zoomImg.width = (zoomImg.naturalWidth || cellW) * (on ? 2 : 1);
     el("zoom-px").setAttribute("aria-pressed", String(on));
   });
 
@@ -776,7 +913,15 @@ async function start() {
   const askToSettings = (ask: RenderAsk = {}): Settings => {
     const s: Settings = { ...settings, views: [...settings.views] };
     if (ask.look) s.look = ask.look;
-    if (ask.views) s.views = ask.views.filter((v) => VIEW_NAMES.includes(v));
+    if (ask.refs !== undefined && ask.refs !== s.refs) {
+      // (Into the reference row or out of it: its views and its light, unless asked for others.)
+      s.refs = ask.refs;
+      s.views = ask.refs ? [...REF_VIEW_NAMES] : [...VIEW_NAMES];
+      s.hour = ask.refs ? REF_HOUR : 9;
+      s.sunLeft = ask.refs;
+    }
+    if (ask.views) s.views = ask.views.filter((v) => (s.refs ? REF_VIEW_NAMES : VIEW_NAMES).includes(v));
+    if (ask.sunLeft !== undefined) s.sunLeft = ask.sunLeft;
     if (ask.one !== undefined) s.one = Math.max(0, rowOf(ask.one));
     if (ask.species) s.only = ask.species.map(rowOf).filter((r) => r >= 0);
     if (ask.region) ((s.region = ask.region), ask.species || (s.only = null));

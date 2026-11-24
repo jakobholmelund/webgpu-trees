@@ -1,0 +1,549 @@
+{
+  "about": "AI-generated reference pictures (Nano Banana, in the Antigravity app), made by the owner on 2026-11-25; see SOURCES.md. Not photographs, not CC0; for the lab and the gallery only.",
+  "views": [
+    {
+      "name": "tee",
+      "gallery": "tee",
+      "label": "25 m, eye height"
+    },
+    {
+      "name": "60m",
+      "gallery": "fairway",
+      "label": "60 m, eye height"
+    },
+    {
+      "name": "under",
+      "gallery": "under",
+      "label": "under the crown, looking straight up"
+    },
+    {
+      "name": "foot",
+      "gallery": "trunk",
+      "label": "the lower 2 m of the trunk from 3 m"
+    }
+  ],
+  "sets": {
+    "stone-pine": {
+      "species": "Stone pine",
+      "note": "checked against real photographs by the owner; its tee and 60 m pictures were named the other way round"
+    },
+    "stone-pine-2": {
+      "species": "Stone pine",
+      "note": "a second tree, generated again (its foot and under pictures much like the first set's)"
+    },
+    "torrey-pine": {
+      "species": "Torrey pine",
+      "note": "as it grows on the California coast"
+    },
+    "monterey-cypress": {
+      "species": "Monterey cypress",
+      "note": "an old coastal tree with flat-topped wind-shaped foliage"
+    },
+    "eucalyptus": {
+      "species": "Eucalyptus",
+      "note": ""
+    },
+    "coast-live-oak": {
+      "species": "Coast live oak",
+      "note": ""
+    },
+    "california-sycamore": {
+      "species": "California sycamore",
+      "note": ""
+    },
+    "mexican-fan-palm": {
+      "species": "Mexican fan palm",
+      "note": "a tall skinned palm as kept on golf courses"
+    },
+    "canary-date-palm": {
+      "species": "Canary date palm",
+      "note": "its leaf bases trimmed into a pineapple shape"
+    },
+    "silver-birch": {
+      "species": "Silver birch",
+      "note": ""
+    },
+    "beech": {
+      "species": "Beech",
+      "note": ""
+    },
+    "oak": {
+      "species": "Oak",
+      "note": "a large open-grown parkland oak"
+    },
+    "scots-pine": {
+      "species": "Scots pine",
+      "note": "a mature tree with a long orange upper stem and a flat-topped crown"
+    }
+  },
+  "references": [
+    {
+      "set": "stone-pine",
+      "species": "Stone pine",
+      "view": "tee",
+      "file": "stone-pine-tee.avif",
+      "source": "stone-pine-60m.webp",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "stone-pine",
+      "species": "Stone pine",
+      "view": "60m",
+      "file": "stone-pine-60m.avif",
+      "source": "stone-pine-tee.webp",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "stone-pine",
+      "species": "Stone pine",
+      "view": "under",
+      "file": "stone-pine-under.avif",
+      "source": "stone-pine-under.webp",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "stone-pine",
+      "species": "Stone pine",
+      "view": "foot",
+      "file": "stone-pine-foot.avif",
+      "source": "stone-pine-foot.webp",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "stone-pine-2",
+      "species": "Stone pine",
+      "view": "tee",
+      "file": "stone-pine-2-tee.avif",
+      "source": "stone-pine-2-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "stone-pine-2",
+      "species": "Stone pine",
+      "view": "60m",
+      "file": "stone-pine-2-60m.avif",
+      "source": "stone-pine-2-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "stone-pine-2",
+      "species": "Stone pine",
+      "view": "under",
+      "file": "stone-pine-2-under.avif",
+      "source": "stone-pine-2-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "stone-pine-2",
+      "species": "Stone pine",
+      "view": "foot",
+      "file": "stone-pine-2-foot.avif",
+      "source": "stone-pine-2-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "torrey-pine",
+      "species": "Torrey pine",
+      "view": "tee",
+      "file": "torrey-pine-tee.avif",
+      "source": "torrey-pine-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "torrey-pine",
+      "species": "Torrey pine",
+      "view": "60m",
+      "file": "torrey-pine-60m.avif",
+      "source": "torrey-pine-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "torrey-pine",
+      "species": "Torrey pine",
+      "view": "under",
+      "file": "torrey-pine-under.avif",
+      "source": "torrey-pine-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "torrey-pine",
+      "species": "Torrey pine",
+      "view": "foot",
+      "file": "torrey-pine-foot.avif",
+      "source": "torrey-pine-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "monterey-cypress",
+      "species": "Monterey cypress",
+      "view": "tee",
+      "file": "monterey-cypress-tee.avif",
+      "source": "monterey-cypress-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "monterey-cypress",
+      "species": "Monterey cypress",
+      "view": "60m",
+      "file": "monterey-cypress-60m.avif",
+      "source": "monterey-cypress-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "monterey-cypress",
+      "species": "Monterey cypress",
+      "view": "under",
+      "file": "monterey-cypress-under.avif",
+      "source": "monterey-cypress-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "monterey-cypress",
+      "species": "Monterey cypress",
+      "view": "foot",
+      "file": "monterey-cypress-foot.avif",
+      "source": "monterey-cypress-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "eucalyptus",
+      "species": "Eucalyptus",
+      "view": "tee",
+      "file": "eucalyptus-tee.avif",
+      "source": "eucalyptus-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "eucalyptus",
+      "species": "Eucalyptus",
+      "view": "60m",
+      "file": "eucalyptus-60m.avif",
+      "source": "eucalyptus-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "eucalyptus",
+      "species": "Eucalyptus",
+      "view": "under",
+      "file": "eucalyptus-under.avif",
+      "source": "eucalyptus-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "eucalyptus",
+      "species": "Eucalyptus",
+      "view": "foot",
+      "file": "eucalyptus-foot.avif",
+      "source": "eucalyptus-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "coast-live-oak",
+      "species": "Coast live oak",
+      "view": "tee",
+      "file": "coast-live-oak-tee.avif",
+      "source": "coast-live-oak-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "coast-live-oak",
+      "species": "Coast live oak",
+      "view": "60m",
+      "file": "coast-live-oak-60m.avif",
+      "source": "coast-live-oak-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "coast-live-oak",
+      "species": "Coast live oak",
+      "view": "under",
+      "file": "coast-live-oak-under.avif",
+      "source": "coast-live-oak-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "coast-live-oak",
+      "species": "Coast live oak",
+      "view": "foot",
+      "file": "coast-live-oak-foot.avif",
+      "source": "coast-live-oak-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "california-sycamore",
+      "species": "California sycamore",
+      "view": "tee",
+      "file": "california-sycamore-tee.avif",
+      "source": "california-sycamore-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "california-sycamore",
+      "species": "California sycamore",
+      "view": "60m",
+      "file": "california-sycamore-60m.avif",
+      "source": "california-sycamore-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "california-sycamore",
+      "species": "California sycamore",
+      "view": "under",
+      "file": "california-sycamore-under.avif",
+      "source": "california-sycamore-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "california-sycamore",
+      "species": "California sycamore",
+      "view": "foot",
+      "file": "california-sycamore-foot.avif",
+      "source": "california-sycamore-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "mexican-fan-palm",
+      "species": "Mexican fan palm",
+      "view": "tee",
+      "file": "mexican-fan-palm-tee.avif",
+      "source": "mexican-fan-palm-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "mexican-fan-palm",
+      "species": "Mexican fan palm",
+      "view": "60m",
+      "file": "mexican-fan-palm-60m.avif",
+      "source": "mexican-fan-palm-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "mexican-fan-palm",
+      "species": "Mexican fan palm",
+      "view": "under",
+      "file": "mexican-fan-palm-under.avif",
+      "source": "mexican-fan-palm-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "mexican-fan-palm",
+      "species": "Mexican fan palm",
+      "view": "foot",
+      "file": "mexican-fan-palm-foot.avif",
+      "source": "mexican-fan-palm-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "canary-date-palm",
+      "species": "Canary date palm",
+      "view": "tee",
+      "file": "canary-date-palm-tee.avif",
+      "source": "canary-date-palm-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "canary-date-palm",
+      "species": "Canary date palm",
+      "view": "60m",
+      "file": "canary-date-palm-60m.avif",
+      "source": "canary-date-palm-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "canary-date-palm",
+      "species": "Canary date palm",
+      "view": "under",
+      "file": "canary-date-palm-under.avif",
+      "source": "canary-date-palm-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "canary-date-palm",
+      "species": "Canary date palm",
+      "view": "foot",
+      "file": "canary-date-palm-foot.avif",
+      "source": "canary-date-palm-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "silver-birch",
+      "species": "Silver birch",
+      "view": "tee",
+      "file": "silver-birch-tee.avif",
+      "source": "silver-birch-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "silver-birch",
+      "species": "Silver birch",
+      "view": "60m",
+      "file": "silver-birch-60m.avif",
+      "source": "silver-birch-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "silver-birch",
+      "species": "Silver birch",
+      "view": "under",
+      "file": "silver-birch-under.avif",
+      "source": "silver-birch-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "silver-birch",
+      "species": "Silver birch",
+      "view": "foot",
+      "file": "silver-birch-foot.avif",
+      "source": "silver-birch-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "beech",
+      "species": "Beech",
+      "view": "tee",
+      "file": "beech-tee.avif",
+      "source": "beech-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "beech",
+      "species": "Beech",
+      "view": "60m",
+      "file": "beech-60m.avif",
+      "source": "beech-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "beech",
+      "species": "Beech",
+      "view": "under",
+      "file": "beech-under.avif",
+      "source": "beech-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "beech",
+      "species": "Beech",
+      "view": "foot",
+      "file": "beech-foot.avif",
+      "source": "beech-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "oak",
+      "species": "Oak",
+      "view": "tee",
+      "file": "oak-tee.avif",
+      "source": "oak-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "oak",
+      "species": "Oak",
+      "view": "60m",
+      "file": "oak-60m.avif",
+      "source": "oak-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "oak",
+      "species": "Oak",
+      "view": "under",
+      "file": "oak-under.avif",
+      "source": "oak-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "oak",
+      "species": "Oak",
+      "view": "foot",
+      "file": "oak-foot.avif",
+      "source": "oak-foot.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "scots-pine",
+      "species": "Scots pine",
+      "view": "tee",
+      "file": "scots-pine-tee.avif",
+      "source": "scots-pine-tee.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "scots-pine",
+      "species": "Scots pine",
+      "view": "60m",
+      "file": "scots-pine-60m.avif",
+      "source": "scots-pine-60m.png",
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "set": "scots-pine",
+      "species": "Scots pine",
+      "view": "under",
+      "file": "scots-pine-under.avif",
+      "source": "scots-pine-under.png",
+      "width": 576,
+      "height": 1024
+    },
+    {
+      "set": "scots-pine",
+      "species": "Scots pine",
+      "view": "foot",
+      "file": "scots-pine-foot.avif",
+      "source": "scots-pine-foot.png",
+      "width": 576,
+      "height": 1024
+    }
+  ]
+}

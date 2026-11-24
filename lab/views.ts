@@ -8,7 +8,9 @@
 // screen's own pixels. The trees choose their tier by their size on that screen (`detailScale`), so a cell
 // shows the tier a player at that spot would see.
 
-export type ViewName = "tee" | "fairway" | "far" | "under" | "trunk";
+export type ViewName = "tee" | "fairway" | "far" | "under" | "trunk" | RefViewName;
+/** The reference pictures' views (lab/references): framed as the owner asked for them, with a phone's lens. */
+export type RefViewName = "tee25" | "fairway60" | "up" | "foot";
 
 export interface ViewInfo {
   name: ViewName;
@@ -25,6 +27,25 @@ export const VIEWS: readonly ViewInfo[] = [
   { name: "trunk", label: "Trunk and fork", note: "close on the foot of the trunk and its first fork" },
 ];
 export const VIEW_NAMES: readonly ViewName[] = VIEWS.map((v) => v.name);
+
+/**
+ * The reference row's views, each as the reference pictures were asked for, through a phone's main camera
+ * (26 mm equivalent: 69 degrees across the long side of the picture, 43 across the short side of a 16:9
+ * one), landscape or portrait as the picture is. `ref` is the reference picture's view the cell sits under.
+ */
+export const REF_VIEWS: readonly (ViewInfo & { name: RefViewName; ref: string; aspect: number })[] = [
+  { name: "tee25", label: "Tee, 25 m", note: "from 25 m at 1.6 m, landscape (further only if the tree would not fit)", ref: "tee", aspect: 16 / 9 },
+  { name: "fairway60", label: "Fairway, 60 m", note: "from 60 m at 1.6 m, landscape", ref: "60m", aspect: 16 / 9 },
+  { name: "up", label: "Straight up", note: "beside the trunk, looking straight up into the crown, portrait", ref: "under", aspect: 9 / 16 },
+  { name: "foot", label: "Trunk foot", note: "the lower 2 m of the trunk and its flare from 3 m, portrait", ref: "foot", aspect: 9 / 16 },
+];
+export const REF_VIEW_NAMES: readonly RefViewName[] = REF_VIEWS.map((v) => v.name);
+/** Every view, the gallery's and the reference row's. */
+export const ALL_VIEWS: readonly ViewInfo[] = [...VIEWS, ...REF_VIEWS];
+/** The phone's field of view from top to bottom (degrees): a 16:9 picture held level, or upright. */
+export const PHONE_FOV = { landscape: 42.6, portrait: 69.4 };
+/** The width over the height of a view's picture: a reference view's own, else the cell's. */
+export const aspectOf = (view: ViewName, cellAspect: number) => REF_VIEWS.find((v) => v.name === view)?.aspect ?? cellAspect;
 
 /** The screen a cell is a piece of: how many lines it has and its field of view from top to bottom (degrees). */
 export interface Screen {
@@ -192,6 +213,31 @@ export function shotFor(input: ShotInput): Shot {
       if (t.crownBase < 0.5) return { eye: [t.x + r * 0.15, 0.3, t.z + r * 1.15 + 0.3], target: [t.x, t.height * 0.75, t.z - r * 0.2], fov: 70 };
       const eyeY = Math.min(1.6, Math.max(0.4, t.crownBase * 0.75));
       return { eye: [t.x + r * 0.12, eyeY, t.z + Math.max(r * 0.5, t.trunkRadius + 1.2)], target: [t.x, up, t.z - r * 0.2], fov: 70 };
+    }
+    case "tee25": {
+      // (From 25 m, the phone's field, pitched so the tree stands in the middle; further back only for a
+      // tree too tall for it.)
+      const d = fitDistance(points, 1.6, aspect, PHONE_FOV.landscape, 25, 0.04);
+      const fit = fitFrom(points, 1.6, d, aspect, 0.04);
+      return { ...fit, fov: PHONE_FOV.landscape };
+    }
+    case "fairway60": {
+      const fit = fitFrom(points, 1.6, 60, aspect, 0.04);
+      return { ...fit, fov: Math.max(PHONE_FOV.landscape, fit.fov) };
+    }
+    case "up": {
+      // (A step from the trunk, at eye height, facing it, the phone tipped back 74 degrees: the trunk rises
+      // from the foot of the picture into the crown, and the top of the picture is past straight up.)
+      const back = t.trunkRadius + 1.0;
+      const eyeY = 1.6;
+      const pitch = rad(74);
+      return { eye: [t.x + 0.15, eyeY, t.z + back], target: [t.x + 0.15, eyeY + Math.sin(pitch) * 10, t.z + back - Math.cos(pitch) * 10], fov: PHONE_FOV.portrait };
+    }
+    case "foot": {
+      // (3 m from the bark, at 1.1 m, looking at the trunk 1 m up: the flare in the lower part of the
+      // picture, the ground before it below, the stem on up out of the top.)
+      const d = t.trunkRadius + 3;
+      return { eye: [t.x, 1.1, t.z + d], target: [t.x, 1.0, t.z], fov: PHONE_FOV.portrait };
     }
     case "trunk": {
       // (From the ground in front of its foot to a little above where it first forks: the flare, the bark,

@@ -611,7 +611,26 @@ and `?photos=<address>` (a photograph of your own per species,
 `<address><name>.jpg`, from a folder you serve yourself) set it from the
 address.
 
-For scripts: `await __gallery.render({ look, views, species })` gives every
+*Reference row* (`?refs=1`) sets each species under the owner's reference
+pictures of it (`lab/references/`: AI-generated, not photographs, credited in
+its `SOURCES.md`; a species with two trees of it, the stone pine, has two
+rows), and draws ours from the views they were taken from, through a phone's
+lens: the **tee** from 25 m at eye height and the **fairway** from 60 m,
+landscape; **straight up** from a step beside the trunk, and the trunk's
+**foot** from 3 m with its lower 2 m in the picture, upright. Their light is
+the pictures' clear morning, the sun low on the left (8:00, mirrored: *Sun
+left*, `?sun=left`, has it for any hour). These cells are drawn at the
+screen's own pixels for their field of view and shrunk into the cell, as a
+screenshot of the game is, so a pine's needles are mipped as a player sees
+them. Only species with pictures are shown; the contact sheet has the
+pictures' rows too, so `__gallery.save({ look: "real", refs: true, species:
+["Torrey pine"] })` writes a sheet of the pictures over ours.
+`tools/references/build.mjs <folder>` makes the row's pictures (1024 pixels,
+AVIF, 5.3 MB in all) and its `manifest.json` from the owner's originals,
+which stay out of the repository; `test/referenceRow.test.ts` holds the
+manifest to its files and the library's species.
+
+For scripts: `await __gallery.render({ look, views, species, refs })` gives every
 cell as a PNG data URL with the tiers drawn; `await __gallery.sheet({...})`
 the contact sheet; and with the dev server started as
 `GALLERY_OUT=<folder> pnpm dev`, `await __gallery.save({...})` writes the

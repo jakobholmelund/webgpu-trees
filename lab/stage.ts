@@ -60,3 +60,14 @@ export function makeGround() {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), materialFor(null));
   return { mesh, uSun, uSunTint, uShadeTint, materialFor };
 }
+
+/**
+ * The sun at an hour, but standing to the left of an eye that looks along -z (as every gallery view does):
+ * the reference pictures' clear morning with a low sun from the left. The morning's sun mirrored east to
+ * west, so it is as high and as far round as at that hour.
+ */
+export function sunFromLeft(hour: number): THREE.Vector3 {
+  const s = sunAt(hour);
+  s.x = -Math.abs(s.x);
+  return s;
+}
