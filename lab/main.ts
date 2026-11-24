@@ -137,8 +137,8 @@ async function start() {
   scene.add(makeSky());
   const { mesh: ground, uSun, uSunTint, uShadeTint, materialFor: groundFor } = makeGround();
   scene.add(ground);
-  /** What the shade was last worked out for: the trees and the hour. */
-  let shadeFor: { trees: Trees | null; hour: number } = { trees: null, hour: NaN };
+  /** What the shade was last worked out for: the trees, the hour, and the style's `structure` and `density` (bakeShade). */
+  let shadeFor: { trees: Trees | null; hour: number; structure: number; density: number } = { trees: null, hour: NaN, structure: NaN, density: NaN };
 
   // ---- The trees. ----
 
@@ -260,6 +260,11 @@ async function start() {
     return document.getElementById(id) as T;
   }
   const hud = el("status-line");
+  // (The rail and the inspector stand under the bar, however many lines it wraps to: its foot, kept in a variable.)
+  const bar = el("bar");
+  const fitUnderBar = () => document.documentElement.style.setProperty("--bar-bottom", `${Math.ceil(bar.getBoundingClientRect().bottom)}px`);
+  new ResizeObserver(fitUnderBar).observe(bar);
+  fitUnderBar();
   const speciesGui = new GUI({ container: el("species-gui"), title: "" });
   const sceneGui = new GUI({ container: el("scene-gui"), title: "" });
   const refreshNumbers = () => [speciesGui, sceneGui].forEach((g) => g.controllersRecursive().forEach((c) => c.updateDisplay()));
@@ -709,16 +714,17 @@ async function start() {
     Object.assign(trees.style, style);
     Object.assign(trees.detail, detail);
     Object.assign(trees.show, show);
-    // (The shade on the ground, again whenever the trees or the sun have changed. Over the scene's ground:
-    // finer for a few trees, coarser for a course.)
-    if (shadeFor.trees !== trees || shadeFor.hour !== light.hour) {
+    // (The shade on the ground, again whenever the trees, the sun, or how far the style takes the crowns' own
+    // leaves and how thick (`structure`, `density`) have changed. Over the scene's ground: finer for a few
+    // trees, coarser for a course.)
+    if (shadeFor.trees !== trees || shadeFor.hour !== light.hour || shadeFor.structure !== style.structure || shadeFor.density !== style.density) {
       if (shadeFor.trees !== trees) {
         (ground.material as THREE.Material).dispose();
         ground.material = groundFor(trees);
       }
       const side = state.scene === "course" ? 2600 : state.scene === "grove" || state.scene === "woodland" ? 400 : 200;
       trees.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: state.scene === "course" ? 1.25 : 0.4 });
-      shadeFor = { trees, hour: light.hour };
+      shadeFor = { trees, hour: light.hour, structure: style.structure, density: style.density };
     }
     trees.update(renderer, camera, clock.getElapsed());
     renderer.render(scene, camera);
