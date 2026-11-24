@@ -616,6 +616,8 @@ export function createTrees(options: TreesOptions): Trees {
     const aRadial = attribute<"vec4">("aRadial", "vec4");
     const aLimb = attribute<"vec4">("aLimb", "vec4");
     const aWood = attribute<"vec4">("aWood", "vec4");
+    // (Which way the surface faces: out from the centre line, tipped where the wood swells, at a collar or a buttress.)
+    const aNormal = attribute<"vec3">("aNormal", "vec3");
     const T = treeOf(t, aLimb.w);
     const fit = fitOf(T);
     const centre = fit.point(positionGeometry);
@@ -631,7 +633,7 @@ export function createTrees(options: TreesOptions): Trees {
     const keepThin = smoothstep(float(0.25), float(0.6), pxAcross);
     const surface = moved.add(radial.mul(r0.mul(keepThin)));
     const at = toWorld(T, surface);
-    const nWorld = dirToWorld(T, radial);
+    const nWorld = dirToWorld(T, fit.radial(aNormal));
     const C = crownAt(T, at);
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)

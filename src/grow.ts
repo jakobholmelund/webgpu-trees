@@ -101,6 +101,12 @@ const TROPISM = 0.22;
 const LEADER_UP = 0.35;
 /** How far a shoot wanders at random each internode, at crooked 1. */
 const WANDER = 0.22;
+/**
+ * How much of its last internode's turn (its wandering and its turning to the light) a shoot keeps into the
+ * next: a shoot bends gently, as it grows, through several internodes; turned afresh at each, it zigzags,
+ * and smoothing only rounds the zigzag off.
+ */
+const BEND_KEEP = 0.4;
 /** A bud sees the voxels within this angle of its way (the cosine), two voxels round. */
 const PERCEIVE = Math.cos(60 * DEG);
 /** The light a branch must gather for each of its internodes to be kept, from `openness` and `branchiness`, when `shed` is not given. */
@@ -146,6 +152,13 @@ const SMOOTH = 0.5;
 const SIMPLIFY = 4 * DEG;
 /** The longest piece simplifying may make, in internodes. */
 const SIMPLIFY_SPAN = 5;
+/**
+ * Where an axis's tip died and the shoot below it took the lead (sympodial growth), the new leader turns
+ * part of the way back towards the way the axis ran: past this angle, by this share of the rest. Grown at
+ * its lateral's angle and left there, every such node is a corner, and a twig of them a zigzag.
+ */
+const TAKE_LEAD_KEEP = 15 * DEG;
+const TAKE_LEAD = 0.6;
 /** How far wood turns down under its weight per internode of length (Evergrove's sag), at the most each piece, and the radius (in twigs' pipes) at which it is half as pliant. */
 const SAG = 0.06;
 const SAG_MOST = 0.3;
@@ -772,6 +785,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const dx = new Float64Array(cap);
   const dy = new Float64Array(cap);
   const dz = new Float64Array(cap);
+  /** Each node's turn as it grew (its wandering and its turning to the light), handed on to its next internode. */
+  const tw = new Float64Array(cap * 3);
   const par = new Int32Array(cap);
   const main = new Int32Array(cap);
   const lat = new Int32Array(cap);
@@ -1027,18 +1042,26 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       if (d[1] < -0.6) d = cone(dirOf(from), branchAngle(sp, rng), az[from] + Math.PI);
     }
     const k = onAxis ? kind[from] : 2;
+    // (The turn it grows with: on along its axis, what its last internode turned by; a new shoot's afresh.)
+    const turn: V3 = onAxis ? [tw[3 * from], tw[3 * from + 1], tw[3 * from + 2]] : [0, 0, 0];
+    let first = !onAxis;
     for (let m = 0; m < n && count < cap; m++) {
       const j = rng.onSphere();
       const up = lift + (k === 0 ? LEADER_UP * sp.leader : 0);
-      let tx = d[0] + WANDER * sp.crooked * j[0];
-      let ty = d[1] + up + WANDER * sp.crooked * j[1];
-      let tz = d[2] + WANDER * sp.crooked * j[2];
+      let wx = WANDER * sp.crooked * j[0];
+      let wy = WANDER * sp.crooked * j[1];
+      let wz = WANDER * sp.crooked * j[2];
       if (lookForLight(px[at], py[at], pz[at], d)) {
-        tx += TO_LIGHT * toLight[0];
-        ty += TO_LIGHT * toLight[1];
-        tz += TO_LIGHT * toLight[2];
+        wx += TO_LIGHT * toLight[0];
+        wy += TO_LIGHT * toLight[1];
+        wz += TO_LIGHT * toLight[2];
       }
-      d = norm([tx, ty, tz]);
+      const keep = first ? 0 : BEND_KEEP;
+      first = false;
+      turn[0] = keep * turn[0] + (1 - keep) * wx;
+      turn[1] = keep * turn[1] + (1 - keep) * wy;
+      turn[2] = keep * turn[2] + (1 - keep) * wz;
+      d = norm([d[0] + turn[0], d[1] + up + turn[1], d[2] + turn[2]]);
       const x = px[at] + d[0] * L;
       const y = py[at] + d[1] * L;
       const z = pz[at] + d[2] * L;
@@ -1048,6 +1071,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       }
       if (at === from && onAxis) tBud[from] = 0;
       const i = add(x, y, z, at, at !== from || onAxis, k, d);
+      tw[3 * i] = turn[0];
+      tw[3 * i + 1] = turn[1];
+      tw[3 * i + 2] = turn[2];
       if (at !== from) tBud[at] = 0;
       tBud[i] = 1;
       at = i;
@@ -1137,6 +1163,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
 
   // Smoothed, bowed by its weight, and its straight runs joined; then a tree that weeps hangs its whips.
   const unit = L;
+  straightenLeads(w, h);
   smoothWood(w, h);
   // (Less in a narrow crown: its wood rises steep and short-armed, and bowed it hooks.)
   sagWood(w, h, sagOf(sp) * (R / depth < NARROW ? Math.max(0.25, R / depth / NARROW) : 1), unit);
@@ -1189,6 +1216,64 @@ function smoothWood(w: Wood, h: Hung, passes = SMOOTH_PASSES, k = SMOOTH): void 
       w.y[i] = ny[i];
       w.z[i] = nz[i];
     }
+  }
+  follow(w, h, x0, y0, z0);
+}
+
+/**
+ * Each shoot that took the lead where its axis's tip died (its node's only child, starting an axis of its
+ * own) turned back towards the way the axis ran, past TAKE_LEAD_KEEP by TAKE_LEAD of the rest, and all it
+ * bears with it. Nodes come parents first.
+ */
+function straightenLeads(w: Wood, h: Hung): void {
+  const n = w.x.length;
+  const x0 = Float64Array.from(w.x);
+  const y0 = Float64Array.from(w.y);
+  const z0 = Float64Array.from(w.z);
+  const q = new Float64Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    q[4 * i + 3] = 1;
+    const p = w.parent[i];
+    if (p < 0) continue;
+    let qx = q[4 * p];
+    let qy = q[4 * p + 1];
+    let qz = q[4 * p + 2];
+    let qw = q[4 * p + 3];
+    const seg: V3 = [x0[i] - x0[p], y0[i] - y0[p], z0[i] - z0[p]];
+    const g = w.parent[p];
+    if (g >= 0 && !w.cont[i] && w.kids[p].length === 1) {
+      const into = norm([w.x[p] - w.x[g], w.y[p] - w.y[g], w.z[p] - w.z[g]]);
+      const out = norm(rotate(qx, qy, qz, qw, seg[0], seg[1], seg[2]));
+      const turn = Math.acos(Math.min(1, Math.max(-1, into[0] * out[0] + into[1] * out[1] + into[2] * out[2])));
+      // (About the axis square to both, turning `out` towards `into`.)
+      const ax: V3 = [out[1] * into[2] - out[2] * into[1], out[2] * into[0] - out[0] * into[2], out[0] * into[1] - out[1] * into[0]];
+      const al = Math.hypot(ax[0], ax[1], ax[2]);
+      if (turn > TAKE_LEAD_KEEP && al > 1e-6) {
+        const angle = (turn - TAKE_LEAD_KEEP) * TAKE_LEAD;
+        const sn = Math.sin(angle / 2) / al;
+        const bx = ax[0] * sn;
+        const by = ax[1] * sn;
+        const bz = ax[2] * sn;
+        const bw = Math.cos(angle / 2);
+        // b times the parent's turn.
+        const nqx = bw * qx + bx * qw + by * qz - bz * qy;
+        const nqy = bw * qy - bx * qz + by * qw + bz * qx;
+        const nqz = bw * qz + bx * qy - by * qx + bz * qw;
+        const nqw = bw * qw - bx * qx - by * qy - bz * qz;
+        qx = nqx;
+        qy = nqy;
+        qz = nqz;
+        qw = nqw;
+      }
+    }
+    q[4 * i] = qx;
+    q[4 * i + 1] = qy;
+    q[4 * i + 2] = qz;
+    q[4 * i + 3] = qw;
+    const [rx, ry, rz] = rotate(qx, qy, qz, qw, seg[0], seg[1], seg[2]);
+    w.x[i] = w.x[p] + rx;
+    w.y[i] = w.y[p] + ry;
+    w.z[i] = w.z[p] + rz;
   }
   follow(w, h, x0, y0, z0);
 }
@@ -2310,7 +2395,7 @@ function boleOf(w: Wood, foot: number): number[] {
 }
 
 /** How far up a stem its root flare reaches (m): its e-folding height, more for a thicker trunk, under breast height. */
-function flareHeight(size: TreeSize): number {
+export function flareHeight(size: TreeSize): number {
   return Math.min(0.4 * breastHeight(size), FLARE_FROM + FLARE_PER_RADIUS * size.trunkRadius);
 }
 

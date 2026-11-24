@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { growTree } from "../src/grow.ts";
 import { ALL_SPECIES, type TreeSpecies } from "../src/species.ts";
-import { IN_CLUMP, SPRAY_FOOT, TIER_SHAPES, cardPieces, clumpTwigs, dabPieces } from "../src/geometry.ts";
+import { IN_CLUMP, LINE_STRIDE, SPRAY_FOOT, TIER_SHAPES, cardPieces, clumpTwigs, dabPieces, woodLines } from "../src/geometry.ts";
 import { type GrownTree, type TreeSize } from "../src/tree.ts";
 
 const SEEDS = [1, 2, 77];
@@ -21,17 +21,27 @@ function sizes(sp: TreeSpecies): [string, TreeSize][] {
   ];
 }
 
-/** The wood a tier draws (pieces of it at least `from` m in radius), and how far a point is from it. */
+/**
+ * The wood a tier draws (pieces of it at least `from` m in radius), and how far a point is from it: from the
+ * centre lines its tubes are drawn along (`woodLines`, close to: curves through the nodes, in short straight
+ * pieces), not the skeleton's straight pieces between nodes.
+ */
 function woodNear(t: GrownTree, from: number): (x: number, y: number, z: number) => number {
   const k = t.skeleton;
+  const { line } = woodLines(t, TIER_SHAPES[0]);
+  // (Every short straight piece of the drawn lines, as its two ends.)
+  const ends: number[] = [];
+  for (let i = 0; i < k.count; i++) {
+    const l = line[i];
+    if (!l || k.radius[i] < from) continue;
+    for (let o = 0; o + LINE_STRIDE < l.length; o += LINE_STRIDE) ends.push(l[o], l[o + 1], l[o + 2], l[o + LINE_STRIDE], l[o + LINE_STRIDE + 1], l[o + LINE_STRIDE + 2]);
+  }
   // (A grid of the pieces, each in every cell its box touches, so a point asks only the pieces near it.)
   const cell = 0.5;
   const grid = new Map<string, number[]>();
-  for (let i = 0; i < k.count; i++) {
-    const p = k.parent[i];
-    if (p < 0 || k.radius[i] < from) continue;
-    const lo = [Math.min(k.x[p], k.x[i]), Math.min(k.y[p], k.y[i]), Math.min(k.z[p], k.z[i])].map((q) => Math.floor(q / cell));
-    const hi = [Math.max(k.x[p], k.x[i]), Math.max(k.y[p], k.y[i]), Math.max(k.z[p], k.z[i])].map((q) => Math.floor(q / cell));
+  for (let i = 0; i < ends.length; i += 6) {
+    const lo = [0, 1, 2].map((a) => Math.floor(Math.min(ends[i + a], ends[i + 3 + a]) / cell));
+    const hi = [0, 1, 2].map((a) => Math.floor(Math.max(ends[i + a], ends[i + 3 + a]) / cell));
     for (let a = lo[0]; a <= hi[0]; a++)
       for (let b = lo[1]; b <= hi[1]; b++)
         for (let c = lo[2]; c <= hi[2]; c++) {
@@ -42,13 +52,12 @@ function woodNear(t: GrownTree, from: number): (x: number, y: number, z: number)
         }
   }
   const piece = (x: number, y: number, z: number, i: number) => {
-    const p = k.parent[i];
-    const dx = k.x[i] - k.x[p];
-    const dy = k.y[i] - k.y[p];
-    const dz = k.z[i] - k.z[p];
+    const dx = ends[i + 3] - ends[i];
+    const dy = ends[i + 4] - ends[i + 1];
+    const dz = ends[i + 5] - ends[i + 2];
     const l2 = dx * dx + dy * dy + dz * dz;
-    const s = l2 > 0 ? Math.min(1, Math.max(0, ((x - k.x[p]) * dx + (y - k.y[p]) * dy + (z - k.z[p]) * dz) / l2)) : 0;
-    return Math.hypot(x - k.x[p] - dx * s, y - k.y[p] - dy * s, z - k.z[p] - dz * s);
+    const s = l2 > 0 ? Math.min(1, Math.max(0, ((x - ends[i]) * dx + (y - ends[i + 1]) * dy + (z - ends[i + 2]) * dz) / l2)) : 0;
+    return Math.hypot(x - ends[i] - dx * s, y - ends[i + 1] - dy * s, z - ends[i + 2] - dz * s);
   };
   return (x, y, z) => {
     let best = Infinity;
