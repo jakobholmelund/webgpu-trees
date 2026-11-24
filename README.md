@@ -881,6 +881,14 @@ spoil).
   outside before, 1.25 to 1.28 and 1.70 to 1.72 after (two runs each,
   interleaved; this Mac is shared): fewer near cards on a pine and on a blue
   gum's bunches pay for the rest.
+- **Cost** of the pines' shoots, the hand-over piece by piece and the bark
+  over the flare: in the lab's grove, 1104 x 1868, the frame took 1.29 to
+  1.34 ms in the clearing and 1.70 to 1.80 from outside before, 1.21 to 1.45
+  and 1.91 to 2.05 after (a mid tree's cards turned to the eye cover more); in
+  the wood edge, from the fairway at 100 m and 60 m, 3.62 and 4.24 ms at the
+  least before, 2.82 and 3.50 after (likely the hand-over: a tree in it no
+  longer draws both tiers whole and throws half away). Runs interleaved on a
+  shared, busy Mac.
 - **Cost** when the photographs came: in the lab's grove, 1552 x 1868, the frame took 1.80 to 1.92 ms
   in the clearing and 2.40 to 2.45 from outside, against 1.35 to 1.58 and 1.75 to
   1.83 without the photographs (`scans: false`): the near cards about twice
