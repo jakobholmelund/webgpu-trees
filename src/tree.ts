@@ -150,4 +150,6 @@ export interface GrownTree {
   size: TreeSize;
   skeleton: Skeleton;
   clumps: Clumps;
+  /** How much its trunk's foot spreads into buttresses, 0..1 (its species' `buttress`; left out, 0). */
+  buttress?: number;
 }

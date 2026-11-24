@@ -26,7 +26,7 @@
 import { hash01 } from "./variants.ts";
 
 /** The kinds of leaf, by row (the same order as `LEAF_KIND_ROWS` in species.ts and `LEAF_KINDS` in leaves.ts). */
-const KINDS = ["broad", "narrow", "needle", "small", "frond"] as const;
+const KINDS = ["broad", "narrow", "needle", "small", "frond", "pine"] as const;
 
 export const MARK_CELL = 256;
 /**
@@ -44,9 +44,9 @@ export const PAINTERLY_COLS = PAINTERLY_VARIANTS * PAINTERLY_DENSITIES.length;
  * A kind's leaf at the coarsest density, as a share of its mark's half width: its length, the mean over its
  * cluster (a needle's is a bough's hanging needles').
  */
-export const LEAF_SHARE: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 0.42, narrow: 0.5, needle: 0.45, small: 0.245, frond: 0.675 };
+export const LEAF_SHARE: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 0.42, narrow: 0.5, needle: 0.45, small: 0.245, frond: 0.675, pine: 0.4 };
 /** A kind's leaf beside a broad leaf (`leafSize` is a broad leaf's): a frond is a palm's, metres long. */
-export const LEAF_SIZE_OF: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 1, narrow: 1.1, needle: 1.2, small: 0.6, frond: 5 };
+export const LEAF_SIZE_OF: Readonly<Record<(typeof KINDS)[number], number>> = { broad: 1, narrow: 1.1, needle: 1.2, small: 0.6, frond: 5, pine: 1.4 };
 export { KINDS as MARK_KINDS };
 export const PAINTERLY_ROWS = KINDS.length;
 /** The sculpted atlas: two by two. */
@@ -160,6 +160,7 @@ const SHAPES: Record<(typeof KINDS)[number], { rim: number; fill: number; len: [
   needle: { rim: 26, fill: 16, len: [0.3, 0.5], wide: 0.08, p: 0.35, q: 1.0, bend: 0.08 },
   small: { rim: 20, fill: 30, len: [0.21, 0.28], wide: 0.46, p: 1, q: 1, bend: 0.05 },
   frond: { rim: 14, fill: 8, len: [0.55, 0.8], wide: 0.11, p: 0.7, q: 1.1, bend: 0.35 },
+  pine: { rim: 0, fill: 0, len: [0.5, 0.66], wide: 0.05, p: 0.3, q: 1.0, bend: 0.1 },
 };
 
 /**
@@ -171,6 +172,7 @@ const SHAPES: Record<(typeof KINDS)[number], { rim: number; fill: number; len: [
  */
 function cluster(kind: (typeof KINDS)[number], seed: number, scale: number): Leaf[] {
   if (kind === "needle") return bough(seed, scale);
+  if (kind === "pine") return tufts(seed, scale);
   const sh = SHAPES[kind];
   const rnd = rng(seed);
   const leafLen = () => (sh.len[0] + rnd() * (sh.len[1] - sh.len[0])) * scale;
@@ -298,6 +300,53 @@ function bough(seed: number, scale: number): Leaf[] {
         const ang = (side > 0 ? 0 : Math.PI) - side * (0.25 + rnd() * 0.5);
         const len = (0.12 + rnd() * 0.08) * s * inside(x, axis(x), ang, (0.12 + 0.08) * s);
         leaves.push({ x, y: axis(x), ang, len, wid: len * 0.1, p: 0.35, q: 1, bend: 0, tone: 0.85 + rnd() * 0.15, own: rnd(), sprig: 0 });
+      }
+    }
+  }
+  return leaves;
+}
+
+/**
+ * A pine's spray, as a pine carries its needles: brushes at its shoots' ends, the shoots behind them bare (a
+ * pine keeps its needles a few years, so only on its last few years' growth), held up off a level branch in a
+ * row, so a crown of them is plates of tufts (the branch itself is the tree's wood, drawn as wood). Each brush a burst of long thin needles, most of them up and
+ * out from its shoot's tip, a few drooping, a darker core where they leave it. Kept level as the needle's
+ * boughs are (engine.ts). (`scale` below 1: more brushes, smaller.)
+ */
+function tufts(seed: number, scale: number): Leaf[] {
+  const rnd = rng(seed);
+  const sh = SHAPES.pine;
+  const leaves: Leaf[] = [];
+  const s = scale < 1 ? scale ** 0.6 : 1;
+  const rows = scale < 0.5 ? [0.32, -0.2] : scale < 1 ? [0.2, -0.25] : [-0.05];
+  const len0 = (sh.len[0] + sh.len[1]) * 0.5 * s;
+  for (const y0 of rows) {
+    const reach = REACH * 0.88;
+    const axis = (x: number) => y0 - 0.12 * (x / reach) ** 2 - len0 * 0.45;
+    const count = Math.max(3, Math.round(3.2 / s + rnd()));
+    for (let k = 0; k < count; k++) {
+      const x = ((k + 0.5 + (rnd() - 0.5) * 0.5) / count - 0.5) * 2 * reach * 0.86;
+      const ax = axis(x);
+      // (Its shoot: up and out from the branch to the brush.)
+      const lean = (x / reach) * 0.5 + (rnd() - 0.5) * 0.4;
+      const sl = len0 * (0.35 + rnd() * 0.2);
+      const hx = x + Math.sin(lean) * sl;
+      const hy = ax + Math.cos(lean) * sl;
+      leaves.push({ x, y: ax, ang: Math.PI / 2 - lean, len: sl, wid: 0.018 * s, p: 0.3, q: 0.6, bend: 0, tone: 0.5, own: rnd(), sprig: 0 });
+      // (Its core.)
+      for (let j = 0, n = Math.round(22 * s); j < n; j++) {
+        const ang = Math.PI / 2 - lean + (rnd() - 0.5) * 3.4;
+        const len = len0 * (0.3 + rnd() * 0.2);
+        leaves.push({ x: hx, y: hy, ang, len, wid: len * 0.13, p: 0.3, q: 1, bend: 0, tone: 0.66 + rnd() * 0.08, own: rnd(), sprig: 0 });
+      }
+      // (Its needles: a burst, longest up and out, a few drooping under it.)
+      for (let j = 0, n = Math.round(120 * s); j < n; j++) {
+        const down = rnd() < 0.18;
+        const ang = down ? -Math.PI / 2 + (rnd() - 0.5) * 2.2 : Math.PI / 2 - lean + (rnd() - 0.5) * 2.7;
+        const up = Math.max(0, Math.sin(ang));
+        const len = len0 * (down ? 0.45 : 0.6 + 0.4 * up) * (0.75 + rnd() * 0.4);
+        const fit = inside(hx, hy, ang, len);
+        leaves.push({ x: hx, y: hy, ang, len: len * fit, wid: len * fit * sh.wide, p: sh.p, q: sh.q, bend: (rnd() - 0.5) * 2 * sh.bend, tone: 0.76 + rnd() * 0.24, own: rnd(), sprig: 0 });
       }
     }
   }

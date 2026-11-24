@@ -24,12 +24,12 @@
 import { hash01 } from "./variants.ts";
 
 /** The kinds of leaf the atlas holds, by index (the same as `LEAF_KIND_ROWS` in species.ts). */
-export const LEAF_KINDS = ["broad", "narrow", "needle", "small", "frond"] as const;
+export const LEAF_KINDS = ["broad", "narrow", "needle", "small", "frond", "pine"] as const;
 export type LeafKind = (typeof LEAF_KINDS)[number];
 
 const CELL = 256;
 const COLS = 4;
-/** Two kinds to a row; the last row's right half is empty (transparent). */
+/** Two kinds to a row. */
 const ROWS = Math.ceil(LEAF_KINDS.length / 2);
 const WIDTH = CELL * COLS;
 const HEIGHT = CELL * ROWS;
@@ -305,8 +305,55 @@ function narrowSpray(v: number, rnd: () => number): Shape[] {
   return [...twigs, ...under(shuffle(leaves, rnd))];
 }
 
-/** Fir or spruce (v 0): a flat frond, side shoots combed with short needles. Pine (v 1): long needles in brushes. */
-function needleSpray(v: number, rnd: () => number): Shape[] {
+/** A fir's or a spruce's spray (two of them, v 0 and 1): a flat frond, side shoots combed with short needles. */
+function needleSpray(_v: number, rnd: () => number): Shape[] {
+  return conifer(0, rnd);
+}
+
+/**
+ * A pine's spray (v 0 and 1): a branch's end of shoots, each ending in a brush of needles, the shoots behind
+ * them bare, as a pine keeps its needles only on its last few years' growth.
+ */
+function pineSpray(v: number, rnd: () => number): Shape[] {
+  const twigs: Shape[] = [];
+  const needles: Shape[] = [];
+  // (A branch's end: a shoot forking into shoots, each of the last few years' growth, each ending in its brush;
+  // v 1 forks once more, finer.)
+  const tips: { x: number; y: number; a: number; len: number }[] = [];
+  const main = twig(twigs, 0, 0, Math.PI / 2 + (rnd() - 0.5) * 0.25, 120, (rnd() - 0.5) * 0.3, 3.2, 2.2, rnd, 8, 0.06);
+  tips.push({ ...main[main.length - 1], len: 30 + rnd() * 6 });
+  let side = rnd() < 0.5 ? 1 : -1;
+  const forks = v === 0 ? [0.3, 0.48, 0.64, 0.8] : [0.22, 0.36, 0.5, 0.62, 0.74, 0.86];
+  for (const f of forks) {
+    const p = along(main, f + (rnd() - 0.5) * 0.04);
+    const len = (75 + rnd() * 25) * (1.15 - f * 0.6);
+    const pts = twig(twigs, p.x, p.y, p.a + side * (0.6 + rnd() * 0.35), len, -side * 0.25, 2.3, 1.7, rnd, 6, 0.07);
+    tips.push({ ...pts[pts.length - 1], len: 26 + rnd() * 6 });
+    if (len > 55) {
+      const q = along(pts, 0.55 + rnd() * 0.1);
+      const sub = twig(twigs, q.x, q.y, q.a - side * (0.5 + rnd() * 0.3), len * 0.45, 0, 1.6, 1.3, rnd, 4, 0.07);
+      tips.push({ ...sub[sub.length - 1], len: 22 + rnd() * 5 });
+    }
+    side = -side;
+  }
+  for (const tip of tips) {
+    const shade = 0.84 + rnd() * 0.26;
+    // (Its brush: needles off the last stretch of the shoot and all round its tip, splayed forward, the shoot
+    // behind it bare.)
+    for (let k = 0; k < 90; k++) {
+      const back = rnd() * tip.len * 0.55;
+      const x = tip.x - Math.cos(tip.a) * back;
+      const y = tip.y - Math.sin(tip.a) * back;
+      const a = tip.a + (rnd() - 0.5) * 2.6 * (0.6 + 0.4 * (back / (tip.len * 0.55)));
+      const forward = 0.6 + 0.4 * Math.cos(a - tip.a);
+      needle(needles, x, y, a, tip.len * forward * (0.75 + rnd() * 0.4), 1.35, rnd, shade);
+    }
+  }
+  return [...twigs, ...needles];
+}
+
+/** Fir or spruce (0): a flat frond, side shoots combed with short needles. Pine (1): long needles in brushes. */
+function conifer(v: number, rnd: () => number): Shape[] {
   const twigs: Shape[] = [];
   const needles: Shape[] = [];
   const shoots: { pts: Pt[]; len: number }[] = [];
@@ -795,7 +842,7 @@ export function leafAtlasPixels(): { data: Uint8Array; width: number; height: nu
   for (let kind = 0; kind < LEAF_KINDS.length; kind++) {
     for (let v = 0; v < 2; v++) {
       const rnd = rng(7919 * (kind + 1) + 131 * v + 17);
-      const shapes = [broadSpray, narrowSpray, needleSpray, smallSpray, frondSpray][kind](v, rnd);
+      const shapes = [broadSpray, narrowSpray, needleSpray, smallSpray, frondSpray, pineSpray][kind](v, rnd);
       fit(shapes);
       L.tone.fill(0);
       L.own.fill(0);

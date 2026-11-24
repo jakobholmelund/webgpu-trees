@@ -780,8 +780,8 @@ export function createTrees(options: TreesOptions): Trees {
       const flutter = sin(uTime.mul(5.3).add(own.mul(40))).mul(0.08).mul(clamp(uWind.z.div(6), 0.1, 1.5));
       let ang: Float = own.mul(6.283).add(flutter);
       if (look === "painterly") {
-        // (A painterly conifer's sprays are boughs: kept level, give or take a little, hanging their needles.)
-        const needle = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("needle"))), float(1), float(0));
+        // (A painterly conifer's sprays are boughs, a pine's plates of tufts: kept level, give or take a little.)
+        const needle = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("needle"))).or(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("pine")))), float(1), float(0));
         ang = mix(ang, own.sub(0.5).mul(0.5).add(flutter), needle);
       }
       if (lobeAt && look === "sculpted") {

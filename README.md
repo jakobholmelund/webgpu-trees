@@ -283,8 +283,91 @@ along (the willow's curtain, the birch's tresses).
 What the grower cannot do yet, so those rows come as close as their data
 allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
 most 3 degrees), several trunks from one foot (a sycamore's, a coast live
-oak's), a buttressed foot (western red cedar), and a fan palm's skirt of
-dead leaves under its head.
+oak's), and a fan palm's skirt of dead leaves under its head.
+
+## Species morphology
+
+A tree is known first by its outline, and then, nearer, by how it is put
+together: whether one stem runs to its top, at what angle its limbs leave
+it, how they bend along their length, how its twigs run, where on them its
+leaves are. Two trees of the same outline, one with a spruce's drooping
+boughs that turn up at their tips and one with an oak's crooked limbs run
+out level, are not mistaken for each other a hundred metres off. So each
+species' row says these things too, and the grower grows them.
+
+[`docs/MORPHOLOGY.md`](docs/MORPHOLOGY.md) is where the numbers come from:
+for each species its form, branching, foliage, bark and the few traits it is
+known by, every number tagged as read from a source (`[S:...]`, the sources
+and their licences listed at its end), estimated (`[est.]`) or seen in the
+field (`[obs.]`), and a table of what a grower needs. It is our own
+synthesis, with citations; TALLO's measured crowns (Jucker et al. 2022,
+CC BY 4.0) give each species' crown radius for its height in a forest.
+
+What a row may say, over its `branchAngle` and `bend` (all left out, a row
+grows as it did):
+
+- **`limbAngle`** `[top, base]`: the angle its first-order limbs (a
+  broadleaf's great limbs, a conifer's boughs) leave the trunk at, at the top
+  of its crown and at its base, in degrees from upright. A Norway spruce's
+  top boughs rise and its low ones droop (`[45, 115]`); a white pine's stand
+  out at right angles below and rise above; a willow's main branches rise at
+  40 to 45 degrees (Trees and Shrubs Online).
+- **`limbCurve`** and **`limbCurveBack`**: how a limb turns along its length,
+  Weber and Penn's curve and curve-back: over its inner half, and over its
+  outer. A spruce's J-curved bough droops and turns up at its tip (-30, +50);
+  a Torrey pine's runs out level and turns up into its candelabra (0, +50); a
+  willow's rises and arches over (+5, -55); a Monterey cypress's rises,
+  elbows and runs level (-50).
+- **`zigzag`**: how far a fine branch turns at each node where its tip died and
+  a side bud took the lead (sympodial growth: a plane's, a sycamore's
+  twigs, 25 degrees), or none (a maple's, whose terminal bud goes on). Grown
+  into the wood after it is smoothed, which would iron a zigzag flat.
+- **`phyllotaxis`**: how its side buds are set round a shoot, by the golden
+  angle (most trees), opposite and crossed (a maple's: one of each pair
+  grown), or in two ranks in the shoot's plane (a beech's flat fans).
+- **`sprayHang`**: how far a conifer's side shoots hang from their bough, from
+  a fir's flat spray to a Norway spruce's comb or a cedar's hanging sprays.
+- **`canopyLift`**: how much of the crown's underside is cleared of leaves,
+  a bowl from its rim up into its middle, so its limbs show beneath it: a
+  stone pine's umbrella on its bare vase of limbs.
+- **`pads`**: how far its leaves gather into flat-topped pads, each branch
+  off a great limb keeping only the leaves near its top, with air and bare
+  wood under each: a Monterey cypress on a headland, an old Scots pine's
+  plates, a Torrey pine's tufts on bare limbs.
+- **`buttress`**: how far its foot spreads into buttresses and flutes, more
+  of them and higher (a western red cedar's, a Sitka spruce's).
+
+Two things follow from the row without a setting. A conifer that keeps its
+leader and wears needles or scales (a spruce, a fir, a cedar) has a spire:
+its leader clothed in needles all round over its last few metres, finer to
+its tip, its last whorls' boughs short, so its top is a dense point and no
+bare stick; drawn as sheets, round the leader, splayed out and up as a fir's
+top shoots are (one crossed pair, mid). And a pine (`leafKind: "pine"`)
+carries its needles as a pine does, in brushes at its shoots' ends, the
+wood behind them bare, because a pine keeps its needles only on its last
+few years' growth: its sprays are brushes on forked shoots (real), plates
+of upright tufts held level (painterly), never a fir's flat combs, which
+made a pine read as a fir.
+
+What draws the eye as wrong first is wood with no leaves where a tree would
+have them: a twig poking out of a conifer's needles. A conifer drawn in
+sheets keeps a twig only where its needles lie close over it, and any twig
+whose end its boughs' sheets still miss is given a sheet of its own along
+it (`test/morphology.test.ts` holds every twig end under its sheets, near and
+mid).
+
+`test/morphology.test.ts` holds the species to the reference's numbers that
+a grown tree can be measured for: the sourced ones within what measuring a
+grown tree allows (a spruce's leader to its top and straight; a willow's
+and a stone pine's limb angles; a white pine's boughs square to its stem
+below and rising above; a coast live oak's limbs leaving a trunk of 1.2 to
+2.4 m and running out level; upper spruce boughs rising and lower ones
+drooping; a plane's twigs zigzagging more than a maple's; every row's crown
+wider for its height than TALLO's forest median, and grown at that median a
+crown of many sprays in its box), and the estimated ones as soft walls,
+with a margin, saying so (each species' limb angles, J-curves, whorls, open
+crown ratios, the cypress's pads, the gorse's mound to the ground, the stone
+pine's bare limbs under its umbrella).
 
 ## The lab
 
