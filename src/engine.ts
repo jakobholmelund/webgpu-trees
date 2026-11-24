@@ -357,7 +357,10 @@ export function createTrees(options: TreesOptions): Trees {
     const half = scanned ? nearCardHalf(l) : 0;
     if (half <= 0) return null;
     // (A palm's: two of its leaves (or long stretches of one) a clump, and no big cards under them.)
-    return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
+    return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "sprays" || l.spray === "tufts"
+        ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
+          { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
+        : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
   });
   const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, sheeted, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, sheeted) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? sheeted : undefined), lobes) : dabPieces(grown, s)));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
