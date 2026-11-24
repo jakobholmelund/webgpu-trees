@@ -202,7 +202,7 @@ const SHOOT_ANGLE = 55 * DEG;
 const SPIRE = 0.18;
 const SPIRE_MOST = 3;
 /** Its needles' clumps every this many clump radii up the leader, the top one this share of a clump's radius below the tree's top, the finest this share of a clump. */
-const SPIRE_STEP = 0.55;
+const SPIRE_STEP = 0.9;
 const SPIRE_TIP = 0.35;
 const SPIRE_FINE = 0.4;
 const SPIRE_FULL = 1.1;
