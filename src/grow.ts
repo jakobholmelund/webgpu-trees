@@ -31,6 +31,16 @@
 //   ones upright, the old ones hanging, each arching over as far as the crown
 //   lets it reach. Its leaves hang along each frond's outer part.
 //
+// Where it stands among other trees (stand.ts) is light too: its neighbours'
+// crowns hide the low sky on their side, as a shadow over the voxels where
+// the sky they hide would have come in. So an edge tree's buds turn out to
+// the open side and its shaded side's lower branches are shed, and a tree
+// inside a wood keeps only its top: the shapes come out of the light, as the
+// rest of the crown's do. An edge tree's great limbs swing a little to the
+// open side, and those that would reach into the dark are never grown; a
+// conifer's boughs on its dark side die back or are not there. The crown
+// still keeps to its outline: what moves is within it.
+//
 // A broadleaf or a shrub that weeps (`weep`) then hangs whips from its outer
 // twigs: a short arch out, then straight down towards the crown's base, leaved
 // all along, in place of the leaves at those twigs' ends.
@@ -47,6 +57,7 @@
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
 import { type TreeSpecies } from "./species.ts";
+import { type Stand, standShare } from "./stand.ts";
 import { crownProfile, type Clumps, type GrownTree, type Skeleton, type TreeSize } from "./tree.ts";
 import { Random } from "./random.ts";
 
@@ -304,6 +315,28 @@ const STUB_THINNEST = 0.08;
 /** The longest a stub is (m): what is left of a dead branch once the wind has had the rest. */
 const STUB_LONGEST = 0.45;
 
+/**
+ * How dark a voxel the stand hides all of its low sky from is to a bud, in the shadow a node of wood casts
+ * on the voxel under it: about as dark as under a few layers of its own crown.
+ */
+const STAND_SHADE = 1.0;
+/**
+ * In a stand, a crown lives only where it is lit at least this, for its best lit (or in the top
+ * `STAND_LIVE_LEAST` of the tree's height, which it keeps however closed its wood: a tree inside a wood has
+ * a live crown of nearly half its height or more: Assmann's yield tables, and every forester's eye).
+ */
+const STAND_LIVE = 0.5;
+const STAND_LIVE_LEAST = 0.45;
+/** How far an edge tree's great limbs swing to the open side, for how lopsided it stands (radians). */
+const STAND_SWING = 0.55;
+/** How far its leader leans out to the open side, for how lopsided it stands (a share of its wander). */
+const STAND_LEADER = 0.05;
+/** A conifer's bough lit less than this is dead, and gone; one lit less than `STAND_BOUGH_FULL` is shorter. */
+const STAND_BOUGH = 0.4;
+const STAND_BOUGH_FULL = 0.8;
+/** Dead stubs along a bole a wood has cleaned, for how enclosed it stands (as `boleStubs`). */
+const STAND_STUBS = 0.6;
+
 /** Where a trunk's radius is measured (m): breast height. */
 export const BREAST_HEIGHT = 1.3;
 
@@ -322,11 +355,18 @@ function branchAngle(sp: TreeSpecies, rng: Random): number {
   return Math.max(5 * DEG, Math.min(175 * DEG, (sp.branchAngle + sp.branchAngleSpread * g) * DEG));
 }
 
-/** Grow one tree of a species to a size. The same arguments give the same tree. */
-export function growTree(species: TreeSpecies, size: TreeSize, seed: number): GrownTree {
+/**
+ * Grow one tree of a species to a size. The same arguments give the same tree. A `stand` (in the tree's own
+ * frame: its open side along +x) grows it in the light its neighbours leave it; left out, it stands alone.
+ */
+export function growTree(species: TreeSpecies, size: TreeSize, seed: number, stand?: Stand): GrownTree {
   const sz = soundSize(size);
   const rng = new Random(seed);
   const wood = newWood();
+  // (Nothing round it is no stand: it grows exactly as one alone.)
+  const st = stand && (stand.enclosure > 0 || stand.lopsided > 0) && species.architecture !== "palm" ? stand : undefined;
+  // (Where its live crown starts: its base, unless its wood has lifted it.)
+  const lift = st ? liveBaseOf(species, sz, st) : sz.crownBase;
   // The species' clump, scaled by the tree's height against the species' own (a younger tree's twigs
   // are smaller, but less so than the tree). No more than a share of the crown's radius, though: a crown
   // grown narrow in a wood is still a crown of many sprays, not two or three balls on a stick.
@@ -335,17 +375,17 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number): Gr
   let hung: Hung;
   switch (species.architecture) {
     case "conifer":
-      hung = whorled(species, sz, rng.fork(), wood, clumpR);
+      hung = whorled(species, sz, rng.fork(), wood, clumpR, st, lift);
       break;
     case "broadleaf":
     case "shrub":
-      hung = budGrow(species, sz, rng.fork(), wood, clumpR);
+      hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift);
       break;
     case "palm":
       hung = palm(species, sz, rng.fork(), wood, clumpR);
       break;
   }
-  return boleStubs(species, finish(species, sz, wood, hung), rng.fork());
+  return boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined), rng.fork(), st);
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */
@@ -355,6 +395,47 @@ function soundSize(s: TreeSize): TreeSize {
   const crownBase = Math.min(Math.max(0, s.crownBase), 0.95 * height);
   const trunkRadius = Math.max(0.001, s.trunkRadius);
   return { height, crownRadius, crownBase, trunkRadius };
+}
+
+/**
+ * How much of a place's sky a tree's stand leaves it (stand.ts, `standShare`, its crown taken as the
+ * shaders take it), for the most it leaves anywhere in the crown: 1 where the crown is best off. So a tree
+ * in an even shade all over (a sapling under a wood's canopy) is grown as one in the open: what shapes a
+ * crown is where its light comes from, not how much of it there is.
+ */
+function standLightOf(sp: TreeSpecies, stand: Stand, size: TreeSize): (x: number, y: number, z: number) => number {
+  const k = 0.5 * (0.3 + (1 - sp.openness) * 1.1);
+  const depth = Math.max(0.01, size.height - size.crownBase);
+  const shell = Math.max(sp.foliageDepth, 0.15) * Math.min(size.crownRadius, 0.5 * depth);
+  const at = (x: number, y: number, z: number) => standShare(stand, size, k, shell, x, y, z);
+  // (The best: over the crown's ellipsoid, at a few heights, out from its axis to near its side.)
+  let best = 1e-3;
+  for (let i = 0; i <= 12; i++) {
+    const e = i / 6 - 1;
+    const y = size.crownBase + 0.5 * depth * (1 + e);
+    const r = size.crownRadius * Math.sqrt(Math.max(0, 1 - e * e));
+    for (const f of [0, 0.5, 0.9])
+      for (let j = 0; j < (f > 0 ? 8 : 1); j++) best = Math.max(best, at(f * r * Math.cos((j * Math.PI) / 4), y, f * r * Math.sin((j * Math.PI) / 4)));
+  }
+  return (x, y, z) => Math.min(1, at(x, y, z) / best);
+}
+
+/**
+ * Where a crown in a stand lives from (m): the lowest height at which a place halfway out on its most open
+ * side is lit enough to keep its leaves (`STAND_LIVE`), and no higher than the top `STAND_LIVE_LEAST` of the
+ * tree. At a wood's edge that is its base (its open side keeps its leaves to the ground); inside a wood, high.
+ */
+function liveBaseOf(sp: TreeSpecies, size: TreeSize, stand: Stand): number {
+  const at = standLightOf(sp, stand, size);
+  const profile = profileOf(sp);
+  const depth = Math.max(0.01, size.height - size.crownBase);
+  const top = size.height * (1 - STAND_LIVE_LEAST);
+  for (let i = 0; i <= 40; i++) {
+    const y = size.crownBase + (i / 40) * depth;
+    if (y >= top) return Math.max(size.crownBase, top);
+    if (at(0.5 * profile(i / 40) * size.crownRadius, y, 0) >= STAND_LIVE) return y;
+  }
+  return Math.max(size.crownBase, top);
 }
 
 // ---------------------------------------------------------------------------
@@ -443,14 +524,40 @@ function profileOf(sp: TreeSpecies): (t: number) => number {
   };
 }
 
+/**
+ * How far a crown reaches from its axis at a height (m): its species' outline from its base to its top. A
+ * crown a wood has lifted (its live crown starting at `lift`, above its base: stand.ts) is a whole crown of
+ * its kind over what is left of the tree, its outline drawn from `lift` to the top, as wide as its own
+ * outline or that, whichever is wider, and never past the crown's ellipsoid: what a ball meets
+ * (`crownEllipsoid`). So a tree inside a wood keeps a full crown, high up and as wide as its neighbours let
+ * it be, not the top of an open-grown one.
+ */
+function outlineOf(sp: TreeSpecies, size: TreeSize, lift = size.crownBase): (y: number) => number {
+  const profile = profileOf(sp);
+  const base = size.crownBase;
+  const depth = Math.max(0.01, size.height - base);
+  const R = size.crownRadius;
+  const own = (y: number) => profile((y - base) / depth) * R;
+  if (!(lift > base + 0.02 * depth)) return own;
+  const live = Math.max(0.01, size.height - lift);
+  const ry = 0.5 * depth;
+  const cy = base + ry;
+  return (y: number) => {
+    const w = own(y);
+    if (y <= lift) return w;
+    const e = (y - cy) / ry;
+    const ellipsoid = e >= 1 ? 0 : R * Math.sqrt(1 - e * e);
+    return Math.max(w, Math.min(ellipsoid, profile((y - lift) / live) * R));
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The crown's envelope: the solid of revolution its profile sweeps, from its
 // base to its top. Every profile is concave in height, so the solid is convex:
 // a ray from inside leaves it once, which is what lets its reach be bisected.
 
 class Envelope {
-  private readonly profile: (t: number) => number;
-  private readonly base: number;
+  private readonly outline: (y: number) => number;
   private readonly depth: number;
   private readonly radius: number;
   private readonly side: number;
@@ -466,9 +573,8 @@ class Envelope {
    * The crown's envelope, shrunk by margins (m) at its side, bottom and top: the space a clump's centre
    * may take and keep the clump inside.
    */
-  constructor(sp: TreeSpecies, size: TreeSize, side = 0, bottom = 0, top = 0) {
-    this.profile = profileOf(sp);
-    this.base = size.crownBase;
+  constructor(sp: TreeSpecies, size: TreeSize, side = 0, bottom = 0, top = 0, lift = size.crownBase) {
+    this.outline = outlineOf(sp, size, lift);
     this.depth = Math.max(0.01, size.height - size.crownBase);
     this.radius = size.crownRadius;
     this.side = side;
@@ -491,7 +597,7 @@ class Envelope {
   /** How far it reaches from the axis at a height (m); below 0 where it does not reach at all. */
   width(y: number): number {
     if (y < this.lo || y > this.hi) return -1;
-    return this.profile((y - this.base) / this.depth) * this.radius - this.side;
+    return this.outline(y) - this.side;
   }
 
   inside(x: number, y: number, z: number): boolean {
@@ -637,7 +743,7 @@ class Lobes {
  * or down by the species' bend, with a lateral bud at every one (by the golden angle); and a branch that
  * gathers too little light for its wood is shed (Takenaka). Nothing grows out of the crown's outline.
  */
-function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
+function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, liftTo = size.crownBase): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
   const crown = Math.cbrt(R * R * depth);
@@ -657,12 +763,13 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const lo = base + Math.min(0.25 * clumpR, 0.2 * depth);
   const hi = H - Math.min(1.05 * clumpR, 0.3 * depth);
   const mid = base + 0.5 * depth;
-  const profile = profileOf(sp);
-  const widthAt = (y: number) => profile((y - base) / depth) * R;
+  const widthAt = outlineOf(sp, size, liftTo);
+  // (In a stand, only where its neighbours leave it light enough to live: `liveAt`, below.)
+  let liveAt: ((x: number, y: number, z: number) => boolean) | null = null;
   const inCrown = (x: number, y: number, z: number): boolean => {
     if (y < lo || y > hi) return false;
     const wd = widthAt(y) * lobes.reach(x / R, (y - mid) / (0.5 * depth), z / R) - side;
-    return wd > 0 && x * x + z * z <= wd * wd;
+    return wd > 0 && x * x + z * z <= wd * wd && (!liveAt || liveAt(x, y, z));
   };
 
   // The voxels: shadow in each, and whether each is in the crown.
@@ -676,6 +783,49 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const oy = (skip - 2) * vs;
   const shadow = new Float64Array(nx * ny * nz);
   const room = new Uint8Array(nx * ny * nz);
+  const full = LIGHT_FULL + LIGHT_OPEN * sp.openness;
+  // In a stand: its light in each voxel, as its own crown leaves it (standLightOf). Where it is too dark for
+  // leaves to pay for themselves, the crown does not grow at all (its lower branches there died young and
+  // were shed long ago: a wood cleans its trees' boles), except in the top of the tree, which a tree keeps
+  // however closed its wood; and the rest is shaded by it, STAND_SHADE layers of the crown's own where its
+  // neighbours hide all of the sky the place has, so its buds turn to the open side. It does
+  // not move as the tree grows.
+  const standAt = stand ? standLightOf(sp, stand, size) : null;
+  const standShadow = new Float64Array(standAt ? nx * ny * nz : 0);
+  const standAlive = new Uint8Array(standAt ? nx * ny * nz : 0);
+  if (standAt) {
+    const alive = standAlive;
+    const keepTop = H * (1 - STAND_LIVE_LEAST);
+    // (Worked out at every other voxel each way and shared by the eight about it: it changes slowly.)
+    const share = new Float32Array(nx * ny * nz);
+    for (let iy = 0; iy < ny; iy += 2)
+      for (let iz = 0; iz < nz; iz += 2)
+        for (let ix = 0; ix < nx; ix += 2) {
+          const l = standAt(ox + (ix + 1) * vs, oy + (iy + 1) * vs, oz + (iz + 1) * vs);
+          for (let a = iy; a < Math.min(ny, iy + 2); a++)
+            for (let b = iz; b < Math.min(nz, iz + 2); b++)
+              for (let d = ix; d < Math.min(nx, ix + 2); d++) {
+                const c = d + nx * (b + nz * a);
+                share[c] = l;
+                alive[c] = l >= STAND_LIVE || oy + (a + 0.5) * vs >= keepTop ? 1 : 0;
+              }
+        }
+    // (The shadow is the stand's light beside the best lit at the same height: it turns buds to the open
+    // side, and darkens nothing where the stand is even all round; the dark below is `alive`'s.)
+    for (let iy = 0; iy < ny; iy++) {
+      const layer = nx * nz * iy;
+      let best = 1e-3;
+      for (let c = layer; c < layer + nx * nz; c++) best = Math.max(best, share[c]);
+      for (let c = layer; c < layer + nx * nz; c++) standShadow[c] = STAND_SHADE * full * (1 - share[c] / best);
+    }
+    const cellOf = (x: number, y: number, z: number): number => {
+      const ix = Math.min(nx - 1, Math.max(0, Math.floor((x - ox) / vs)));
+      const iy = Math.min(ny - 1, Math.max(0, Math.floor((y - oy) / vs)));
+      const iz = Math.min(nz - 1, Math.max(0, Math.floor((z - oz) / vs)));
+      return ix + nx * (iz + nz * iy);
+    };
+    liveAt = (x, y, z) => alive[cellOf(x, y, z)] === 1;
+  }
   for (let iy = 0; iy < ny; iy++) {
     const y = oy + (iy + 0.5) * vs;
     if (y < lo || y > hi) continue;
@@ -684,6 +834,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
         if (inCrown(ox + (ix + 0.5) * vs, y, oz + (iz + 0.5) * vs)) room[ix + nx * (iz + nz * iy)] = 1;
       }
   }
+  // (Where the live crown starts: its base, unless a stand has lifted it.)
+  let liveLow = Infinity;
+  for (let c = 0; c < room.length && liveAt; c++) if (room[c]) liveLow = Math.min(liveLow, oy + (Math.floor(c / (nx * nz)) + 0.5) * vs);
+  if (!Number.isFinite(liveLow)) liveLow = lo;
   const fall = new Float64Array(SHADOW_DEPTH + 1);
   for (let q = 0; q <= SHADOW_DEPTH; q++) fall[q] = SHADOW_A * SHADOW_B ** -q;
   const voxel = (x: number, y: number, z: number): number => {
@@ -712,10 +866,11 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       }
     }
   };
-  const full = LIGHT_FULL + LIGHT_OPEN * sp.openness;
   const lightAt = (x: number, y: number, z: number): number => {
     const c = voxel(x, y, z);
-    const s = c < 0 ? 0 : shadow[c];
+    // (In a stand, a bud where no crown lives is in the dark: it gets nothing, and gives its branch nothing.)
+    if (standAt && c >= 0 && !standAlive[c]) return 0;
+    const s = c < 0 ? 0 : shadow[c] + (standAt ? standShadow[c] : 0);
     return Math.min(1, Math.max(0, (full - s + SHADOW_A) / full));
   };
   // What a bud sees: the voxels two round it, within its cone. The least shaded three of them in the crown
@@ -746,7 +901,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       if (jx < 0 || jy < 0 || jz < 0 || jx >= nx || jy >= ny || jz >= nz) continue;
       const c = jx + nx * (jz + nz * jy);
       if (!room[c]) continue;
-      const score = shadow[c] - 0.05 * SHADOW_A * dot;
+      const score = shadow[c] + (standAt ? standShadow[c] : 0) - 0.05 * SHADOW_A * dot;
       // (Kept in order, least first.)
       let j = 2;
       if (score >= best[j]) continue;
@@ -851,7 +1006,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const ny2 = y + d[1] * L;
       const nz2 = z + d[2] * L;
       if (inCrown(nx2, ny2, nz2)) entered = true;
-      else if (entered || ny2 < 0) break;
+      // (In a stand, a spine that has found no live crown by the crown's edge never will.)
+      else if (entered || ny2 < 0 || (liveAt && nx2 * nx2 + nz2 * nz2 > R * R)) break;
       x = nx2;
       y = ny2;
       z = nz2;
@@ -897,9 +1053,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     }
     // A tree's trunk: bare to its crown's base, then through the scaffolds' span, one of them at each of
     // their heights (one in each of as many slots up it), its own lateral buds between.
-    const yLo = base + SCAFFOLD_FROM * depth;
+    // (In a stand, from where its live crown starts, its wood's shade having lifted it.)
+    const yLo = Math.max(base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0);
     const span = Math.min(0.8, SCAFFOLD_SPAN + SCAFFOLD_SPAN_LEADER * sp.leader);
-    const yHi = Math.max(yLo + L, base + span * depth);
+    const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : Math.max(yLo + L, base + span * depth);
     const levels: { y: number; scaffold: number }[] = [];
     const below = Math.max(1, Math.ceil(yLo / TRUNK_STEP));
     for (let k = 1; k < below; k++) levels.push({ y: (yLo * k) / below, scaffold: -1 });
@@ -934,7 +1091,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       let lz = 0;
       const pts = spine(at, () => {
         const j = rng.onSphere();
-        lx = 0.7 * lx + 0.06 * sp.crooked * j[0];
+        lx = 0.7 * lx + 0.06 * sp.crooked * j[0] + (stand ? STAND_LEADER * stand.lopsided : 0);
         lz = 0.7 * lz + 0.06 * sp.crooked * j[2];
         return norm([lx, 1, lz]);
       }, Math.max(0, top - py[at]));
@@ -951,7 +1108,15 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       // column), the limbs rise steeply, or they would reach its side at once and curl over into hooks.)
       const room = R / depth < NARROW ? Math.atan((2.4 * R) / depth) : Math.PI;
       const angle = Math.min(110 * DEG, room, Math.max(8 * DEG, (sp.branchAngle + 0.5 * sp.branchAngleSpread * g) * DEG + SCAFFOLD_SWING * (0.5 - pos)));
-      const a0 = azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
+      let a0 = azs + k * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
+      if (standAt && stand) {
+        // (An edge tree's limbs swing out to the open side, along +x; one whose end would be in the dark has
+        // died young and gone.)
+        a0 -= STAND_SWING * stand.lopsided * Math.sin(a0);
+        const reachY = Math.min(hi, py[node] + 0.25 * depth);
+        const reachR = 0.8 * widthAt(reachY);
+        if (!inCrown(reachR * Math.cos(a0), reachY, reachR * Math.sin(a0))) continue;
+      }
       const e0 = 0.5 * Math.PI - angle;
       const sway = SCAFFOLD_SWAY * sp.crooked * rng.range(-1, 1);
       const phase = rng.range(0, Math.PI);
@@ -1170,7 +1335,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const most = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
   const simple = simplifyWood(w, h, unit * SIMPLIFY_SPAN, most);
   if (weep <= 0) return h;
-  const whips = hangWhips(sp, size, simple, clumpR, weep, rng);
+  const whips = hangWhips(sp, size, simple, clumpR, weep, rng, liveAt, liftTo);
   const out = newHung();
   for (let c = 0; c < h.node.length; c++) {
     if (whips.bears.has(h.node[c])) continue;
@@ -1452,14 +1617,14 @@ function simplifyOnce(w: Wood, h: Hung, angle: number, longest: number): boolean
  * short), kept inside the crown's outline, and leaved along all its length. Two whips do not hang where
  * their leaves would crowd each other. Returns the twigs they hang from and their clumps.
  */
-function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, weep: number, rng: Random): { bears: Set<number>; h: Hung } {
+function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, weep: number, rng: Random, alive?: ((x: number, y: number, z: number) => boolean) | null, lift = size.crownBase): { bears: Set<number>; h: Hung } {
   const { crownBase: base, crownRadius: R, height: H } = size;
   const depth = Math.max(0.01, H - base);
   const rW = WHIP_CLUMP * clumpR;
   const thinK = thinGap(sp);
   const piece = 2.3 * thinK * rW;
   const gap = 2 * thinK * rW;
-  const inner = new Envelope(sp, size, rW, 0.7 * rW, rW);
+  const inner = new Envelope(sp, size, rW, 0.7 * rW, rW, lift);
   const ends: number[] = [];
   for (let i = 0; i < w.x.length; i++) if (w.kids[i].length === 0 && w.parent[i] >= 0 && w.y[i] > base) ends.push(i);
   const score = (i: number) => Math.hypot(w.x[i], w.z[i]) / R + (0.5 * (w.y[i] - base)) / depth;
@@ -1511,6 +1676,8 @@ function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, wee
       const ny = y + d[1] * piece;
       let nz = z + d[2] * piece;
       if (ny < stop) break;
+      // (In a stand, no lower than its crown lives there: a whip hangs to the ground on the open side.)
+      if (alive && !alive(nx, ny, nz)) break;
       // Inside the crown's outline: drawn in to it (its arch, from a twig at the crown's edge, follows the
       // edge round), and ended where the outline narrows fast under it as it hangs.
       const wd = inner.width(ny);
@@ -1566,11 +1733,11 @@ function boughLine(rise: number, curve: number, n: number): { h: number[]; v: nu
   return { h, v };
 }
 
-function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number): Hung {
+function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, lift = size.crownBase): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
-  const profile = profileOf(sp);
-  const profileAt = (y: number) => profile((y - base) / depth) * R;
+  const standAt = stand ? standLightOf(sp, stand, size) : null;
+  const profileAt = outlineOf(sp, size, lift);
   const spacing = Math.min(1 / Math.max(0.05, sp.whorlsPerMetre), WHORL_OF_CROWN * R);
   const top = H - 1.1 * clumpR;
   const segLen = Math.max(0.05, BOUGH_STEP * R);
@@ -1655,7 +1822,16 @@ function whorled(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const planned = plan(lv.y, angle);
       const { line, n } = planned;
       // Not every bough is whole: some were broken or shaded back, and stop short.
-      const len = planned.len * (rng.chance(BOUGH_BROKEN) ? rng.range(0.45, 0.8) : rng.range(0.85, 1));
+      let len = planned.len * (rng.chance(BOUGH_BROKEN) ? rng.range(0.45, 0.8) : rng.range(0.85, 1));
+      if (standAt) {
+        // In a stand, a bough on the dark side is shorter, or dead and gone (its stub may stay: boleStubs).
+        const lit = standAt(0.5 * len * Math.cos(az), lv.y, 0.5 * len * Math.sin(az));
+        if (lit < STAND_BOUGH && lv.y < H * (1 - STAND_LIVE_LEAST)) {
+          shed[i] += 0.5 * n;
+          continue;
+        }
+        len *= 0.55 + 0.45 * Math.min(1, (lit - STAND_BOUGH) / (STAND_BOUGH_FULL - STAND_BOUGH));
+      }
       // A bough whose leaves would hang below the crown's base is in the shade of those above: it has
       // died and fallen, as a forest tree's lower boughs do (the trunk keeps its wood).
       const leafFrom = Math.min(n, Math.max(1, Math.ceil(n * (1 - shell))));
@@ -1852,11 +2028,12 @@ function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: num
 // ---------------------------------------------------------------------------
 // For every tree: thin the clumps, fit to size, the radii, and the arrays.
 
-function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree {
-  const env = new Envelope(sp, size);
+function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: number): GrownTree {
+  const lifted = lift !== undefined;
+  const env = new Envelope(sp, size, 0, 0, 0, lift);
   let keep = thin(sp, env, hung);
   if (sp.architecture !== "palm") keep = shedBare(w, hung, keep);
-  fit(size, w, hung, keep);
+  fit(size, w, hung, keep, lifted);
   if (sp.architecture !== "palm") keepToOutline(env, w, hung);
   if (!w.radius) refineBoles(size, w, hung);
 
@@ -2097,10 +2274,13 @@ function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
  * Wood only: no leaves below the crown's base. (No living shoots from dormant buds: a leafless one reads
  * as a bare twig.)
  */
-function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
-  const amount = Math.min(1, Math.max(0, sp.boleStubs ?? 0));
+function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random, stand?: Stand): GrownTree {
+  // (A tree in a wood keeps the stubs of the branches the wood's shade killed, whatever its kind: a
+  // conifer's too, its dead boughs.)
+  const amount = Math.min(1, Math.max(0, sp.boleStubs ?? 0, stand ? STAND_STUBS * stand.enclosure : 0));
   const sk = tree.skeleton;
-  if (amount <= 0 || sp.architecture !== "broadleaf" || Math.round(sp.stems) > 1) return tree;
+  const kinds = sp.architecture === "broadleaf" || (stand && sp.architecture === "conifer");
+  if (amount <= 0 || !kinds || Math.round(sp.stems) > 1) return tree;
   // The bole: the first stem's nodes from its foot to the first that bears a branch.
   const bole = [0];
   for (;;) {
@@ -2117,7 +2297,8 @@ function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
   }
   const top = sk.y[bole[bole.length - 1]];
   const from = Math.max(STUB_FROM, breastHeight(tree.size));
-  const length = STUB_TOP * Math.min(top, tree.size.crownBase) - from;
+  // (Up to the crown's base; in a wood, up to the first living limb, where the wood's shade lifted it.)
+  const length = STUB_TOP * (stand ? top : Math.min(top, tree.size.crownBase)) - from;
   const room = MAX_NODES + 100 - sk.count;
   const count = Math.min(Math.floor(room / 2), Math.round(amount * STUBS_PER_METRE * length));
   if (count < 1) return tree;
@@ -2316,7 +2497,7 @@ function keepToOutline(env: Envelope, w: Wood, h: Hung): void {
  * little) its lowest at its crown's base, stretching the crown and the trunk under it apart. The growing
  * aims at all three already; this takes up what it misses by.
  */
-function fit(size: TreeSize, w: Wood, h: Hung, keep: number[]): void {
+function fit(size: TreeSize, w: Wood, h: Hung, keep: number[], lifted = false): void {
   let reach = 0;
   let topY = 0;
   let lowY = Infinity;
@@ -2332,7 +2513,9 @@ function fit(size: TreeSize, w: Wood, h: Hung, keep: number[]): void {
   let from = size.crownBase;
   let to = size.crownBase;
   const off = lowY - size.crownBase;
-  if (Number.isFinite(lowY) && (off > FIT_LOW * depth || off < -FIT_HANG * depth) && lowY > 0.01 * size.height && size.crownBase > 0.03 * size.height) {
+  // (A crown its stand has lifted keeps its lowest leaves where they grew: down to the crown's base on its open
+  // side, if it has one, and no lower; inside a wood, higher.)
+  if (Number.isFinite(lowY) && ((off > FIT_LOW * depth && !lifted) || off < -FIT_HANG * depth) && lowY > 0.01 * size.height && size.crownBase > 0.03 * size.height) {
     from = lowY;
     to = size.crownBase + 0.5 * FIT_LOW * depth;
   }

@@ -28,6 +28,7 @@ import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles
 import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, woodPieces } from "./geometry.ts";
 import { growTree } from "./grow.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
+import { type Stand, standingOf } from "./stand.ts";
 import { type GrownTree, type TreeSize } from "./tree.ts";
 import { DEFAULT_VARIANT_OPTIONS, type Plan, type TreeInstance, type VariantOptions, packTrees, planVariants } from "./variants.ts";
 
@@ -38,6 +39,10 @@ type Vec4 = THREE.Node<"vec4">;
 type UInt = THREE.Node<"uint">;
 
 const TIERS = 3;
+/** The least of the sky a stand leaves anywhere (engine.ts `standOn`). */
+const STAND_SKY = 0.22;
+/** Rows (vec4) a tree has in the shaders' list of trees. */
+const TREE_ROWS = 5;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -69,8 +74,13 @@ export interface TreesOptions {
   species: readonly TreeSpecies[];
   variants?: Partial<VariantOptions>;
   world?: TreeWorld;
-  /** Grow trees some other way than this library's (see `growTree`). */
-  grow?: (species: TreeSpecies, size: TreeSize, seed: number) => GrownTree;
+  /**
+   * Where each tree stands among the others (by tree, as in `trees`), over what is worked out from its
+   * neighbours (stand.ts): any part of it, or nothing. A list of trees may say it of each tree instead.
+   */
+  stands?: readonly (Partial<Stand> | null | undefined)[];
+  /** Grow trees some other way than this library's (see `growTree`; `stand` left out, a tree alone). */
+  grow?: (species: TreeSpecies, size: TreeSize, seed: number, stand?: Stand) => GrownTree;
   /** The look (`stylized` unless given). `style` starts as the look's (`LOOK_STYLES`). */
   look?: TreeLook;
 }
@@ -139,9 +149,10 @@ function linear(hex: string): THREE.Color {
 export function createTrees(options: TreesOptions): Trees {
   let species = options.species;
   const packed = options.trees instanceof Float32Array ? options.trees : packTrees(options.trees);
-  const plan = planVariants(packed, species, { ...DEFAULT_VARIANT_OPTIONS, ...options.variants });
+  const stands = options.stands ?? (options.trees instanceof Float32Array ? undefined : options.trees.map((t) => t.stand));
+  const plan = planVariants(packed, species, { ...DEFAULT_VARIANT_OPTIONS, ...options.variants }, stands);
   const grow = options.grow ?? growTree;
-  const grown = plan.variants.map((v) => grow(species[v.species], v.size, v.seed));
+  const grown = plan.variants.map((v) => grow(species[v.species], v.size, v.seed, v.standing === "open" ? undefined : v.stand));
   const N = plan.placements.length;
   const V = plan.variants.length;
   const world = options.world ?? {};
@@ -162,11 +173,20 @@ export function createTrees(options: TreesOptions): Trees {
 
   // ---- What the shaders read: the trees, the variants, the species. ----
 
-  // Four rows a tree: where (x, y, z) and which way (yaw); its size; its tint and a number of its own; its
-  // lean (x, z), whether mirrored, and its variant.
-  const treeData = new Float32Array(Math.max(1, N) * 16);
+  // Five rows a tree: where (x, y, z) and which way (yaw); its size; its tint and a number of its own; its
+  // lean (x, z), whether mirrored, and its variant; its stand (stand.ts): how enclosed, which way open by how
+  // much (on the ground), and its walls' top and how far off they stand (decimetres, packed in one number:
+  // top * 1024 + off). A tree that stands in the open has none: whatever little its neighbours hide of its
+  // sky (a park's next tree, 30 m off) fades out, and it is lit as it always was.
+  const treeData = new Float32Array(Math.max(1, N) * TREE_ROWS * 4);
   plan.placements.forEach((p, i) => {
-    treeData.set([p.x, p.y, p.z, p.yaw, p.size.height, p.size.crownBase, p.size.crownRadius, p.size.trunkRadius, p.tint[0], p.tint[1], p.tint[2], p.own, p.leanX, p.leanZ, p.mirror, p.variant], i * 16);
+    const st = p.stand;
+    const most = st.enclosure + st.lopsided;
+    // (A shrub in a wood is grown as in the open but lit as where it stands.)
+    const by = p.standing !== "open" || standingOf(st) !== "open" ? 1 : Math.min(1, Math.max(0, (most - 0.3) / 0.2));
+    const top = Math.min(1000, Math.round(10 * st.canopy * p.size.height));
+    const off = Math.min(1023, Math.round(10 * p.size.crownRadius * (1 + st.gap)));
+    treeData.set([p.x, p.y, p.z, p.yaw, p.size.height, p.size.crownBase, p.size.crownRadius, p.size.trunkRadius, p.tint[0], p.tint[1], p.tint[2], p.own, p.leanX, p.leanZ, p.mirror, p.variant, st.enclosure * by, st.lopsided * st.openX * by, st.lopsided * st.openZ * by, top * 1024 + off], i * TREE_ROWS * 4);
   });
   // Two rows a variant: its size as grown; where its lists start, how long each is, its species, and how many
   // lobes its crown has (a lobed look's).
@@ -275,9 +295,9 @@ export function createTrees(options: TreesOptions): Trees {
   const cull = Fn(() => {
     const id = instanceIndex;
     If(id.lessThan(uint(N)), () => {
-      const r0 = treesR.element(id.mul(4));
-      const r1 = treesR.element(id.mul(4).add(1));
-      const r3 = treesR.element(id.mul(4).add(3));
+      const r0 = treesR.element(id.mul(TREE_ROWS));
+      const r1 = treesR.element(id.mul(TREE_ROWS).add(1));
+      const r3 = treesR.element(id.mul(TREE_ROWS).add(3));
       const v = uint(r3.w);
       // (A sphere round the whole tree, foot to top and crown wide, leant as far as it may.)
       const centre = vec3(r0.x, r0.y.add(r1.x.mul(0.5)), r0.z);
@@ -326,16 +346,17 @@ export function createTrees(options: TreesOptions): Trees {
     const vrow0 = variantsR.element(uint(v).mul(2));
     const vrow1 = variantsR.element(uint(v).mul(2).add(1));
     const id = visibleR.element(uint(vrow1.x).add(uint(vrow1.y).mul(t)).add(instanceIndex));
-    const r0 = treesR.element(id.mul(4));
-    const r1 = treesR.element(id.mul(4).add(1));
-    const r2 = treesR.element(id.mul(4).add(2));
-    const r3 = treesR.element(id.mul(4).add(3));
+    const r0 = treesR.element(id.mul(TREE_ROWS));
+    const r1 = treesR.element(id.mul(TREE_ROWS).add(1));
+    const r2 = treesR.element(id.mul(TREE_ROWS).add(2));
+    const r3 = treesR.element(id.mul(TREE_ROWS).add(3));
+    const r4 = treesR.element(id.mul(TREE_ROWS).add(4));
     const rows = [0, 1, 2, 3].map((k) => speciesR.element(uint(vrow1.z).mul(4).add(k)));
     const srow = (k: number) => rows[k];
     // (Its yaw's cosine and sine, once: every turn into and out of the tree's frame uses them.)
     const yawC = cos(r0.w);
     const yawS = sin(r0.w);
-    return { vrow0, vrow1, r0, r1, r2, r3, srow, yawC, yawS };
+    return { vrow0, vrow1, r0, r1, r2, r3, r4, srow, yawC, yawS };
   };
   type TreeRows = ReturnType<typeof treeOf>;
 
@@ -409,11 +430,12 @@ export function createTrees(options: TreesOptions): Trees {
   };
 
   /**
-   * The light on a piece of the tree at `at` (the world) facing `n`: the sun, as much of it as gets through
-   * the crown between (Monsi and Saeki: it falls off as exp(-k L) over the length L of crown it crosses, the
-   * crown taken as its ellipsoid), and the sky, as much as the crown above lets through.
+   * The light on a piece of the tree at `at` (the world) facing `n` (its crown's form, left out): the sun, as
+   * much of it as gets through the crown between (Monsi and Saeki: it falls off as exp(-k L) over the length L
+   * of crown it crosses, the crown taken as its ellipsoid), and the sky, as much as the crown above lets
+   * through; and both as much as its stand leaves it (`standOn`).
    */
-  const crownAt = (T: TreeRows, at: Vec3) => {
+  const crownAt = (T: TreeRows, at: Vec3, n?: Vec3) => {
     const k = T.srow(3).x.mul(uStyle3.x);
     const ry = max(T.r1.x.sub(T.r1.y).mul(0.5), float(0.05));
     const rx = max(T.r1.z, float(0.05));
@@ -439,7 +461,45 @@ export function createTrees(options: TreesOptions): Trees {
     const cloud = world.sun ? world.sun(vec2(at.x, at.z)) : float(1);
     // (Which way the crown as a whole faces here: its ellipsoid's normal. The shape a painter lights first.)
     const form = normalize(p.div(scale));
-    return { sunIn, sky, form, cloud };
+    const stand = standOn(T, at, n ?? form, k);
+    return { sunIn: sunIn.mul(stand.sun), sky: sky.mul(stand.sky), standSky: stand.sky, form, cloud };
+  };
+
+  /**
+   * What a tree's stand (stand.ts) leaves of the sky and the sun at `at`, facing `n`: its neighbours' crowns
+   * are walls standing round it, as far as each way is closed, up to their top. The sky they hide is what
+   * lies below their top as seen from here (sin² of its elevation, of a uniform sky): the way the piece
+   * faces, as far as it faces sideways, and all round, as far as it faces up. The sun is hidden as far as its
+   * ray, rising to the walls' top, runs through them first (exp(-k L), their leaves taken as the tree's own).
+   * So a wood's interior is dark from its floor up to its canopy, and an edge tree's open side is lit.
+   */
+  const standOn = (T: TreeRows, at: Vec3, n: Vec3, k: Float) => {
+    const S = T.r4;
+    const top = floor(S.w.div(1024));
+    const wall = S.w.sub(top.mul(1024)).mul(0.1);
+    const rise = max(top.mul(0.1).sub(at.y.sub(T.r0.y)), float(0));
+    const q = vec2(at.x.sub(T.r0.x), at.z.sub(T.r0.z));
+    const nearest = T.r1.z.mul(0.15);
+    const below = (d: Float): Float => rise.mul(rise).div(rise.mul(rise).add(d.mul(d)).add(1e-4));
+    const nh = vec2(n.x, n.z);
+    const side = length(nh);
+    const u = nh.div(max(side, float(1e-4)));
+    const closedThere = clamp(S.x.sub(dot(u, S.yz)), 0, 1);
+    const lostThere = closedThere.mul(below(max(wall.sub(dot(q, u)), nearest)));
+    const lostRound = S.x.mul(below(max(wall, nearest)));
+    // (Never below STAND_SKY: light comes down through the canopy's gaps and off the leaves round about, and
+    // a wood's floor is dim, not black.)
+    const sky = max(float(1).sub(mix(lostRound, lostThere, side)), float(STAND_SKY));
+    // (The sun: closed the way it comes from as far as the stand is; its ray runs `inside` metres through the
+    // walls before it is over their top.)
+    const sunH = vec2(uSun.x, uSun.z);
+    const sunSide = max(length(sunH), float(1e-4));
+    const s = sunH.div(sunSide);
+    const closedSun = clamp(S.x.sub(dot(s, S.yz)), 0, 1);
+    const run = rise.mul(sunSide).div(max(uSun.y, float(0.05)));
+    const inside = max(run.sub(max(wall.sub(dot(q, s)), float(0))), float(0));
+    const sun = float(1).sub(closedSun.mul(float(1).sub(exp(k.negate().mul(inside).div(sunSide)))));
+    return { sky, sun };
   };
   type Crown = ReturnType<typeof crownAt>;
   /**
@@ -588,7 +648,7 @@ export function createTrees(options: TreesOptions): Trees {
         // (The rim of a lobe, against the light: the sun through its thin edge, more the more the eye looks
         // towards the sun, and the sky's light round it.)
         const against = float(0.3).add(smoothstep(float(-0.3), float(0.9), dot(toEye.negate(), uSun)).mul(0.9));
-        const rimCol = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(against.mul(C.cloud).mul(sqrt(C.sunIn))).add(albedo.mul(uShadeTint).mul(0.35)).mul(uStyle5.y).mul(3);
+        const rimCol = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(against.mul(C.cloud).mul(sqrt(C.sunIn))).add(albedo.mul(uShadeTint).mul(C.standSky).mul(0.35)).mul(uStyle5.y).mul(3);
         const shadeAir = intoAir(shade, at);
         const litAir = intoAir(lit, at);
         const rimAir = intoAir(rimCol, at).sub(intoAir(vec3(0), at));
@@ -656,8 +716,8 @@ export function createTrees(options: TreesOptions): Trees {
       const toEye = normalize(cameraPosition.sub(axis));
       const side = normalize(cross(vec3(0, 1, 0), toEye).add(vec3(1e-4, 0, 0)));
       position = axis.add(side.mul(aDab.x.mul(aNormal.x).mul(fit.wood)));
-      const C = crownAt(T, position);
       const n = normalize(side.mul(aDab.x).add(normalize(vec3(toEye.x, 0, toEye.z).add(vec3(0, 0, 1e-4))).mul(0.4)));
+      const C = crownAt(T, position, n);
       const bark = T.srow(1);
       colour = intoAir(bark.xyz.mul(barkTone(T)).mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, n, float(0.3)))), position);
     }
@@ -779,7 +839,7 @@ export function createTrees(options: TreesOptions): Trees {
     const surface = moved.add(radial.mul(r0.mul(keepThin)));
     const at = toWorld(T, surface);
     const nWorld = dirToWorld(T, fit.radial(aNormal));
-    const C = crownAt(T, at);
+    const C = crownAt(T, at, nWorld);
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)
     const pale = bark.w.mul(smoothstep(float(0.05), float(0.5), surface.y.div(T.r1.x)));

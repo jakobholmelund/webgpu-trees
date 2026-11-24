@@ -48,6 +48,10 @@ trees.update(renderer, camera, timeSeconds);
   trunk's radius (all optional; left out, they are its species'). A yaw and
   a seed may be given; left out, they come from its place. Many trees go in
   packed, ten numbers a tree (`packTrees`, `TREE_FIELDS`).
+- **Where it stands** (alone, at a wood's edge, inside a wood) is worked
+  out from the list itself, from each tree's neighbours (see *Where a tree
+  stands*). A host that knows better says so, of any tree: `stand` on a
+  tree in the list, or `stands` beside a packed list.
 - **A species** is a row of plain data (`species.ts`): how the tree is put
   together (broadleaf, conifer, shrub), its crown's outline, how deep its
   leaves go and how open it is, how it branches, its clumps of leaves, its
@@ -215,8 +219,9 @@ pnpm dev
 
 Then open the address it prints (the lab is at `/lab/`). Drag to turn,
 right-drag to move, the wheel to come nearer. The bar chooses what stands on
-the ground (*One tree*, *Specimen*: one of each, *Grove*: 400, *Course*:
-30,000 over 2.4 km), the look (*Painted*, *Painterly*, *Sculpted*, *Real*,
+the ground (*One tree*, *Specimen*: one of each, *Grove*: 400, *Wood edge*:
+a wood of some 1,400 trees, their undergrowth among them, seen across open
+ground, *Course*: 30,000 over 2.4 km), the look (*Painted*, *Painterly*, *Sculpted*, *Real*,
 each with its own style), the eye, the hour and the wind; *Envelope* draws each
 tree's measured size over it (its crown's box, outline and ellipsoid, its
 trunk), which is how one sees a drawn tree fills the numbers it was given.
@@ -303,17 +308,20 @@ upper crowns to Rautiainen's exponents.
 
 ## How a course's trees are drawn
 
-- **A few are grown.** Each species' trees are sorted into shapes by how
-  wide their crowns are for their height and how high the crown starts;
+- **A few are grown.** Each species' trees are sorted by where they stand
+  (in the open, at a wood's edge, inside a wood: see *Where a tree
+  stands*), then into shapes by how wide their crowns are for their height
+  and how high the crown starts (and, in a wood, how closed in they are);
   each shape is grown once a seed (two by default), at the shape's typical
-  size (see *How a tree grows*). Leaves hang in clumps at the twigs, never
-  in the air.
+  size (see *How a tree grows*), in the light its trees' neighbours leave
+  them. Leaves hang in clumps at the twigs, never in the air.
 - **Every tree is fitted to its own numbers.** Up the tree in two
   stretches (the trunk to its crown's base, the crown to its top), across
   to its crown radius, and the wood thickened to its trunk radius apart
   from where it runs. So a drawn tree fills the space its numbers give,
   which is what a ball hitting it meets. It is then turned, maybe mirrored,
-  leant up to 3 degrees and tinted.
+  leant up to 3 degrees and tinted. An edge tree is turned so its open side
+  faces its own open ground (give or take 17 degrees), and leans that way.
 - **Three tiers, chosen on the graphics card.** A compute pass puts every
   tree in view on the list of the tier its size in the picture calls for:
   near (all its wood, down to the twigs, and three dabs to a clump of
@@ -365,6 +373,83 @@ trees, 107 near from the clearing) the wood takes some 0.7 ms of a 2.4 ms
 frame in the clearing and 0.55 of 1.8 ms from outside, 0.4 and 0.33 ms of
 2.15 and 1.5 drawn straight.
 
+## Where a tree stands
+
+A course is mostly woods seen from a fairway, 50 to 200 m off, and a wood
+is not a row of trees each grown alone. Its edge trees keep long low
+branches and dense leaves on the side facing the open ground and reach
+out to the light there, while their side in the wood dies back; inside, a
+tree keeps a crown only high up, on a tall clean bole, and little sky
+reaches in. All of it is the light: a tree's sky comes from round it as
+much as from above, and its neighbours' crowns hide the low sky on their
+side.
+
+**Each tree's stand** (`standsOf`, `stand.ts`) is worked out from where the
+trees stand and how big their crowns are, through a grid of cells hashed by
+place (some 200 ms for 30,000 trees on this Mac). Round each tree, in
+sixteen sectors: how much of each its neighbours' crowns fill, as walls of
+leaves standing past its own crown. A neighbour counts by the angle its
+crown spans, by how far it reaches over this tree's crown base (a shrub
+under an oak hides nothing of the oak's sky), by how near it stands (one a
+tree's height off past the crowns hides little), and one crown hides only
+seven tenths of what is behind it, so a way is closed as far as the wood is
+crowns deep. The sixteen are kept as the first two terms of their Fourier
+series: how closed it is all round (`enclosure`: 0 in the open, about a half
+at a straight edge, 0.8 and more inside a wood), how much more on one side
+(`lopsided`) and which way it is most open; and how tall the walls stand
+and how far off. A host may set any of it, tree by tree.
+
+**Three kinds of tree are grown from it.** Where even its most open side is
+mostly closed, a tree is grown as one inside a wood; where one side is closed
+and another open, as one at an edge; else as one in the open, as it always
+was (`standingOf`). Each kind is grown for its trees' stand on the whole,
+its open side along +x, and every tree of it is turned so that side faces
+its own open ground. Shrubs and palms are grown as in the open wherever
+they stand; a tree alone, or a park's trees 30 m apart, are grown and lit
+exactly as before.
+
+**Grown in the light its neighbours leave it** (`grow.ts`). Of the sky that
+would reach a place in the crown were the tree alone, the share its stand
+leaves it (`standShare`): its sky comes through its own crown either way
+(exp(-k L) over the leafy shell a ray crosses, as the shaders light a
+crown), and the walls hide what comes in below their tops. So a place on
+an edge tree's wood side, which had most of its sky from that side, keeps
+only what comes over or through the rest of the crown, and a place on its
+open side loses only what reached it through the crown already. Taken for
+the best lit of the crown, so a sapling in an even shade under a canopy is
+grown as one in the open. Where it is under half, the crown does not grow at
+all: its lower branches there died young and were shed (a tree always
+keeps the top 45% of its height, as foresters find of a dominant tree in a
+closed stand); and the rest of the crown is shaded by it beside the best
+lit at the same height, so its buds turn to the open side. An edge tree's
+great limbs swing out to the open side and those that would end in the
+dark are never grown; its leader leans out a little; a conifer's boughs on
+its dark side are shorter, or dead and gone; a weeping tree's whips hang no
+lower than its crown lives. A crown a wood has lifted is a whole crown of
+its kind over what is left of the tree, its outline drawn from where it
+starts to the top and as wide as its own outline or that, never past the
+crown's ellipsoid (what a ball meets): so a tree inside a wood keeps a full
+crown, high up, as wide as its neighbours let it be. Its bole keeps dead
+stubs up to the first living limb, a conifer's too.
+
+**Lit as it stands** (`engine.ts`, a fifth row of numbers a tree): the
+walls hide the sky below their tops as seen from each piece of the tree,
+the way it faces as far as it faces sideways and all round as far as it
+faces up, never below a fifth of it (light comes down through the canopy's
+gaps and off the leaves round about); and the sun as far as its ray runs
+through the walls before it is over their top. So a wood's floor and its
+trunks are dim, its inside dark from outside, and its edge bright where the
+sun is on it. A tree whose stand is little (under 0.3 closed on its most
+closed side) is lit as it always was.
+
+`test/stand.test.ts` holds it: a tree alone and the specimens are in the
+open; a wood's front row stands at its edge, open to the open ground, and
+its inside is interior; an open stand grows the same tree as none; at an
+edge a tree keeps its leaves low on the open side and loses the wood
+side's, inside it is lifted and keeps its top, and wherever it stands it
+keeps to its box and to its outline or its ellipsoid; an edge tree faces
+and leans its own way.
+
 ## Left out, for now
 
 - Trees' shadows on each other and on what stands under them (the ground's
@@ -372,4 +457,8 @@ frame in the clearing and 0.55 of 1.8 ms from outside, 0.4 and 0.33 ms of
 - Impostors for the farthest trees.
 - A fan palm's skirt of dead fronds; multi-stemmed trees (a sycamore's, a
   live oak's); leaning trunks.
+- In a wood: crowns that press into each other's shapes (each is still its
+  kind's outline, lifted or lopsided), the light that comes in under an
+  edge's crowns to the trees behind it, and the undergrowth, which is the
+  host's to plant (the lab's wood has some).
 - Phones: WebGPU only.
