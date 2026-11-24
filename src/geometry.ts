@@ -1352,6 +1352,8 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
  * and this share less high, and lie this share nearer level, facing up by this much more, so a pad is a
  * shelf, flat-topped and thin.
  */
+/** A clump faces up past this when its sprays hang less there (`FixedCards.hangTop`). */
+const HANG_TOP_FROM = 0.3;
 const PAD_WIDE = 0.5;
 const PAD_FLAT = 0.75;
 const PAD_LEVEL = 0.8;
@@ -1368,6 +1370,11 @@ export interface FixedCards {
   big: number;
   bigSize: number;
   hang: number;
+  /**
+   * How much less its sprays hang on a clump facing straight up, over the top of its crown (a weeping willow's:
+   * hung all below their twigs there, they left the wood over them a bare wire along the crown's top).
+   */
+  hangTop?: number;
   /** How far its sprays turn up along their twigs, 0..1 (a pine's shoots turn up to the light, their tufts like brushes held up). */
   rise?: number;
 }
@@ -1426,7 +1433,9 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + off[1] * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : at0;
         // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's;
         // its big cards too, the clump's hanging mass.)
-        const hang = fix ? fix.hang * (filler ? 0.85 : 0.75 + 0.5 * hash01(k, 27)) : 0;
+        // (Less on a clump facing the sky, as far as its kind says: `hangTop`.)
+        const top = Math.max(0, (n[1] - HANG_TOP_FROM) / (1 - HANG_TOP_FROM));
+        const hang = fix ? fix.hang * (filler ? 0.85 : 0.75 + 0.5 * hash01(k, 27)) * (1 - (fix.hangTop ?? 0) * top) : 0;
         // (Its facing: out of the crown and up, turned its own way by as much again; a hanging spray's no
         // more up than its leaves let it, as they hang edge to the sky: a card facing up has no way down
         // along it, and its leaves would lie flat.)

@@ -72,6 +72,20 @@ test("hanging sprays hang edge to the sky: their cards stand upright, their twig
   assert.ok(mean(hung.filter((c) => c.big).map((c) => c.twig[1])) < -0.4);
 });
 
+test("a weeping crown's sprays hang less over its top (`hangTop`), and as they did under it", () => {
+  const sp = species("Weeping willow");
+  const tree = growTree(sp, own(sp), 1);
+  const plain = cards(tree, fixed({ hang: 0.95 }));
+  const topped = cards(tree, fixed({ hang: 0.95, hangTop: 0.6 }));
+  const H = sp.height;
+  const high = (cs: typeof plain) => cs.filter((c) => !c.big && c.at[1] > 0.85 * H);
+  const low = (cs: typeof plain) => cs.filter((c) => !c.big && c.at[1] < 0.5 * H);
+  const down = (cs: typeof plain) => mean(cs.map((c) => c.twig[1]));
+  console.log(`weeping top: twigs ${down(high(topped)).toFixed(2)} with hangTop, ${down(high(plain)).toFixed(2)} without`);
+  assert.ok(down(high(topped)) > down(high(plain)) + 0.1, "over the top, they hang less");
+  assert.ok(Math.abs(down(low(topped)) - down(low(plain))) < 0.1, "low down, as they were");
+});
+
 test("a padded crown's sprays lie level in thin shelves (`habit.pads`)", () => {
   const sp = species("Monterey cypress");
   const tree = growTree(sp, own(sp), 1);

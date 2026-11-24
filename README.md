@@ -287,9 +287,13 @@ shaded branches (from `openness` and `branchiness` if left out).
 
 A palm (`architecture: "palm"`) is grown as a palm (`palm.ts`; see *Palms*).
 A broadleaf or a shrub that
-weeps (`weep`, 0..1) hangs whips from that share of its outer twigs: a short
-arch out, then straight down to as low as the crown's base, leaved all
-along (the willow's curtain, the birch's tresses).
+weeps (`weep`, 0..1) hangs whips from that share of its outer twigs and of
+the tops of its upper limbs' arches: a short arch out, then straight down to
+as low as the crown's base, leaved all along and over its arch (the willow's
+curtain, the birch's tresses). Past the crown's outline a whip goes no
+further out and turns down the sooner; drawn back in to it, a whip arching
+out of the crown's narrow top turned back on itself, a loop of wire over the
+crown.
 
 What the grower cannot do yet, so those rows come as close as their data
 allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
@@ -396,8 +400,8 @@ grows as it did):
 - **`limbCurve`** and **`limbCurveBack`**: how a limb turns along its length,
   Weber and Penn's curve and curve-back: over its inner half, and over its
   outer. A spruce's J-curved bough droops and turns up at its tip (-30, +50);
-  a Torrey pine's runs out level and turns up into its candelabra (0, +50); a
-  willow's rises and arches over (+5, -55); a Monterey cypress's rises,
+  a Torrey pine's runs out level, dips and turns up into its candelabra (-10, +30); a
+  willow's rises and arches over (+5, -35); a Monterey cypress's rises,
   elbows and runs level (-50).
 - **`zigzag`**: how far a fine branch turns at each node where its tip died and
   a side bud took the lead (sympodial growth: a plane's, a sycamore's
@@ -616,7 +620,12 @@ upper crowns to Rautiainen's exponents.
   sheets (see *Boughs*). Each tier is one mesh holding every variant, drawn
   once per variant by an indirect draw for as many trees as are on its
   list: nothing out of view costs a vertex. A tree passing between tiers is
-  drawn by both, each in the pixels the other leaves.
+  drawn by both, each in the pixels the other leaves; the realistic look's
+  leaves piece by piece instead, each card, dab or sheet growing in or
+  shrinking away by a number of its own as the other tier's do the
+  opposite (`pieceShare`): the two tiers' leaves do not lie in the same
+  places, and handed over pixel by pixel they were a speckle of sky inside
+  the crown and of leaves outside it over the whole hand-over.
 - **The wood is drawn as wood**: a tube along a curve through the nodes
   (a cubic through each, running the way the wood runs there), its rings
   at even steps of its turning (9 degrees on limbs, 14 on twigs, close to;
@@ -798,7 +807,12 @@ spoil).
   `docs/MORPHOLOGY.md`, times the species' `barkScale`): seen from two sides
   square to the wood, each laid up the wood as the bark runs, the two blended
   by which way the surface faces and by their relief, so there is no seam
-  round a stem and the furrows run up a limb however it leans. Its colour is
+  round a stem and the furrows run up a limb however it leans. Over a stem's
+  root flare and its buttresses it is laid by the length of the surface (not
+  up the centre line, which drew it out in long smears where the foot widens)
+  and round the stem's radius above the flare, so its furrows run on down
+  the flare and spread, and do not cross in chevrons where the two sides
+  meet (`geometry.ts` `flareBark`). Its colour is
   the scan's, scaled from the set's mean to the species' bark colour (paler up
   the trunk where the species' is); its relief lights each ridge's sunny side,
   and the sky's light is less deep in its furrows, where moss gathers first.
@@ -824,24 +838,37 @@ spoil).
   maple's in pairs, a blue gum's few long sickles hanging from the twig's end
   (its cards hang too, standing upright, their leaves edge to the sky, as a
   blue gum's do: a card that faced up had no way down along it, and its
-  leaves lay flat), a willow's and a birch's along hanging whips; a fir's
-  and a cedar's whole scanned sprays; a pine's shoots each a bottle brush, its
-  picture's brush on along the shoot and needles drawn one by one standing
-  forward round it (a brush's picture laid as a fan to a shoot made a pine's
-  spray a palmate leaf, and its crown a broad leaf's), its shoots turned up
-  along their twigs, its big card tufts at its branches' ends with air
-  between; a Canary palm's card a two-metre stretch of its frond, a fan
-  palm's its whole fan. A crown in pads (`pads`) lays its sprays level and
-  facing the sky, in shelves wider than high, so a Monterey cypress is
+  leaves lay flat; its leaves narrowed to its own, 12 to 30 by 2 to 3 cm, and
+  hung alternately along the shoot, as gathered at its end they lay over one
+  another into an oak's lobed leaf), a willow's and a birch's along hanging
+  whips; a fir's and a cedar's whole scanned sprays. A pine's are its shoots
+  grown as a pine grows them, a whorl of two or three a year, each putting out
+  its own, turning up at their ends, and a tuft of needles only at the end of
+  each, the wood behind it bare (`pineShoots`): a long-needled pine's twig two
+  or three big brushes, a short-needled one's a dozen small ones, as long as
+  its needles (`needleCm`, from `docs/MORPHOLOGY.md`), and its big card a
+  branch of them, a candelabrum with sky between. A tuft is drawn needle by
+  needle, each bundle set in three dimensions (forward near the tip, standing
+  out square and falling back further down) and seen side-on: a starburst,
+  darker at its heart, its needles lying together in spokes so a tuft keeps
+  its spikes when the card is mipped down a few dozen metres off. Its picture
+  as a fan to a shoot made a pine's spray a palmate leaf, and its crown a
+  broad leaf's. A pine's cards are turned about their shoots to the eye (a
+  brush is alike all round), keep a soft fringe of needle tips while a pixel
+  is a few of their texels, and close over their gaps as they are mipped, its
+  big card most (`coverageMips`, a fill a cell). A Canary palm's card a
+  two-metre stretch of its frond, a fan palm's its whole fan. A crown in pads
+  (`pads`) lays its sprays level and facing the sky, in shelves wider than high, so a Monterey cypress is
   flat-topped tiers and not a heap of balls. The near cards are many small ones (as many to a clump as
   cover it, at most 36), spread through the clump about its shoots, over two
   big cards a clump set into it, its mass (three under needles and scales,
-  one under a pine's tufts). A dense species' big card (`openness` under 0.4)
+  none under a pine's tufts, whose picture a clump wide was a lump close to,
+  as many tufts to a clump as the pine is dense). A dense species' big card (`openness` under 0.4)
   has a second branch's leaves behind its own, darker, in their shade: one
   layer of sprays left gaps a dense crown does not have. Close to, a big card
   is turned to the eye at least two thirds of the way (seen near edge on, a
   picture a clump wide was a smear through the crown, its mip chosen by the
-  way it is squeezed most), and it gives way to the small sprays over it from
+  way it is squeezed most), as a mid tree's cards are, and it gives way to the small sprays over it from
   five of its half widths off, gone by two and a half, where its texels would
   be larger than a pixel.
   The card keeps the drawn sprays' channels (a grey tone

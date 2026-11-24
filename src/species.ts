@@ -719,7 +719,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     branchiness: 0.85,
     limbAngle: [40, 45],
     limbCurve: 5,
-    limbCurveBack: -55,
+    limbCurveBack: -35,
     zigzag: 5,
     leafKind: "narrow",
     clumpSize: 1.4,

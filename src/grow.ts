@@ -240,12 +240,14 @@ const WHIP_NODES = 0.45;
 const WHIP_CLUMPS = 0.75;
 /** The share of the leaves along a weeping tree's twigs that it does not bear, at weep 1: they are on its whips. */
 const WEEP_TWIG_BARE = 0.4;
+/** ... under this share of its crown's depth: over it, every leaf along its twigs is kept. */
+const WEEP_TOP = 0.6;
 /** A whip's clump, as a share of the species'. */
 const WHIP_CLUMP = 0.7;
 /** How far a whip turns down with each piece of its arch. */
 const WHIP_TURN = 35 * DEG;
 /** The steepest a whip leaves its twig upwards, and the lowest. */
-const WHIP_RISE = 25 * DEG;
+const WHIP_RISE = 10 * DEG;
 const WHIP_DIP = -20 * DEG;
 /** How much shorter a whip may stop than the crown's base, as a share of the way down to it from its twig (squared draws: most reach far). */
 const WHIP_STAGGER = 0.45;
@@ -1410,8 +1412,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const out = newHung();
   for (let c = 0; c < h.node.length; c++) {
     if (whips.bears.has(h.node[c])) continue;
-    // A tree that weeps bears most of its leaves on its whips, few along its twigs.
-    if (simple.kids[h.node[c]].length > 0 && rng.chance(WEEP_TWIG_BARE * weep)) continue;
+    // A tree that weeps bears most of its leaves on its whips, few along its twigs; but all of them over the
+    // top of its crown, which they clothe over its arching limbs.
+    if (simple.kids[h.node[c]].length > 0 && h.y[c] < base + WEEP_TOP * depth && rng.chance(WEEP_TWIG_BARE * weep)) continue;
     hang(out, h.node[c], h.x[c], h.y[c], h.z[c], h.r[c]);
   }
   for (let c = 0; c < whips.h.node.length; c++) hang(out, whips.h.node[c], whips.h.x[c], whips.h.y[c], whips.h.z[c], whips.h.r[c], true);
@@ -1840,7 +1843,8 @@ function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, wee
     for (let k = 0; k < lines.length && free; k += 2) if (Math.hypot(lines[k] - lx, lines[k + 1] - lz) < gap) free = false;
     if (!free) continue;
     lines.push(lx, lz);
-    bears.add(i);
+    // (A twig's end gives its leaves to its whip; an arch's top keeps its own, over the wood.)
+    if (w.kids[i].length === 0) bears.add(i);
     let q = i;
     const n = Math.min(pieces, nodesLeft, clumpsLeft);
     for (let k = 0; k < n; k++) {

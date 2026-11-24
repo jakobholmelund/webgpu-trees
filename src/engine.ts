@@ -68,6 +68,8 @@ const BIG_CARD_GONE = 2.5;
 const PINE_FACE_EYE = 0.85;
 /** How much of a tier's hand-over each realistic piece of leaves takes to grow in or shrink away (`pieceShare`). */
 const PIECE_BAND = 0.3;
+/** How much less a weeping tree's sprays hang over its crown's top (`FixedCards.hangTop`). */
+const WEEPING_HANG_TOP = 0.6;
 /** How far a pine card's alpha is left soft rather than sharpened at the cut, and how steep it is then about the cut. */
 const PINE_SOFT = 0.7;
 /** How far a pine's near cards and its big card close over the gaps between their needles a mip (`coverageMips`). */
@@ -406,7 +408,8 @@ export function createTrees(options: TreesOptions): Trees {
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
-        : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
+        : // (A weeping tree's sprays hang less over its crown's top, over the arches of its limbs.)
+          { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0 };
   });
   // (A palm's leaves are its fronds, drawn as they are: `frondSets`. Its clumps are only for its light.)
   const isPalm = grown.map((g) => !!g.palm);
