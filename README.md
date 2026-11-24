@@ -442,6 +442,14 @@ trunks are dim, its inside dark from outside, and its edge bright where the
 sun is on it. A tree whose stand is little (under 0.3 closed on its most
 closed side) is lit as it always was.
 
+**Cost.** More is grown: the lab's course of 30,000 trees grows 275 variants
+for 120 (an edge and an inside kind of most species; inside, one shape
+fewer), in 4.5 s for 1.7 s in node on this Mac; its stands are worked out in
+some 0.3 s. Drawing costs no more: a fifth row of numbers a tree, read once a
+vertex, and a lifted crown has fewer leaves (the course's views and the wood
+edge's measured the same or less, within what other work on this Mac
+swings them by).
+
 `test/stand.test.ts` holds it: a tree alone and the specimens are in the
 open; a wood's front row stands at its edge, open to the open ground, and
 its inside is interior; an open stand grows the same tree as none; at an

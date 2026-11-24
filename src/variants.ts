@@ -209,7 +209,9 @@ export function sizeOf(packed: Float32Array, i: number, species: TreeSpecies): T
 const STANDINGS: { standing: Standing; shapes: (n: number) => number }[] = [
   { standing: "open", shapes: (n) => n },
   { standing: "edge", shapes: (n) => n },
-  { standing: "interior", shapes: (n) => n },
+  // (Seen from outside only between the edge's trees: one shape fewer, sorted by how closed in it stands as
+  // much as by its crown's shape.)
+  { standing: "interior", shapes: (n) => Math.max(1, n - 1) },
 ];
 
 /** A stand with a host's parts over it, kept to what can be grown. */

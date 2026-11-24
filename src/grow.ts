@@ -796,18 +796,19 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   if (standAt) {
     const alive = standAlive;
     const keepTop = H * (1 - STAND_LIVE_LEAST);
-    // (Worked out at every other voxel each way and shared by the eight about it: it changes slowly.)
+    // (Worked out at every third voxel each way and shared by the 27 about it: it changes slowly.)
     const share = new Float32Array(nx * ny * nz);
-    for (let iy = 0; iy < ny; iy += 2)
-      for (let iz = 0; iz < nz; iz += 2)
-        for (let ix = 0; ix < nx; ix += 2) {
-          const l = standAt(ox + (ix + 1) * vs, oy + (iy + 1) * vs, oz + (iz + 1) * vs);
-          for (let a = iy; a < Math.min(ny, iy + 2); a++)
-            for (let b = iz; b < Math.min(nz, iz + 2); b++)
-              for (let d = ix; d < Math.min(nx, ix + 2); d++) {
+    for (let iy = 0; iy < ny; iy += 3)
+      for (let iz = 0; iz < nz; iz += 3)
+        for (let ix = 0; ix < nx; ix += 3) {
+          const l = standAt(ox + (ix + 1.5) * vs, oy + (iy + 1.5) * vs, oz + (iz + 1.5) * vs);
+          for (let a = iy; a < Math.min(ny, iy + 3); a++)
+            for (let b = iz; b < Math.min(nz, iz + 3); b++)
+              for (let d = ix; d < Math.min(nx, ix + 3); d++) {
                 const c = d + nx * (b + nz * a);
                 share[c] = l;
-                alive[c] = l >= STAND_LIVE || oy + (a + 0.5) * vs >= keepTop ? 1 : 0;
+                // (In its top it lives in half the light: but not on an edge's dark side, nor deep in the dark.)
+                alive[c] = l >= STAND_LIVE || (oy + (a + 0.5) * vs >= keepTop && l >= 0.5 * STAND_LIVE) ? 1 : 0;
               }
         }
     // (The shadow is the stand's light beside the best lit at the same height: it turns buds to the open
