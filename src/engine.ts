@@ -1764,7 +1764,8 @@ export function createTrees(options: TreesOptions): Trees {
     const vShares = varying(sharesFor(t, T), "vPalmShares");
     // (A near fan small in the picture is drawn as its starburst, as the mid and far tiers draw it: its photograph
     // mipped down to a few pixels is a disc. The whole fan goes over together, by its own blade's size in the
-    // picture, pixel by pixel through a fixed pattern, so there is no line where it changes.)
+    // picture, and each fan at a size of its own (its own number): gone over pixel by pixel through a fixed pattern,
+    // half of each fan's pixels its photograph and half its thin starburst, a crown at the tee was a speckled lace.)
     let vFanFar: Float | null = null;
     let vFanOff: Vec2 | null = null;
     if (t === 0) {
@@ -1776,12 +1777,12 @@ export function createTrees(options: TreesOptions): Trees {
       const b = aUv.z.greaterThan(float(PALM_CELL.fanB - 0.5));
       const footAt = toWorld(T, foot.add(atFoot));
       const bladePx = L.mul(0.3).mul(uPxPerM).div(max(length(cameraPosition.sub(footAt)), float(0.1)));
-      vFanFar = varying(smoothstep(float(40), float(22), bladePx).mul(isFan), "vPalmFanFar");
+      vFanFar = varying(step(own.mul(0.9).add(0.05), smoothstep(float(40), float(22), bladePx)).mul(isFan), "vPalmFanFar");
       vFanOff = varying(vec2(select(b, float(a4), float(a3)), select(b, float(b4), float(b3))), "vPalmFanOff");
     }
     m.colorNode = Fn(() => {
       handOver(vShares);
-      const starburst = vFanFar && vFanOff ? step(pixelShare(), vFanFar) : null;
+      const starburst = vFanFar && vFanOff ? step(float(0.5), vFanFar) : null;
       const uv = starburst && vFanOff ? vUv.add(vFanOff.mul(starburst)) : vUv;
       const cellNow = starburst ? mix(vCell, float(PALM_CELL.fanFar), starburst) : vCell;
       const tex = texture(palmTex!, uv);

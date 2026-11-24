@@ -78,9 +78,11 @@ trees.update(renderer, camera, timeSeconds);
   it pre-bundles the package (then exclude it from `optimizeDeps`, or copy
   `assets/` somewhere served and pass `scans: { base: "/where/" }`). Hosts
   may give species photographs of their own (`scans.looks`).
-- **Light and wind** (`trees.environment`) are the host's to set, as the
+- **Light, wind and season** (`trees.environment`) are the host's to set, as the
   grass takes them: the sun's direction, the colour of sunlight and of
-  shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
+  shade, the wind's heading and speed; and the day of the year (`day`, 1 on
+  the 1st of January, or null), from which a flowering species' bloom is
+  worked out (see *Flowers*). `world.sun(xz)` and `world.air(colour,
   at)` let a host's clouds and haze reach the trees. Without `world.air` the
   trees take the scene's fog; with it, only the host's air.
 
@@ -409,7 +411,10 @@ deep narrow one lets them hang.
   off (mid, far, and a near fan under about 40 pixels across) a fan is drawn as
   a starburst of a few broad segments in its photograph's colours: its
   photograph mipped down to a few pixels was a disc, and a crown of discs a
-  lettuce. A skirt, near, is shingles of dead leaves round the stem, each row
+  lettuce. A near fan goes over to its starburst whole, between 40 and 22
+  pixels, each fan at a size of its own: gone over pixel by pixel, half of a
+  fan's pixels its photograph and half its thin starburst, a California fan
+  palm's crown from the tee was a speckled lace. A skirt, near, is shingles of dead leaves round the stem, each row
   half over the one below; mid and far, one continuous thatch from under the
   crown to its ragged foot. It is carrot-shaped: its shoulder, tucked under
   the hanging green leaves, flares about as wide as they reach, then it tapers
@@ -570,7 +575,7 @@ The rail chooses a species; the inspector changes it (colours and light at
 once, its form by growing it again) or the scene (style, detail, which
 tiers show, how many variants). *Preset* is all of it as JSON; *Measure*
 times the graphics card over fixed views. H puts the panels away, `[` and
-`]` step the scenes. `?scene=`, `?look=`, `?species=`, `?hour=`, `?wind=`, `?eye=`
+`]` step the scenes. `?scene=`, `?look=`, `?species=`, `?hour=`, `?wind=`, `?day=`, `?eye=`
 and `?fresh` (ignore what the lab kept) set it from the address.
 
 ## The gallery
@@ -601,7 +606,7 @@ when tracked files differ from it), the look, the hour and the wind:
 `trees-9029955-painterly-h9-w4.png`. *Compare* takes two sheets and shows
 them side by side, flickering, or as their difference (with how many pixels
 differ). `?look=` (or `all` with `?one=`), `?species=`, `?region=`, `?kind=`,
-`?views=`, `?hour=`, `?wind=`, `?cell=` (width in pixels), `?screen=` (lines)
+`?views=`, `?hour=`, `?wind=`, `?day=`, `?cell=` (width in pixels), `?screen=` (lines)
 and `?photos=<address>` (a photograph of your own per species,
 `<address><name>.jpg`, from a folder you serve yourself) set it from the
 address.
@@ -907,12 +912,15 @@ and, where no scan exists, AI-generated pictures (a silver birch's bark, its
 rugged foot's too, a beech's, a blue gum's rough stocking and smooth streaked
 stem, a Scots pine's copper upper flakes, a stone pine's plates, a black
 alder's, a coast live oak's, a weeping willow's, a Lombardy poplar's, a Torrey
-pine's, a sugar maple's and a red oak's bark; a Canary palm's trunk and frond,
+pine's, a sugar maple's and a red oak's bark, and a Monterey pine's, an Aleppo
+pine's, a Corsican pine's, an eastern white pine's, a Sitka spruce's, a white
+spruce's and a Monterey cypress's; a Canary palm's trunk and frond,
 a blue gum's sickle leaves, a London plane's leaves, a coast live oak's, a
 hawthorn's, a black alder's, a California sycamore's, a Lombardy poplar's, a
 silver birch's and a weeping willow's, a gorse's flowering sprigs, a Monterey
-cypress's sprays and pads, the pines' cushions and clumps, a Torrey pine's and
-an eastern white pine's shoots; the palms' fans, queen palm frond, dead skirt
+cypress's sprays and pads, the pines' cushions and clumps, a Torrey pine's, an
+eastern white pine's and a Corsican pine's shoots, a Sitka spruce's, a white
+spruce's and a Douglas fir's branch tips; the palms' fans, queen palm frond, dead skirt
 and pineapple cut, and the painted fronds and fans of the other looks), all
 credited in `assets/SOURCES.md` with the tool and the prompt each was made with
 (the generated ones marked so: they are not CC0). A generated bark is pieced
@@ -922,8 +930,8 @@ read from its lightness; a generated sheet of leaves is keyed off its magenta,
 each edge taking the colour of the leaf beside it, so no pink rim is left.
 `tools/scans/fetch.mjs` downloads the sources, `tools/scans/build.mjs` makes
 `assets/` from them (`tools/scans/recipe.mjs` lists both, and how each is cut).
-16.9 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
-spoil).
+20.5 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
+spoil). Where the owner gave a picture again at 2048 pixels, that one is used.
 
 - **Bark** is a set a species wears (`scans.ts` `SCAN_LOOKS`): a tile of
   1024 texels of bark, its colour (roughness in alpha) and its relief (normal
@@ -1093,10 +1101,20 @@ spoil).
   dark beneath. Its pads are bigger (`cushionSize`, 2.8 clump radii from their middle, its mid cards
   as big), so they join each other and the crown into flat-topped masses, and it has as many whole
   sprays as a crown without pads, a third of them hanging under the pads, so the wood leading into a
-  shelf is clothed near it. A Monterey pine's are fewer and larger (`cushionCards` 1, `cushionSize` 2.1:
-  one cushion a clump, where a closed crown has four of 2 overlapping), so its crown is a few big
-  rounded lumps in shelves with dark creases and some sky between them, its picture's own light on
-  each, and not one heavy dark blob.
+  shelf is clothed near it; and five short sprays more a shelf along the wood leading up into it, over
+  3.5 m of it (`FixedCards.clothe`). A shelf stands up from its wood, never dropped under it (hung below,
+  its own limb ran on bare above it). Seen from well beneath (tipped more than 0.6 of the way over to the
+  eye), a cushion card is turned its own way about the eye, and a pad's drawn longer up its picture, about
+  as deep as it is wide: their up had been the way out from under the eye, the same for every one
+  overhead, so their wide low pictures lay in rings of stretched bands round the eye. From the tee
+  they stay level bands.
+- **A Monterey pine in clumps.** Real Monterey pines are dense but lumpy: distinct rounded clumps, sky
+  between them, an irregular outline (the Big Sur reference). Its cushion a clump had been 2.1 of the
+  clump's radius from its middle, its clumps even through the crown 1.4 radii apart: side-on, under 1% of
+  the crown inside its outline showed sky, one heavy mass. Its leaves now gather into bunches at its
+  branches' ends, some branches bare (`clusters` 0.7), it is a little more open (0.35) and lumpier (lobes
+  0.6), and its cushion is 1.2 radii: some 10% sky inside its outline, the clumps rounded masses apart,
+  its bare lower limbs showing under them (`test/realLook.test.ts`).
 - **Flowers** (`ScanLook.flowers`, the style's `bloom`). A gorse wears its own sprigs whole (a
   `sprays` kind, as a cypress's), their yellow pea flowers along their upper half. Its cards keep
   how far each texel is a flower (yellow or orange: red and green well over blue, red not under
@@ -1104,16 +1122,43 @@ spoil).
   the flowers' mean and each spine's against the spines', and the shader colours a flower in the
   look's own flower colour (`#f2c230`), lit as the leaf there is (the light on the leaf over the
   leaf's colour, times the flower's; the air's own light taken off and put back). `bloom` is the
-  share of a bush's sprays in flower, each by its own number: 1 in spring, 0 out of flower (its
-  flowers gone and its spines left), 0.7 as a links course's gorse has them most of the year.
+  share of a bush's sprays in flower, each by its own number: 1 in full flower, 0 out of flower (its
+  flowers gone and its spines left); 0.3 with no day given, a few flowers, not a bush mostly yellow.
+  Given the day of the year (`trees.environment.day`), a species' own year says instead
+  (`ScanLook.flowering`, eased between the days it names and round from December to January, written to
+  the species' rows only when the day changes): common gorse's (`GORSE_FLOWERING`) mainly in flower from
+  January to June, at its height from March to May (0.95 on the 20th of April), a few flowers the rest of
+  the year (0.08 to 0.18; Clements et al. 2001, Tarayre et al. 2007). A host south of the equator passes
+  the day half a year on.
 - **Shoots for tufts** (`ScanLook.tuftPicture`). An eastern white pine's needles are long, soft and
   fine, in fives; drawn needle by needle as a Scots pine's they were stiff spiky brushes. Its tufts
   are laid from its own shoot pictures instead, a soft drooping tassel at each shoot's end (the
-  picture three needles long, its brush reaching as far past the shoot as a drawn tuft would).
+  picture three needles long, its brush reaching as far past the shoot as a drawn tuft would). A
+  Corsican pine's from its own shoots too, a stout twig in a brush of long stiff needles (the picture two
+  needles long, `tuftShoot`). A Torrey pine's long stiff grey-green brushes from its own: its picture is
+  mostly brush (`tuftShoot` 1.6), so it is cut where its brush begins (`tuftFrom` 0.3, its bare twig left
+  to the card's own wood) and laid three to a tuft, fanned 0.55 rad apart about the brush's foot
+  (`tuftFan`), each a little longer or shorter, over the pine's own drawn needles, a little longer than
+  them: one flat-laid picture was a narrow tassel, a broad leaf's blot from the tee, and a fan of pictures
+  alone a fan palm's leaf from under the crown; the drawn needles give the brush its edge of needle tips.
 - **Where one bark gives way to the next** is laid round the tree's own axis and up its height, eased
   pixel by pixel: laid round each tube and along it, and eased once a vertex, a forked stem's or a
   clump's stems took the pattern up afresh where they part, and a sycamore's or a birch's foot bark
   ended in a line round the top of its root plate.
+- **The bark's stand-in.** Until the photographs come, the bark's texture is one texel. three builds a
+  texture's sampling into the shader from the texture there when the wood is first drawn, and the stand-in
+  had its defaults, nearest on both sides and clamped: built so, the photographs were read a texel at a time
+  and clamped at the tile's edge wherever the bark ran past it, long vertical streaks up every stem close
+  to. The lab draws before they come and showed it; the gallery waits for `ready`. The stand-in and the
+  sets are now made by one function (`barkLayers`, `test/barkTexture.test.ts`), sampled alike.
+- **Cost** of the sixth round (the 2048-pixel pictures, the conifers' own bark and shoots, the Monterey pine's clumps,
+  the cypress's clothed limbs, the Torrey pine's fanned brushes): in the lab's grove, 1104 x 1868, the least of two or
+  three runs each, interleaved against main on a shared, busy Mac: the mixed grove 1.38 ms in the clearing and 1.30
+  from outside before, 1.46 and 1.31 after; a grove of Monterey cypresses 1.20 and 1.38 before, 1.45 and 1.34 after
+  (five sprays more a shelf near to); of Monterey pines 0.95 and 1.50 before, 0.87 and 1.11 after (smaller cushions,
+  fewer clumps); of Torrey pines 0.96 and 0.78 before, 0.97 and 0.78 after. The pictures added to the package are
+  3.6 MB of AVIF (seven bark sets, four shoot sets, and the 2048-pixel pictures a little bigger than the 1024 ones):
+  20.5 MB of bark and leaves, 22.2 MB with the painted marks.
 - **Cost** of the fifth batch (pads in layers, the Monterey pine's cushions, gorse's sprigs and flowers, the white
   pine's shoots, the new bark and leaves): in the lab's grove, 3456 x 2006, the least of two or three runs each,
   interleaved against main on a shared, busy Mac (graphics card's time for the frame): the mixed grove 4.08 ms in
