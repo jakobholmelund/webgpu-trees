@@ -903,11 +903,16 @@ and leans its own way.
 
 The realistic look wears photographs: scanned bark and scanned leaves, CC0
 from [ambientCG](https://ambientcg.com) and [Poly Haven](https://polyhaven.com),
-and, where no scan exists, AI-generated pictures (a silver birch's bark, a
-beech's, a blue gum's rough stocking and smooth streaked stem, a Scots pine's
-copper upper flakes; a Canary palm's trunk and frond, a blue gum's sickle
-leaves, a London plane's leaves, a coast live oak's, a Monterey cypress's
-sprays, a Torrey pine's shoots; the palms' fans, queen palm frond, dead skirt
+and, where no scan exists, AI-generated pictures (a silver birch's bark, its
+rugged foot's too, a beech's, a blue gum's rough stocking and smooth streaked
+stem, a Scots pine's copper upper flakes, a stone pine's plates, a black
+alder's, a coast live oak's, a weeping willow's, a Lombardy poplar's, a Torrey
+pine's, a sugar maple's and a red oak's bark; a Canary palm's trunk and frond,
+a blue gum's sickle leaves, a London plane's leaves, a coast live oak's, a
+hawthorn's, a black alder's, a California sycamore's, a Lombardy poplar's, a
+silver birch's and a weeping willow's, a gorse's flowering sprigs, a Monterey
+cypress's sprays and pads, the pines' cushions and clumps, a Torrey pine's and
+an eastern white pine's shoots; the palms' fans, queen palm frond, dead skirt
 and pineapple cut, and the painted fronds and fans of the other looks), all
 credited in `assets/SOURCES.md` with the tool and the prompt each was made with
 (the generated ones marked so: they are not CC0). A generated bark is pieced
@@ -917,7 +922,7 @@ read from its lightness; a generated sheet of leaves is keyed off its magenta,
 each edge taking the colour of the leaf beside it, so no pink rim is left.
 `tools/scans/fetch.mjs` downloads the sources, `tools/scans/build.mjs` makes
 `assets/` from them (`tools/scans/recipe.mjs` lists both, and how each is cut).
-10.5 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
+16.9 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
 spoil).
 
 - **Bark** is a set a species wears (`scans.ts` `SCAN_LOOKS`): a tile of
@@ -1072,6 +1077,51 @@ spoil).
   and darkened to their undersides. The stone pine wears its own bark too, thick reddish
   plates between deep fissures (`stonePine`, a tile 1.2 m square). The drawn cushions
   (`"drawn"`) remain for a pine with no pictures.
+- **A photograph's tone at the species' colour.** A species' leaf colour is its crown's as it is seen
+  from some way off (`docs/MORPHOLOGY.md`), its own leaves' shade already in it. A card's tone is
+  each leaf's lightness over its sheet's mean, 0.6 on average, and the shader had laid it on at 1.12
+  (as the drawn marks' are), so a photographed crown was 0.67 of its colour before the crown's own
+  shade and the sun were laid over it: the pictures' shade under their leaves counted twice, and the
+  crowns came out darker than the photographs beside them in the gallery. A photographed card's tone
+  is now brought to its species' colour on average (`PHOTO_TONE`, 1/0.6), every realistic crown about
+  half again as bright in linear light; the drawn sprays (`scans: false`) are as they were.
+- **Pads in layers** (`ScanLook.padThick`). A Monterey cypress's pad picture is a thin shelf, a fifth
+  as high as wide; laid one to a card, an old coastal cypress's thick flat-topped shelves (1–2 m deep,
+  the Lone Cypress's) were thin dark discs floating apart. Each pad card now lays its picture in up to
+  four layers, each a little narrower, higher and to one side, the higher ones behind, a quarter
+  taller than the picture, until the pad is 0.45 as thick as wide: lumpy, lit along each layer's top,
+  dark beneath. Its pads are bigger (`cushionSize`, 2.8 clump radii from their middle, its mid cards
+  as big), so they join each other and the crown into flat-topped masses, and it has as many whole
+  sprays as a crown without pads, a third of them hanging under the pads, so the wood leading into a
+  shelf is clothed near it. A Monterey pine's are fewer and larger (`cushionCards` 1, `cushionSize` 2.1:
+  one cushion a clump, where a closed crown has four of 2 overlapping), so its crown is a few big
+  rounded lumps in shelves with dark creases and some sky between them, its picture's own light on
+  each, and not one heavy dark blob.
+- **Flowers** (`ScanLook.flowers`, the style's `bloom`). A gorse wears its own sprigs whole (a
+  `sprays` kind, as a cypress's), their yellow pea flowers along their upper half. Its cards keep
+  how far each texel is a flower (yellow or orange: red and green well over blue, red not under
+  green; `flowerOf`) in the channel the drawn cards spend on tone again, each flower's tone against
+  the flowers' mean and each spine's against the spines', and the shader colours a flower in the
+  look's own flower colour (`#f2c230`), lit as the leaf there is (the light on the leaf over the
+  leaf's colour, times the flower's; the air's own light taken off and put back). `bloom` is the
+  share of a bush's sprays in flower, each by its own number: 1 in spring, 0 out of flower (its
+  flowers gone and its spines left), 0.7 as a links course's gorse has them most of the year.
+- **Shoots for tufts** (`ScanLook.tuftPicture`). An eastern white pine's needles are long, soft and
+  fine, in fives; drawn needle by needle as a Scots pine's they were stiff spiky brushes. Its tufts
+  are laid from its own shoot pictures instead, a soft drooping tassel at each shoot's end (the
+  picture three needles long, its brush reaching as far past the shoot as a drawn tuft would).
+- **Where one bark gives way to the next** is laid round the tree's own axis and up its height, eased
+  pixel by pixel: laid round each tube and along it, and eased once a vertex, a forked stem's or a
+  clump's stems took the pattern up afresh where they part, and a sycamore's or a birch's foot bark
+  ended in a line round the top of its root plate.
+- **Cost** of the fifth batch (pads in layers, the Monterey pine's cushions, gorse's sprigs and flowers, the white
+  pine's shoots, the new bark and leaves): in the lab's grove, 3456 x 2006, the least of two or three runs each,
+  interleaved against main on a shared, busy Mac (graphics card's time for the frame): the mixed grove 4.08 ms in
+  the clearing and 2.77 from outside before, 3.50 and 3.03 after; a grove of Monterey cypresses 3.81 and 3.65 before,
+  4.14 and 3.32 after (bigger, layered pads and more sprays near to); of Monterey pines 3.22 and 3.03 before, 2.82 and
+  2.69 after (one cushion a clump, not four); of gorse (all far dabs there) 0.87 and 0.81 before, 0.78 and 0.78
+  after. All within this Mac's noise but perhaps the cypress's clearing, some 0.3 ms. The pictures added to the
+  package are 4.1 MB of AVIF (eight leaf sets and eight bark sets): 16.9 MB in all.
 - **Cost** of the photographed cushions: in the lab's grove of stone pines only, 3456 x 2006,
   the frame took 3.48 and 3.28 ms in the clearing and 2.51 and 2.53 from outside before, 4.01
   and 4.02 and 3.40 and 4.21 after (runs interleaved against the drawn cushions, on a shared,

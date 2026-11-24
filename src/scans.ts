@@ -181,7 +181,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
   "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays", cushion: "cypressPad", padThick: 0.45, cushionSize: 2.8 },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 2, cushionSize: 1.5 },
+  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 1, cushionSize: 2.1 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
   "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
   "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
@@ -191,7 +191,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
   "Queen palm": { bark: "palmRings", barkScale: 0.75, leaves: "frond", leafCm: 400, spray: "whole" },
   "Coast live oak": { bark: "liveOak", leaves: "liveOak", leafCm: 5, spray: "alternate", perSpray: 12 },
-  "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "sycamore", leafCm: 24, spray: "alternate" },
+  "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.05, to: 0.22 }, leaves: "sycamore", leafCm: 24, spray: "alternate" },
   "Sugar maple": { bark: "maple", leaves: "maple", leafCm: 12, spray: "opposite" },
   "Red oak": { bark: "redOak", leaves: "redOak", leafCm: 17, spray: "alternate" },
   // (Its own shoots, soft feathery brushes of fine needles 8–12 cm in fives: its tufts laid from them, `tuftPicture`.)

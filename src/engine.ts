@@ -1845,8 +1845,10 @@ export function createTrees(options: TreesOptions): Trees {
       // (Directions out of the tree's frame, fitted as its normals are.)
       const toW = (v: Vec3): Vec3 => dirToWorld(T, normalize(fit.radial(v)));
       // (Where it is up the tree, as a share of its height: where one bark gives way to the next.)
-      const S4 = T.srow(4);
-      const upper = smoothstep(S4.z, S4.w, surface.y.div(max(T.r1.x, float(0.01))));
+      // (Its height as a share, handed on as it is and eased pixel by pixel: eased once a vertex, a forked stem's or a
+      // clump's tubes, whose first ring is where the stems part, had the whole of the upper bark from there up, the
+      // lower ending in a line round the top of the root plate.)
+      const upper = surface.y.div(max(T.r1.x, float(0.01)));
       const vE = varying(nWorld, "vWoodE");
       // (Which way round the wood the point is, for laying the bark: out from the centre line, not the way the
       // surface faces, which turns aside on a buttress's flank and up on a flare, and drew the bark across them.)
@@ -1866,6 +1868,10 @@ export function createTrees(options: TreesOptions): Trees {
       const vAirAdd = airAdd ? varying(airAdd, "vWoodAirAdd") : null;
       const vAirMul = airAdd ? varying(intoAir(vec3(1), at).sub(airAdd), "vWoodAirMul") : null;
       const vMossRaw = varying(vec4(mossAlbedo, mossAmount), "vWoodMoss");
+      // (Where it is in the tree's own frame, still (out from the stem's foot, and up), for where one bark gives way to
+      // the next: the same pattern on a trunk and on the stems it parts into, with no line where they meet.)
+      const still = centre.add(radial.mul(r0.mul(keepThin)));
+      const vPlace = varying(vec3(still.x, still.z, still.y), "vWoodPlace");
       m.colorNode = Fn(() => {
         handOver(vShares);
         // The photograph wrapped round the wood, at its size in metres: seen from two sides square to the wood,
@@ -1885,11 +1891,17 @@ export function createTrees(options: TreesOptions): Trees {
         const round = atan(cw, cu);
         // (Where the upper bark takes over, in tongues up and down the furrows, not in a line round the stem.)
         // (Its edge ragged at two sizes, and drawn out up and down in streaks, as bark gives way along its furrows.)
-        const streaks = sin(round.mul(23).add(sin(alongW.mul(2.1).add(round.mul(5))).mul(2.2))).mul(0.12).add(sin(round.mul(41).sub(alongW.mul(1.3))).mul(0.06));
-        const tongue = sin(alongW.mul(5.3).add(round.mul(3))).mul(0.18).add(sin(alongW.mul(13.1).sub(round.mul(7))).mul(0.12)).add(sin(alongW.mul(2.3).add(round.mul(11))).mul(0.1)).add(streaks).add(0.5);
-        const up = step(tongue, vGeo.z);
+        // (Laid round the tree's own axis and up its height, not round each tube and along it: a forked stem's or a
+        // clump's stems each took up the pattern afresh where they part, the lower bark ending in a line round the top
+        // of the root plate.)
+        const roundT = atan(vPlace.y, vPlace.x);
+        const upT = vPlace.z;
+        const streaks = sin(roundT.mul(23).add(sin(upT.mul(2.1).add(roundT.mul(5))).mul(2.2))).mul(0.12).add(sin(roundT.mul(41).sub(upT.mul(1.3))).mul(0.06));
+        const tongue = sin(upT.mul(5.3).add(roundT.mul(3))).mul(0.18).add(sin(upT.mul(13.1).sub(roundT.mul(7))).mul(0.12)).add(sin(upT.mul(2.3).add(roundT.mul(11))).mul(0.1)).add(streaks).add(0.5);
         const sp = uint(vInfo.x).mul(SPECIES_ROWS);
         const S4f = speciesR.element(sp.add(4));
+        const upper = smoothstep(S4f.z, S4f.w, vGeo.z);
+        const up = step(tongue, upper);
         const S5 = speciesR.element(sp.add(5));
         const S6 = speciesR.element(sp.add(6));
         const layer = mix(mix(S4f.x, S4f.y, up), mix(float(ballLayer), float(bootsLayer), vInfo.w), vInfo.z);
@@ -1920,7 +1932,7 @@ export function createTrees(options: TreesOptions): Trees {
         const upB = upCode.sub(upR.mul(65536)).sub(upG.mul(256));
         const upperCol = select(S5.w.greaterThan(0.5), pow(vec3(upR, upG, upB).div(255), vec3(2.2)), paled);
         // (A foot's own colour lightens up the stem as it gives way: a birch's black, deepest at the ground.)
-        const footCol = mix(S6.xyz, mix(S6.xyz, paled, 0.45), vGeo.z);
+        const footCol = mix(S6.xyz, mix(S6.xyz, paled, 0.45), upper);
         const target = mix(mix(select(S6.w.greaterThan(0.5), footCol, paled), upperCol, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
         const tinted = mix(albedo.mul(target).div(max(L0.xyz, vec3(0.005))), target, float(1).sub(uBarkOn)).mul(vInfo.y);
         // (Its relief: each side's normal from its picture, round the wood (across the picture) and along it

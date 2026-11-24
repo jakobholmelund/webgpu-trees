@@ -32,7 +32,7 @@ test("every picture is there, an AVIF, under 1 MB; all of them under 18 MB", () 
     assert.ok(n > 5_000 && n < 1_000_000, `${f}: ${n} bytes`);
     total += n;
   }
-  // (16.5 MB with the fifth batch of the owner's pictures: 23 bark sets and 38 leaf sets.)
+  // (16.9 MB with the fifth batch of the owner's pictures: 24 bark sets and 39 leaf sets.)
   assert.ok(total < 18e6, `${(total / 1e6).toFixed(1)} MB`);
 });
 
