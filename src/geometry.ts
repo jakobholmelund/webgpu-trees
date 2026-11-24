@@ -1344,7 +1344,7 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
  * out of the crown and a little up, as leaves turn to the light, each its own way about that. Each card:
  * `position` its centre; `aDab` its corner, its size (m, across half of it), a number of its own;
  * `aNormal` its clump's outward normal and depth; `aOffset` its own facing (unit) and 0; `aTangent` the
- * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant. A variant
+ * way its twig runs (unit, square to its facing) and how high the corner is in its clump (its radii); `aLimb` the foot of its limb and its variant. A variant
  * `skip` says is left without cards.
  */
 /**
@@ -1379,7 +1379,7 @@ export interface FixedCards {
   rise?: number;
 }
 
-export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[]): Pieces {
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
   trees.forEach((tree, v) => {
     b.begin();
@@ -1430,7 +1430,9 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // (In a tree whose leaves lie in pads, `habit.pads`, flattened into a shelf: wider, and thin.)
         const spread = fix && !filler ? r * 0.55 * Math.sqrt(hash01(k, 26)) : 0;
         const wide = 1 + PAD_WIDE * pads;
-        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + off[1] * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : at0;
+        // (A pine's tufts, held up off their shoots, make a cushion domed above them: none hang under it.)
+        const offUp = fix && (fix.rise ?? 0) > 0.5 ? Math.abs(off[1]) : off[1];
+        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + offUp * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : at0;
         // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's;
         // its big cards too, the clump's hanging mass.)
         // (Less on a clump facing the sky, as far as its kind says: `hangTop`.)
@@ -1440,7 +1442,9 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // more up than its leaves let it, as they hang edge to the sky: a card facing up has no way down
         // along it, and its leaves would lie flat.)
         // (So too a spray that rises along its twig, half as far.)
-        const rise = fix && !filler ? (fix.rise ?? 0) : 0;
+        // (Its big cards too, and a mid card of a variant `rises` says, as far: a pine's big card is a branch's
+        // cushion of tufts held up off it, flat beneath and domed above; spun any way about its facing, a blot.)
+        const rise = fix ? (fix.rise ?? 0) : (rises?.[v] ?? 0);
         // (A pad's sprays face the sky, as a shelf's top does.)
         const face = norm([n[0] * 0.9 + off[0] * 0.8, (n[1] * 0.9 + off[1] * 0.8 + 0.5) * (1 - 0.85 * Math.min(1, hang)) * (1 - 0.5 * rise) + PAD_FACE_UP * pads, n[2] * 0.9 + off[2] * 0.8]);
         // (Its twig: on along the wood its foot is on, out of the crown a little, turned its own way (a
@@ -1453,7 +1457,7 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const along0 = [from.d[0] + spin[0] * 0.6 * (1 - 0.5 * rise) + n[0] * out, from.d[1] + spin[1] * 0.6 * (1 - 0.5 * rise) + n[1] * out + rise, from.d[2] + spin[2] * 0.6 * (1 - 0.5 * rise) + n[2] * out];
         const l0 = Math.hypot(along0[0], along0[1], along0[2]) || 1;
         // (A pad's sprays, its big cards too, lie level: from the side a pad is a band of them, not a ball.)
-        const level = 1 - PAD_LEVEL * pads;
+        const level = 1 - PAD_LEVEL * pads * (1 - Math.min(1, rise));
         const along = [(along0[0] / l0) * (1 - hang), ((along0[1] / l0) * (1 - hang) - hang) * level, (along0[2] / l0) * (1 - hang)];
         const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
         const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
@@ -1465,7 +1469,10 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const at = [from.p[0] + tangent[0] * on, from.p[1] + tangent[1] * on, from.p[2] + tangent[2] * on];
         let f = -1;
         for (const [cx, cy] of CORNERS) {
-          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, filler ? 1 : 0], aTangent: [...tangent, 0], aLimb: [...limb, v] });
+          // (How high the corner is in its clump, in the clump's radii: along the twig, which the card keeps
+          // however it is turned to the eye. A dense clump's needles low in it are in its own shade.)
+          const inClump = Math.max(-1.5, Math.min(1.5, (at[1] + tangent[1] * cy * half - cl.y[c]) / Math.max(r, 1e-3)));
+          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, filler ? 1 : 0], aTangent: [...tangent, inClump], aLimb: [...limb, v] });
           if (f < 0) f = i;
         }
         b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);

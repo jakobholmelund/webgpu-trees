@@ -92,7 +92,10 @@ for (const sp of trees) {
       const stem = stemNodes(tree);
 
       test(`${name}: its bole under the crown is no thread`, () => {
-        const share = radiusAt(tree, stem, 0.97 * size.crownBase) / radiusAt(tree, stem, bh);
+        // (Under its fork, where a stem forks below its crown (`fork`, a stone pine's): above it, the stem
+        // followed is one of its limbs.)
+        const under = Math.min(size.crownBase, (sp.fork ?? 1) * size.crownBase);
+        const share = radiusAt(tree, stem, 0.97 * under) / radiusAt(tree, stem, bh);
         assert.ok(share >= 0.35, `its radius under the crown is ${(share * 100).toFixed(0)}% of its radius at breast height`);
       });
 

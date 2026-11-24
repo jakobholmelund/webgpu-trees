@@ -33,18 +33,33 @@ const DENSE_FROM = 0.6;
  * out and falling back), in radians; and how many needles to a needle's length in texels, fewest and most.
  */
 const TUFT_STRETCH = 0.8;
+/** Behind a long brush's tip (`ScanLook.brush`), the angles its needles stand forward from the shoot at (rad). */
+const BRUSH_ANGLE_LO = 0.55;
+const BRUSH_ANGLE_HI = 1.15;
 const TUFT_TIP_ANGLE = 0.45;
 const TUFT_BACK_ANGLE = 1.9;
 const TUFT_NEEDLES = 1.4;
 const TUFT_LEAST = 18;
 const TUFT_MOST = 160;
 /** At most this many bundles to a tuft, and how far a bundle's needles stray from its line (rad). */
-const TUFT_BUNDLES = 18;
+const TUFT_BUNDLES = 28;
+/** At least this many: a tuft of a few big spokes was a palmate leaf a few dozen metres off. */
+const TUFT_BUNDLES_LEAST = 12;
 const TUFT_BUNDLE_SPREAD = 0.1;
 /** The share of a tuft's needles that stand loose between its bundles. */
-const TUFT_LOOSE = 0.3;
+const TUFT_LOOSE = 0.45;
 /** The shortest a pine's shoot that puts out more, in its needles' lengths. */
 const PINE_SHOOT = 2.2;
+/** A pine's big card: how many branches' shoots it carries side by side, and as many more for a dense one; the fan they spread over (rad). */
+const BRANCH_SHOOTS = 5;
+const BRANCH_SHOOTS_DENSE = 7;
+const BRANCH_FAN = 1.2;
+/** How long a pine's big card's branch is, as a share of the card. */
+const BRANCH_REACH = 0.8;
+/** How thick its wood is beside a near card's: its stems, a texel or two each, were a ladder under the cushion. */
+const BRANCH_WOOD = 0.5;
+/** Needles shorter than this (m) fill a pine's big card with as many more shoots as they are shorter, to twice as many. */
+const BRANCH_NEEDLE = 0.1;
 /** A pine's needle when its look gives none: this share of its brush (`leafCm`). */
 const NEEDLE_OF_BRUSH = 0.45;
 const UNDER_TONE = 0.55;
@@ -122,19 +137,26 @@ function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: nu
  * bundles behind the shoot are drawn first and darker, those in front last and lighter, each needle lighter to
  * its tip.
  */
-function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rnd: () => number, tone: number, own: number): void {
-  const n = Math.round(Math.min(TUFT_MOST, Math.max(TUFT_LEAST, len * TUFT_NEEDLES)));
-  const bundles = Math.max(7, Math.min(TUFT_BUNDLES, Math.round(n / 5)));
-  const stretch = len * TUFT_STRETCH;
+function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rnd: () => number, tone: number, own: number, brush = TUFT_STRETCH): void {
+  // (A longer brush, as many more needles and bundles as it is longer: as thick all along it.)
+  const more = Math.max(1, brush / TUFT_STRETCH);
+  const n = Math.round(Math.min(TUFT_MOST * more, Math.max(TUFT_LEAST, len * TUFT_NEEDLES * more)));
+  const bundles = Math.max(TUFT_BUNDLES_LEAST, Math.min(Math.round(TUFT_BUNDLES * more), Math.round(n / 4)));
+  const tip = len * TUFT_STRETCH;
+  const stretch = len * Math.max(TUFT_STRETCH, brush);
   // (A needle at least most of a texel wide: thinner, a branch's card of them is a lace, little of it at the cut.)
   const w = Math.max(0.7, len * 0.012);
   const ca = Math.cos(ang);
   const sa = Math.sin(ang);
   const needles: { bx: number; by: number; dx: number; dy: number; front: number; t: number }[] = [];
   for (let b = 0; b < bundles; b++) {
-    // (Where along the stretch, 0 at its back and 1 at the tip: more of them towards the tip.)
-    const s = (b + rnd()) / bundles;
-    const theta = lerp(TUFT_BACK_ANGLE, TUFT_TIP_ANGLE, s) * (0.8 + 0.4 * rnd());
+    // (Where along the stretch, 0 at its back and 1 at the tip: more of them towards the tip. Behind the tip's
+    // starburst, a long brush's needles stand forward along the shoot, as a bottle brush's: older needles
+    // than the tip's, still pointing the way the shoot grew.)
+    const q = (b + rnd()) / bundles;
+    const back = stretch * (1 - q);
+    const s = back <= tip ? 1 - back / tip : 0;
+    const theta = back <= tip ? lerp(TUFT_BACK_ANGLE, TUFT_TIP_ANGLE, s) * (0.8 + 0.4 * rnd()) : lerp(BRUSH_ANGLE_LO, BRUSH_ANGLE_HI, rnd());
     const phi = rnd() * Math.PI * 2;
     const bt = LEAF * tone * (0.8 + 0.35 * rnd());
     const per = Math.max(2, Math.round(((n * (1 - TUFT_LOOSE)) / bundles) * (0.6 + 0.8 * rnd())));
@@ -147,19 +169,19 @@ function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rn
       const v = Math.sin(th) * Math.cos(ph);
       const front = Math.sin(th) * Math.sin(ph);
       const nl = len * (0.82 + 0.25 * rnd());
-      const at = stretch * (1 - s) + (rnd() - 0.5) * stretch * 0.12;
+      const at = back + (rnd() - 0.5) * tip * 0.12;
       needles.push({ bx: x - ca * at, by: y - sa * at, dx: (ca * u - sa * v) * nl, dy: (sa * u + ca * v) * nl, front, t: bt * (0.9 + 0.2 * rnd()) });
     }
   }
   // (And some loose between them, so close to a tuft is a brush and not a few spokes.)
   for (let q = 0; q < n * TUFT_LOOSE; q++) {
-    const s = rnd();
-    const th = lerp(TUFT_BACK_ANGLE, TUFT_TIP_ANGLE, s) * (0.8 + 0.4 * rnd());
+    const at = stretch * rnd();
+    const s = at <= tip ? 1 - at / tip : 0;
+    const th = at <= tip ? lerp(TUFT_BACK_ANGLE, TUFT_TIP_ANGLE, s) * (0.8 + 0.4 * rnd()) : lerp(BRUSH_ANGLE_LO, BRUSH_ANGLE_HI, rnd());
     const ph = rnd() * Math.PI * 2;
     const u = Math.cos(th);
     const v = Math.sin(th) * Math.cos(ph);
     const nl = len * (0.75 + 0.25 * rnd());
-    const at = stretch * (1 - s);
     needles.push({ bx: x - ca * at, by: y - sa * at, dx: (ca * u - sa * v) * nl, dy: (sa * u + ca * v) * nl, front: Math.sin(th) * Math.sin(ph), t: LEAF * tone * (0.75 + 0.35 * rnd()) });
   }
   needles.sort((p, q) => p.front - q.front);
@@ -191,6 +213,8 @@ interface Lay {
   flip: boolean;
   tone: number;
   own: number;
+  /** A pine's tuft's brush, in its needles' lengths. */
+  brush?: number;
 }
 
 /** Bilinear sample of a sheet's channel k at (x, y) texels; 0 off the sheet. */
@@ -234,7 +258,13 @@ function tuftInside(L: Layer, l: Lay): boolean {
   const r = l.len * 1.3;
   const cx = l.x - ca * l.len * 0.2;
   const cy = l.y - sa * l.len * 0.2;
-  return cx - r >= MARGIN && cy - r >= MARGIN && cx + r <= L.n - 1 - MARGIN && cy + r <= L.n - 1 - MARGIN;
+  // (A long brush's back too: its needles stand out from the shoot that far behind the tip.)
+  const b = l.len * Math.max(0, (l.brush ?? TUFT_STRETCH) - TUFT_STRETCH);
+  const bx = l.x - ca * (l.len * TUFT_STRETCH + b);
+  const by = l.y - sa * (l.len * TUFT_STRETCH + b);
+  const rb = l.len;
+  const ok = (x: number, y: number, rr: number) => x - rr >= MARGIN && y - rr >= MARGIN && x + rr <= L.n - 1 - MARGIN && y + rr <= L.n - 1 - MARGIN;
+  return ok(cx, cy, r) && (b <= 0 || ok(bx, by, rb));
 }
 
 function leaf(L: Layer, sh: Sheet, l: Lay, shadow: number): void {
@@ -335,6 +365,8 @@ interface LeafAt {
   len: number;
   /** Drawn needle by needle (a pine's tuft, `needleTuft`), not as its picture. */
   needles?: boolean;
+  /** A tuft's brush along its shoot, in its needles' lengths (`ScanLook.brush`). */
+  brush?: number;
 }
 
 function grow(x: number, y: number, a: number, len: number, curl: number, rnd: () => number, n = 8, wobble = 0.08): Twig["pts"] {
@@ -368,7 +400,7 @@ function nearSpray(look: ScanLook, extent: number, rnd: () => number, density = 
   if (kind === "tufts") {
     // (A pine's twig's end: its last few years' shoots, each year's a whorl, and a tuft of needles at the end
     // of each: two or three big brushes on a long-needled pine, a dozen small ones on a short-needled one.)
-    return pineShoots(extent * 0.55, Math.min(needleOf(look), extent * 0.3), density, rnd);
+    return pineShoots(extent * 0.55, Math.min(needleOf(look), extent * 0.3), density, rnd, look.brush);
   }
   if (kind === "sprays") {
     // (A short bare stem, and off it the sprays fanning out, the middle one last, on top.)
@@ -451,7 +483,7 @@ function nearSpray(look: ScanLook, extent: number, rnd: () => number, density = 
  * pine's branch is a candelabrum of separate tufts with sky between, not a mat of needles, which read as a
  * broad leaf's mass; a dense pine's (`density`) more crowded, an open one's sparser.
  */
-export function pineShoots(reach: number, N: number, density: number, rnd: () => number): { twigs: Twig[]; leaves: LeafAt[] } {
+export function pineShoots(reach: number, N: number, density: number, rnd: () => number, brush?: number): { twigs: Twig[]; leaves: LeafAt[] } {
   const twigs: Twig[] = [];
   const leaves: LeafAt[] = [];
   // (A shoot shorter than this ends in a tuft and puts out no more: a year's shoot is some twice its needles
@@ -462,7 +494,7 @@ export function pineShoots(reach: number, N: number, density: number, rnd: () =>
     const pts = grow(x, y, a, len, (UP - a) * 0.35, rnd, 6, 0.06);
     twigs.push({ pts, r0: r, r1: r * 0.6 });
     const tip = pts[pts.length - 1];
-    leaves.push({ x: tip.x, y: tip.y, ang: tip.a, len: N * (0.85 + 0.3 * rnd()), needles: true });
+    leaves.push({ x: tip.x, y: tip.y, ang: tip.a, len: N * (0.85 + 0.3 * rnd()), needles: true, brush });
     if (depth >= 3 || len < least) return;
     // (Its whorls up it, two or three shoots each, shorter towards its end; a few of them lost.)
     for (let f = 0.3 + rnd() * 0.1; f < 0.9; f += 0.28 * (0.85 + rnd() * 0.3)) {
@@ -483,11 +515,45 @@ export function pineShoots(reach: number, N: number, density: number, rnd: () =>
 }
 
 /**
+ * A pine's big card: the end of a branch a clump wide, `extent` metres, seen from the side: the branch running
+ * across the card, a little bowed, its shoots rising off it side by side, each of them a pine's shoots
+ * (`pineShoots`) at their size, longer towards its middle. A cushion of tufts, flat beneath and domed above,
+ * wider than high, as many and as close as the pine is dense, its rim the tufts' spikes: a pine's clump as it
+ * is seen from afar. One branch's shoots fanned from a point were a round blot, a broad leaf's mass, and a
+ * crown of them a cloud.
+ */
+function pineBranch(extent: number, N: number, density: number, rnd: () => number, brush?: number): { twigs: Twig[]; leaves: LeafAt[] } {
+  const twigs: Twig[] = [];
+  const leaves: LeafAt[] = [];
+  const d = Math.min(1, Math.max(0, density));
+  // (A short-needled pine's tufts are small: more of its shoots to fill the cushion.)
+  const m = Math.round((BRANCH_SHOOTS + BRANCH_SHOOTS_DENSE * d) * Math.min(2, Math.max(1, BRANCH_NEEDLE / Math.max(N, 0.01))));
+  const reach = extent * BRANCH_REACH;
+  const main = grow(-reach / 2, 0, (rnd() - 0.5) * 0.1, reach, -0.25 + (rnd() - 0.5) * 0.15, rnd, 10, 0.03);
+  const r = Math.min(0.02, Math.max(0.004, N * 0.06));
+  twigs.push({ pts: main, r0: r * BRANCH_WOOD, r1: r * 0.5 * BRANCH_WOOD });
+  for (let q = 0; q < m; q++) {
+    // (Along the branch evenly, give or take; the middle's shoots longest, so the cushion's top is a dome.)
+    const f = Math.min(1, Math.max(0, (q + 0.2 + 0.6 * rnd()) / m));
+    const p = along(main, f);
+    const mid = 1 - Math.abs(2 * f - 1);
+    const a = UP + (f - 0.5) * BRANCH_FAN + (rnd() - 0.5) * 0.35;
+    const len = extent * (0.1 + 0.22 * mid) * (0.75 + 0.5 * rnd());
+    const one = pineShoots(len, N, density, rnd, brush);
+    const c = Math.cos(a - UP);
+    const sn = Math.sin(a - UP);
+    for (const t of one.twigs) twigs.push({ pts: t.pts.map((u) => ({ x: p.x + u.x * c - u.y * sn, y: p.y + u.x * sn + u.y * c, a: u.a + a - UP })), r0: t.r0 * BRANCH_WOOD, r1: t.r1 * BRANCH_WOOD });
+    for (const l of one.leaves) leaves.push({ ...l, x: p.x + l.x * c - l.y * sn, y: p.y + l.x * sn + l.y * c, ang: l.ang + a - UP });
+  }
+  return { twigs, leaves };
+}
+
+/**
  * A big card's spray: a branch's end `extent` metres long, side shoots off it, and all along them its near
  * sprays (`near` metres across each), turned their own ways: as many leaves as a clump of the tree carries.
  */
 function bigSpray(look: ScanLook, extent: number, near: number, rnd: () => number, density = 0): { twigs: Twig[]; leaves: LeafAt[] } {
-  if (look.spray === "tufts") return pineShoots(extent * 0.62, needleOf(look), density, rnd);
+  if (look.spray === "tufts") return pineBranch(extent, needleOf(look), density, rnd, look.brush);
   const twigs: Twig[] = [];
   const leaves: LeafAt[] = [];
   const kind = look.spray;
@@ -649,6 +715,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       flip: rnd() < 0.5,
       tone: (0.9 + rnd() * 0.2) * (i < deep ? UNDER_TONE : 1),
       own: rnd(),
+      brush: l.brush,
     };
     // (A leaf that would reach past the card's edge is made smaller, or left off: cut by the edge, it shows a
     // straight line.)
@@ -659,7 +726,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
       fits = inside();
     }
     if (!fits) continue;
-    if (l.needles) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own);
+    if (l.needles) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own, l.brush);
     else leaf(L, sheet, lay, palm ? shadow * 0.5 : shadow);
   }
   // (Where nothing is drawn, the card's mean tone, so its mips' edges do not darken.)
@@ -670,10 +737,14 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     wsum += L.cover[o];
   }
   const mean = Math.min(1, wsum > 0 ? sum / wsum : LEAF);
+  const flipRows = look.spray === "tufts";
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const o = j * n + i;
-      const p = ((oy + j) * out.width + ox + i) * 4;
+      // (A pine's card is written bottom row first: the cards are drawn upside down on their twigs, the
+      // picture's first row at the twig's far end (seen in the lab: a card's foot showed above it), and a
+      // pine's tufts, held up off their shoots, hung from them. Its foot is so at the twig's foot.)
+      const p = ((oy + (flipRows ? n - 1 - j : j)) * out.width + ox + i) * 4;
       // (A frond's stretch fades out at the card's edges, where its leaflets run on past it.)
       const edge = Math.min(i, j, n - 1 - i, n - 1 - j) - MARGIN;
       const fade = whole ? clamp01(edge / (n * 0.08)) : 1;

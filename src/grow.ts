@@ -128,6 +128,8 @@ const SHED_SPARSE = 0.15;
 const SCAFFOLD_FROM = 0;
 const SCAFFOLD_SPAN = 0.14;
 const SCAFFOLD_SPAN_LEADER = 0.5;
+/** A stem that forks below its crown (`fork`) puts out its limbs over this share of the way from its fork to its crown's base. */
+const FORK_SPAN = 0.25;
 /** How much wider than the species' angle the lowest scaffold leaves (and narrower the highest). */
 const SCAFFOLD_SWING = 40 * DEG;
 /** How far a scaffold turns up over a crown radius of its length, at bend 1 (down at -1), and how far it arches over by its weight. */
@@ -1081,9 +1083,11 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     // A tree's trunk: bare to its crown's base, then through the scaffolds' span, one of them at each of
     // their heights (one in each of as many slots up it), its own lateral buds between.
     // (In a stand, from where its live crown starts, its wood's shade having lifted it.)
-    const yLo = Math.max(base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0);
+    // (Or lower, where the species' stem forks (`fork`): its limbs rise bare to its crown.)
+    const yLo = Math.max(sp.fork !== undefined ? Math.min(1, Math.max(0, sp.fork)) * base : base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0);
     const span = Math.min(0.8, SCAFFOLD_SPAN + SCAFFOLD_SPAN_LEADER * sp.leader);
-    const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : Math.max(yLo + L, base + span * depth);
+    // (A forked stem's limbs leave it close together, in a vase: its V-forks.)
+    const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : sp.fork !== undefined ? Math.max(yLo + L, yLo + FORK_SPAN * (base - yLo)) : Math.max(yLo + L, base + span * depth);
     const levels: { y: number; scaffold: number }[] = [];
     const below = Math.max(1, Math.ceil(yLo / TRUNK_STEP));
     for (let k = 1; k < below; k++) levels.push({ y: (yLo * k) / below, scaffold: -1 });
@@ -2221,7 +2225,7 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
     clumps.ty[k] = t[1];
     clumps.tz[k] = t[2];
   }
-  return sp.architecture === "palm" ? { size, skeleton, clumps } : shedStrays(size, skeleton, clumps);
+  return sp.architecture === "palm" ? { size, skeleton, clumps } : shedStrays(size, skeleton, clumps, sp.fork !== undefined ? sp.fork * size.crownBase : undefined);
 }
 
 /**
@@ -2339,9 +2343,10 @@ function shedBare(w: Wood, h: Hung, keep: number[], inSpray = IN_SPRAY): number[
  * hanging from it), as a tree drops a limb it cannot hold up or light. Stems stay; a clump on shed wood
  * goes with it, and wood it leaves bare goes after it.
  */
-function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
+function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps, forkY?: number): GrownTree {
   const depth = Math.max(0.01, size.height - size.crownBase);
-  const low = size.crownBase - STRAY_BELOW * depth;
+  // (A stem that forks below its crown (`fork`) keeps its limbs from there.)
+  const low = Math.min(size.crownBase - STRAY_BELOW * depth, forkY !== undefined ? forkY - 0.5 : Infinity);
   const far = STRAY_BEYOND * size.crownRadius;
   const keep = new Uint8Array(sk.count);
   for (let i = 0; i < sk.count; i++) {

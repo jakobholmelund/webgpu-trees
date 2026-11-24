@@ -104,6 +104,12 @@ export interface ScanLook {
   perSpray?: number;
   /** A pine's needles, how long (cm): its tufts are as big (else a share of `leafCm`, `sprays.ts` `needleOf`). */
   needleCm?: number;
+  /**
+   * How long a pine's brush of needles is along its shoot's end, in its needles' lengths (else `TUFT_STRETCH`,
+   * a starburst at the tip): a pine keeps its needles two to four years, so a dense one's shoots are clothed
+   * along their last years' growth, bottle brushes standing side by side (a stone pine's, a Monterey pine's).
+   */
+  brush?: number;
 }
 
 /** The photographs each of the library's species wears, by name. */
@@ -117,7 +123,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes: the plates
   // its own grey-brown, not the orange its species is known by from afar.)
-  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6 },
+  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6, brush: 1.6 },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
   "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
@@ -132,11 +138,11 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
   "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays" },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12 },
+  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
   "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
-  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8 },
-  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14 },
+  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2 },
+  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2 },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
