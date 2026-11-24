@@ -37,7 +37,7 @@ import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
-import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, flowerColorCode, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
+import { BARK_SIZE, type ScanLook, barkSet, bloomShare, leafSet, loadBark, loadLeaves, flowerColorCode, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
 import { clothed, growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
@@ -60,7 +60,7 @@ const STAND_SKY = 0.22;
 /** Rows (vec4) a tree has in the shaders' list of trees. */
 const TREE_ROWS = 5;
 /** Rows (vec4) a species has in the shaders' list of species. */
-const SPECIES_ROWS = 9;
+const SPECIES_ROWS = 10;
 /** A near tree's big cards: how far they turn to the eye at least (as `faceEye`), and from how many of their half widths off they start to give way to the small sprays over them, gone by the second. */
 const BIG_CARD_FACE_EYE = 0.65;
 const BIG_CARD_FULL = 5;
@@ -188,6 +188,22 @@ export interface TreeWorld {
   air?(colour: Vec3, at: Vec3): Vec3;
 }
 
+/**
+ * The light, the air and the season, for the host to set, as the grass library takes them: `sun` points at the sun;
+ * a leaf is lit `sunTint` where the sun reaches it and `shadeTint` where only the sky does; `wind` is its heading
+ * (x, y: unit, in the ground's x and z) and its speed in metres a second (z); `day` is the day of the year (1 on
+ * the 1st of January, to 365 or 366; fractions allowed), from which a flowering species' bloom is worked out
+ * (`ScanLook.flowering`), or null for none known (the style's `bloom`). A host south of the equator passes the
+ * day half a year on (day + 182.5), the seasons being the other way round there.
+ */
+export interface TreeEnvironment {
+  sun: THREE.Vector3;
+  sunTint: THREE.Vector3;
+  shadeTint: THREE.Vector3;
+  wind: THREE.Vector3;
+  day: number | null;
+}
+
 export interface TreesOptions {
   /** The trees on the ground: a list, or packed (see `packTrees`). */
   trees: readonly TreeInstance[] | Float32Array;
@@ -224,12 +240,8 @@ export interface TreesOptions {
 export interface Trees {
   /** Add this to the scene. */
   object: THREE.Group;
-  /**
-   * The light and the air, for the host to set, as the grass library takes them: `sun` points at the sun;
-   * a leaf is lit `sunTint` where the sun reaches it and `shadeTint` where only the sky does; `wind` is
-   * its heading (x, y: unit, in the ground's x and z) and its speed in metres a second (z).
-   */
-  environment: { sun: THREE.Vector3; sunTint: THREE.Vector3; shadeTint: THREE.Vector3; wind: THREE.Vector3 };
+  /** The light, the air and the season, for the host to set (`TreeEnvironment`). */
+  environment: TreeEnvironment;
   style: TreeStyle;
   detail: TreeDetail;
   /** What was grown and how the trees were fitted to it. */
@@ -427,6 +439,8 @@ export function createTrees(options: TreesOptions): Trees {
   // takes the light (per metre), how deep its leaves go, its kind of leaf, and how much moss its bark
   // takes (none on a palm's stem, less on pale, peeling bark: a birch's, a eucalyptus's, a plane's).
   const speciesData = new Float32Array(Math.max(1, species.length) * SPECIES_ROWS * 4);
+  /** The day and the style's bloom the species' bloom was last worked out for. */
+  const bloomAt = { day: null as number | null, bloom: style.bloom };
   const packSpecies = () => {
     species.forEach((s, i) => {
       // (Its photographs: its bark's layers, the share of its height the lower gives way to the upper over,
@@ -451,6 +465,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (And whether they are photographs, whose warmth the cards keep: sprays.ts `Layer.warm`.)
       // (And whether its cards keep its flowers (`ScanLook.flowers`), and their colour, packed as an upper bark's.)
       speciesData.set([scanned && sl.cushion ? 1 : 0, scanned && sl.cushion && sl.cushion !== "drawn" ? 1 : 0, scanned && sl.flowers ? 1 : 0, flowerColorCode(sl)], (i * SPECIES_ROWS + 8) * 4);
+      // (How far in flower it is: the share of its sprays in flower, for the day the host gives, or the style's;
+      // written again by `update` when either changes.)
+      speciesData[(i * SPECIES_ROWS + 9) * 4] = bloomShare(sl, bloomAt.day, bloomAt.bloom);
       speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
@@ -1230,7 +1247,7 @@ export function createTrees(options: TreesOptions): Trees {
         flowerV = vec4(select(code.greaterThan(0.5), lin.div(max(albedo, vec3(0.004))), vec3(1)), T.srow(8).z);
         // (And whether this card is in flower: as many of them as `bloom` says, each by its own number, so a bush
         // part in flower is some sprays all yellow and some all spines, not every flower half faded.)
-        flowerAir = vec4(intoAir(vec3(0), at), smoothstep(own.sub(0.02), own.add(0.02), uLight.z));
+        flowerAir = vec4(intoAir(vec3(0), at), smoothstep(own.sub(0.02), own.add(0.02), T.srow(9).x));
       }
       if (pineCard) {
         // (A pine's clump is a dense cushion of needles: those low in it are in its own shade, a light box
@@ -2321,11 +2338,12 @@ export function createTrees(options: TreesOptions): Trees {
   const pv = new THREE.Matrix4();
   const size = new THREE.Vector2();
 
+  const environment: TreeEnvironment = { sun: uSun.value, sunTint: uSunTint.value, shadeTint: uShadeTint.value, wind: uWind.value, day: null };
   const pieces = TIER_SHAPES.map((_, t) => ({ dabs: dabSets[t].index.length / 6, wood: woodSets[t].index.length / 3, sheets: sheetSets[t].index.length / 3, fronds: frondSets[t].index.length / 3 }));
 
   return {
     object: group,
-    environment: { sun: uSun.value, sunTint: uSunTint.value, shadeTint: uShadeTint.value, wind: uWind.value },
+    environment,
     style,
     detail,
     plan,
@@ -2354,6 +2372,14 @@ export function createTrees(options: TreesOptions): Trees {
       uLeafSize.value = style.leafSize;
       uThrough.value.set(style.throughPower, style.throughWarp, style.throughVary, style.moss);
       uLight.value.set(style.structure, style.density, style.bloom, 0);
+      // (A flowering species' bloom, for the day if the host gives one: written to the species' rows when it changes.)
+      const day = environment.day !== null && Number.isFinite(environment.day) ? environment.day : null;
+      if (day !== bloomAt.day || style.bloom !== bloomAt.bloom) {
+        bloomAt.day = day;
+        bloomAt.bloom = style.bloom;
+        species.forEach((_, i) => (speciesData[(i * SPECIES_ROWS + 9) * 4] = bloomShare(looks[i], day, style.bloom)));
+        speciesAttr.needsUpdate = true;
+      }
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);

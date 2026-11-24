@@ -14,6 +14,7 @@
 //   ?views=tee,far            only these views (tee, fairway, far, under, trunk)
 //   ?hour=9 ?wind=4           the sun's hour and the wind (m/s), for every cell (scripts may also give
 //                             `style`: numbers of the style over the look's own)
+//   ?day=105                  the day of the year (a gorse's bloom); left out, none (the style's bloom)
 //   ?cell=400                 a cell's width in pixels (its height is 1.25 times it)
 //   ?screen=1080              the lines of the screen a cell is a piece of: the trees choose their tier as on it
 //   ?thumbs=0                 no reference photographs' thumbnails (the links stay)
@@ -67,6 +68,8 @@ interface Settings {
   views: ViewName[];
   hour: number;
   wind: number;
+  /** The day of the year (a flowering species' bloom), or null: the style's bloom. */
+  day: number | null;
   /** Numbers of the style over the look's own (for scripts: one style beside another). */
   style?: Partial<TreeStyle>;
 }
@@ -93,6 +96,8 @@ interface RenderAsk {
   one?: number | string;
   hour?: number;
   wind?: number;
+  /** The day of the year, or null for none. */
+  day?: number | null;
   region?: Region | "all";
   kind?: Architecture | "all";
   /** Numbers of the style over the look's own. */
@@ -155,6 +160,7 @@ function settingsFromQuery(): Settings {
   const kind = query.get("kind") as Architecture | null;
   const hour = Number(query.get("hour"));
   const wind = Number(query.get("wind"));
+  const day = Number(query.get("day"));
   return {
     look: look === "all" ? "all" : (TREE_LOOKS.find((l) => l === look) ?? "stylized"),
     one: Math.max(0, rowOf(query.get("one") ?? "0")),
@@ -164,6 +170,7 @@ function settingsFromQuery(): Settings {
     views: views.length > 0 ? views : [...VIEW_NAMES],
     hour: query.has("hour") && Number.isFinite(hour) ? hour : 9,
     wind: query.has("wind") && Number.isFinite(wind) ? wind : 4,
+    day: query.has("day") && Number.isFinite(day) ? day : null,
   };
 }
 
@@ -291,6 +298,7 @@ async function start() {
     t.environment.shadeTint.copy(ground.uShadeTint.value);
     const heading = THREE.MathUtils.degToRad(WIND_HEADING);
     t.environment.wind.set(Math.cos(heading), Math.sin(heading), s.wind);
+    t.environment.day = s.day;
     if (stand.shadeHour !== s.hour) {
       const side = stand.shadeSide;
       t.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: 0.4 });
@@ -313,7 +321,7 @@ async function start() {
     return { key: cellKey(row, look, view, s), row, look, view, blob, url: URL.createObjectURL(blob), tiers, shot };
   };
 
-  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}|${s.wind}${s.style ? `|${JSON.stringify(s.style)}` : ""}`;
+  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}|${s.wind}|${s.day}${s.style ? `|${JSON.stringify(s.style)}` : ""}`;
   const cells = new Map<string, Cell>();
 
   /** One thing at a time on the renderer: what asks next waits for what asked before. */
@@ -461,6 +469,7 @@ async function start() {
     if (settings.views.length < VIEW_NAMES.length) q.set("views", settings.views.join(","));
     if (settings.hour !== 9) q.set("hour", String(settings.hour));
     if (settings.wind !== 4) q.set("wind", String(settings.wind));
+    if (settings.day !== null) q.set("day", String(settings.day));
     for (const key of ["cell", "screen", "photos", "thumbs", "seed"]) if (query.has(key)) q.set(key, query.get(key)!);
     const text = q.toString();
     history.replaceState(null, "", text ? `${location.pathname}?${text}` : location.pathname);
@@ -774,6 +783,7 @@ async function start() {
     if (ask.kind) ((s.kind = ask.kind), ask.species || (s.only = null));
     if (ask.hour !== undefined) s.hour = ask.hour;
     if (ask.wind !== undefined) s.wind = ask.wind;
+    if (ask.day !== undefined) s.day = ask.day;
     if (ask.style) s.style = ask.style;
     return s;
   };

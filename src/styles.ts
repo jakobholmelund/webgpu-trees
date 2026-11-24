@@ -90,8 +90,9 @@ export interface TreeStyle {
   /**
    * How far in flower the trees are, 0..1, where their pictures show flowers (the realistic look: a gorse's yellow
    * pea flowers, `ScanLook.flowers`): the share of its sprays in flower, each by a number of its own; 1 in full
-   * flower, as in spring, 0 out of it, the flowers gone and the spines left; 0.7 as a links course's gorse has
-   * them most of the year.
+   * flower, as in spring, 0 out of it, the flowers gone and the spines left. It is the bloom when the host gives no
+   * day of the year (`TreeEnvironment.day`); given one, each flowering species' own year says (`ScanLook.flowering`).
+   * 0.3: a gorse's few flowers over the year, a third of it in full flower and much of it not.
    */
   bloom: number;
 }
@@ -110,7 +111,7 @@ export type TreeLook = "stylized" | "painterly" | "sculpted" | "real";
 export const TREE_LOOKS: readonly TreeLook[] = ["stylized", "painterly", "sculpted", "real"];
 
 /** The painted look's style (and every look's, for the numbers it does not use). */
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, throughPower: 4, throughWarp: 0.1, throughVary: 0.4, moss: 0.25, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1, leafSize: 0.22, structure: 0.8, density: 0.8, bloom: 0.7 };
+export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, throughPower: 4, throughWarp: 0.1, throughVary: 0.4, moss: 0.25, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1, leafSize: 0.22, structure: 0.8, density: 0.8, bloom: 0.3 };
 
 /** The realistic look's style: light as the sun gives it, the crown's shade, light through the leaves, furrowed bark. */
 // (selfShade a half, as the painted look's: the crown's own shade taken in full, through a whole leafy

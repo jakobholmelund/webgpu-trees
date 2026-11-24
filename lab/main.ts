@@ -10,6 +10,7 @@
 //   ?fill=1          the scene with only that species in it
 //   ?hour=9          the sun's hour, 5 to 19
 //   ?wind=4          the wind's speed (m/s)
+//   ?day=105         the day of the year (a gorse's bloom; left out, none: the style's bloom)
 //   ?eye=standing | tree | overhead | course   where the eye starts
 //   ?at=x,y,z,tx,ty,tz   exactly a view, as "Share view" writes it
 //   ?look=painterly  the look: stylized (painted), painterly, sculpted or real
@@ -91,7 +92,8 @@ async function start() {
   if (tierAsked !== null) Object.assign(show, { near: tierAsked === "0", mid: tierAsked === "1", far: tierAsked === "2" });
   const hourAsked = Number(query.get("hour"));
   const windAsked = Number(query.get("wind"));
-  const light = { hour: query.has("hour") && Number.isFinite(hourAsked) ? hourAsked : 9, windSpeed: query.has("wind") && Number.isFinite(windAsked) ? windAsked : 4, windHeading: 37 };
+  const dayAsked = Number(query.get("day"));
+  const light = { day: query.has("day") && Number.isFinite(dayAsked) ? dayAsked : 0, hour: query.has("hour") && Number.isFinite(hourAsked) ? hourAsked : 9, windSpeed: query.has("wind") && Number.isFinite(windAsked) ? windAsked : 4, windHeading: 37 };
   const sceneAsked = query.get("scene") === "specimens" ? "specimen" : query.get("scene");
   const state = {
     scene: (SCENES.find(([, name]) => name === sceneAsked)?.[1] ?? "grove") as SceneName,
@@ -440,6 +442,8 @@ async function start() {
     if (state.fill) q.set("fill", "1");
     q.set("hour", String(light.hour));
     q.set("wind", String(light.windSpeed));
+    if (light.day > 0) q.set("day", String(light.day));
+    else q.delete("day");
     q.set("at", [...camera.position.toArray(), ...controls.target.toArray()].map((n) => Number(n.toFixed(2))).join(","));
     history.replaceState(null, "", `${location.pathname}?${q.toString()}`);
     navigator.clipboard.writeText(location.href).then(() => said("The link to this view is in the address, and copied."), () => said("The link to this view is in the address (it could not be copied)."));
@@ -588,6 +592,7 @@ async function start() {
   lightPanel.add(light, "hour", 4, 20, 0.25).name("hour").onChange(() => refreshHour());
   lightPanel.add(light, "windSpeed", 0, 20, 0.5).name("wind (m/s)").onChange(() => refreshWind());
   lightPanel.add(light, "windHeading", 0, 360, 1).name("wind heading (°)");
+  lightPanel.add(light, "day", 0, 366, 1).name("day of year (0: none)");
   const stylePanel = sceneGui.addFolder("Style");
   // (Every number of the style, in the package's own ranges; the button sets the look's own again.)
   const STYLE_NAMES: Record<keyof TreeStyle, string> = {
@@ -726,6 +731,7 @@ async function start() {
     trees.environment.shadeTint.copy(uShadeTint.value);
     const heading = THREE.MathUtils.degToRad(light.windHeading);
     trees.environment.wind.set(Math.cos(heading), Math.sin(heading), light.windSpeed);
+    trees.environment.day = light.day > 0 ? light.day : null;
     Object.assign(trees.style, style);
     Object.assign(trees.detail, detail);
     Object.assign(trees.show, show);

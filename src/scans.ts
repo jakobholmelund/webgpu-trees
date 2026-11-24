@@ -147,6 +147,57 @@ export interface ScanLook {
    * `bloom` says (0 out of flower: the flowers gone, its spines left).
    */
   flowers?: string;
+  /**
+   * When it flowers: the share of its sprays in flower through the year, as [day of the year, share] from January on,
+   * eased between them and round from December to January (`bloomShare`). Without it, or with no day given, the
+   * style's `bloom`.
+   */
+  flowering?: readonly (readonly [number, number])[];
+}
+
+/**
+ * Common gorse's year (Ulex europaeus): in flower mainly from January to June, at its height in spring (March to
+ * May), and with a few flowers on it most of the year besides ("when gorse is out of blossom, kissing's out of
+ * fashion"), fewest in late summer and autumn (Clements, Peterson and Prasad 2001, The biology of Canadian weeds:
+ * Ulex europaeus; Tarayre et al. 2007, flowering phenology of Ulex europaeus).
+ */
+export const GORSE_FLOWERING: readonly (readonly [number, number])[] = [
+  [1, 0.3], // 1 January: out, here and there
+  [32, 0.5], // 1 February
+  [74, 0.85], // 15 March
+  [110, 0.95], // 20 April: at its height
+  [140, 0.8], // 20 May
+  [171, 0.45], // 20 June
+  [201, 0.15], // 20 July: going over
+  [244, 0.08], // 1 September: a few flowers
+  [305, 0.1], // 1 November
+  [335, 0.18], // 1 December: coming out again
+];
+
+/** The year's length the flowering is laid round (days). */
+const YEAR_DAYS = 365.25;
+
+/**
+ * How far in flower a species is, 0..1 (the share of its sprays in flower): on `day` (of the year, 1 on the 1st of
+ * January), as its `flowering` says, eased between the days it names; with no day given, or no flowering of its own,
+ * `bloom` (the style's).
+ */
+export function bloomShare(look: ScanLook, day: number | null, bloom: number): number {
+  const year = look.flowering;
+  if (day === null || !Number.isFinite(day) || !year || year.length === 0) return bloom;
+  const d = (((day - 1) % YEAR_DAYS) + YEAR_DAYS) % YEAR_DAYS + 1;
+  for (let i = 0; i < year.length; i++) {
+    const [d0, s0] = year[i];
+    const [d1raw, s1] = year[(i + 1) % year.length];
+    const d1 = i + 1 < year.length ? d1raw : d1raw + YEAR_DAYS;
+    // (Past the last named day, or before the first: round the year from December to January.)
+    const at = d < year[0][0] ? d + YEAR_DAYS : d;
+    if (at >= d0 && at <= d1) {
+      const f = (at - d0) / Math.max(d1 - d0, 1e-6);
+      return s0 + (s1 - s0) * (0.5 - 0.5 * Math.cos(Math.PI * f));
+    }
+  }
+  return year[year.length - 1][1];
 }
 
 /** The photographs each of the library's species wears, by name. */
@@ -174,7 +225,8 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   // (Its own deeply cut leaves, 3–5 cm with their stalk.)
   Hawthorn: { bark: "oak", barkScale: 0.45, leaves: "hawthorn", leafCm: 5, spray: "alternate", perSpray: 14 },
   // (Its own sprigs, spines and yellow flowers, whole: a twig's end of a few of them, the flowers kept yellow.)
-  Gorse: { bark: "ridged", barkScale: 0.35, leaves: "gorse", leafCm: 22, spray: "sprays", flowers: "#f2c230" },
+  // (In flower mainly from January to June, a few flowers most of the year: `GORSE_FLOWERING`, for the host's day.)
+  Gorse: { bark: "ridged", barkScale: 0.35, leaves: "gorse", leafCm: 22, spray: "sprays", flowers: "#f2c230", flowering: GORSE_FLOWERING },
   "Sitka spruce": { bark: "spruce", barkScale: 1.6, leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its long dark needles, 8–16 cm, in brushes at its shoots' ends: the Torrey pine's shoots, tinted dark.)
   "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts", needleCm: 12 },
