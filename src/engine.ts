@@ -649,8 +649,9 @@ export function createTrees(options: TreesOptions): Trees {
     m.positionNode = at;
     const vCol = varying(intoAir(col, at), "vWoodCol");
     const vShares = varying(sharesFor(t, T), "vWoodShares");
-    // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go.)
-    const vBark = varying(vec3(aRadial.x, aRadial.z, aWood.x), "vWoodBark");
+    // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go; round
+    // by the way its surface faces, so where a limb leaves its parent, lit as its parent, they run on from its.)
+    const vBark = varying(vec3(aNormal.x, aNormal.z, aWood.x), "vWoodBark");
     m.colorNode = Fn(() => {
       handOver(vShares);
       const round = atan(vBark.y, vBark.x);
