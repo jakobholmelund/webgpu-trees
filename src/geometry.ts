@@ -648,6 +648,9 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
     const trunk = sk.radius[0] || tree.size.trunkRadius;
     const hf = flareHeight(tree.size, tree.buttress ?? 0);
     const ownOf = new Float64Array(sk.count).fill(0.5);
+    const kidCount = new Uint16Array(sk.count);
+    // (Children of a fair size: a stem dividing, not a stub or a twig leaving it.)
+    for (let i = 0; i < sk.count; i++) if (sk.parent[i] >= 0 && sk.radius[i] >= 0.3 * sk.radius[sk.parent[i]]) kidCount[sk.parent[i]]++;
     const stitch = (a: number, na: number, c: number, nc: number) => {
       let i = 0;
       let j = 0;
@@ -686,7 +689,10 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
       let lastKey = "";
       let end = { c: [0, 1, 0], d: [0, 1, 0], r: 0, attrs: { limb: [0, 0, 0], order: 0, along: 0 } };
       const startAlong = W.line[chain[0]]![8];
-      const bark = flared ? flareBark(chain.map((i) => W.line[i]!), sk.y[foot], hf, lobe ?? undefined) : null;
+      // (Over its root flare up to where the stem first divides, if lower: a forked trunk's or a clump's stems
+      // narrow fast where they part, and that is not flare to lay bark over.)
+      const parts = flared ? chain.findIndex((i) => (kidCount[i] ?? 0) > 1) : -1;
+      const bark = flared ? flareBark((parts >= 0 ? chain.slice(0, parts + 1) : chain).map((i) => W.line[i]!), sk.y[foot], hf, lobe ?? undefined) : null;
       const ownAt = (along: number) => {
         const f = Math.min(1, Math.max(0, (along - startAlong) / blend));
         return ownFrom + (own - ownFrom) * f * f * (3 - 2 * f);

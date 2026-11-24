@@ -4,8 +4,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STARTER_SPECIES } from "../src/species.ts";
-import { growTree } from "../src/grow.ts";
-import { DEFAULT_VARIANT_OPTIONS, fitPoint, packTrees, planVariants, type TreeInstance } from "../src/variants.ts";
+import { formsVary, growTree } from "../src/grow.ts";
+import { DEFAULT_VARIANT_OPTIONS, FORM_SEEDS, fitPoint, packTrees, planVariants, type TreeInstance } from "../src/variants.ts";
 
 /** Trees of every starter species, their sizes spread as a survey finds them. */
 function survey(n: number): TreeInstance[] {
@@ -23,11 +23,13 @@ test("every tree is fitted to a variant of its own species", () => {
   const list = survey(600);
   const plan = planVariants(packTrees(list), STARTER_SPECIES);
   // (A shape a seed for each of where they stand: in the open, at an edge, inside a wood.)
+  // (A species whose trees differ in form at the foot, some forked or clumps, a few more seeds a shape.)
   const o = DEFAULT_VARIANT_OPTIONS;
-  assert.ok(plan.variants.length <= STARTER_SPECIES.length * 3 * o.shapes * o.seeds, `${plan.variants.length} variants`);
+  const seeds = STARTER_SPECIES.reduce((sum, sp) => sum + (formsVary(sp) ? Math.max(o.seeds, FORM_SEEDS) : o.seeds), 0);
+  assert.ok(plan.variants.length <= 3 * o.shapes * seeds, `${plan.variants.length} variants`);
   // (Grown as alone, as many as ever.)
   const alone = planVariants(packTrees(list), STARTER_SPECIES, { ...o, stands: false });
-  assert.ok(alone.variants.length <= STARTER_SPECIES.length * o.shapes * o.seeds, `${alone.variants.length} variants alone`);
+  assert.ok(alone.variants.length <= o.shapes * seeds, `${alone.variants.length} variants alone`);
   assert.ok(alone.placements.every((p) => p.standing === "open" && p.stand.enclosure === 0));
   plan.placements.forEach((p, i) => assert.equal(plan.variants[p.variant].species, list[i].species));
   const total = plan.variants.reduce((s, v) => s + v.trees, 0);

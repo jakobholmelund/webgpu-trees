@@ -840,8 +840,27 @@ async function start() {
     navigator.clipboard.writeText(el("bench-text").textContent ?? "").then(() => (el("bench-note").textContent = "Copied."), () => (el("bench-note").textContent = "Could not copy: select the text instead."));
   });
 
+  /**
+   * Draw the scene from a view and have the dev server write it into its GALLERY_OUT folder as `name` (a
+   * .png): for scripts, which may run while the lab is out of view and draws no frames of its own.
+   */
+  const saveView = async (at: number[], look: number[], name: string): Promise<string> => {
+    await trees.ready;
+    lookFrom(at, look);
+    for (let i = 0; i < 6; i++) frame();
+    await new Promise((done) => setTimeout(done, 300));
+    frame();
+    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/png"));
+    if (!blob) throw new Error("the canvas gave no picture");
+    const r = await fetch(`/__gallery/save?name=${encodeURIComponent(name)}`, { method: "POST", body: blob });
+    const text = await r.text();
+    if (!r.ok) throw new Error(text);
+    return text;
+  };
+
   // For checking the lab by script. `trees` is whichever trees stand now: they are made again on a change.
   const lab = {
+    saveView,
     get trees() {
       return trees;
     },

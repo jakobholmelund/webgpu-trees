@@ -23,6 +23,7 @@
 // turned so that side faces the way the tree's own wood is open; it leans
 // that way, as far as a lean may go.
 
+import { formDraw, formsVary } from "./grow.ts";
 import { type Pruning } from "./palm.ts";
 import { type TreeSpecies } from "./species.ts";
 import { OPEN_STAND, type Stand, type Standing, standingOf, standsOf } from "./stand.ts";
@@ -106,6 +107,34 @@ export interface VariantOptions {
   mirror: boolean;
   /** Whether trees are grown for where they stand (stand.ts): edge and interior trees as well as open ones. */
   stands: boolean;
+  /**
+   * A number mixed into every variant's seed: another set of trees of the same shapes (0 or left out: the
+   * set as it has always been).
+   */
+  seed?: number;
+}
+
+/**
+ * How many seeds a shape is grown from, at least, for a species whose trees differ in their form at the foot
+ * (`formsVary`: some forked, some clumps, some one stem), so that a stand of them shows the mix.
+ */
+export const FORM_SEEDS = 3;
+
+/**
+ * A variant's seed, for a species whose trees differ in form: the first of a run of seeds from `base` whose
+ * form's draw (`formDraw`) falls in the `k`th of `m` even shares of 0..1, offset a little for the `c`th of
+ * `shapes` shapes. So a shape's few variants are spread over the species' forms by their shares, and not left
+ * to chance (two seeds might both be one stem).
+ */
+function spreadSeed(base: number, k: number, m: number, c: number, shapes: number): number {
+  const lo = (k + c / shapes) / m;
+  const hi = lo + 1 / (m * shapes);
+  for (let j = 0; j < 4000; j++) {
+    const seed = (base + Math.imul(j, 0x9e3779b1)) >>> 0;
+    const u = formDraw(seed);
+    if (u >= lo && u < hi) return seed;
+  }
+  return base;
 }
 
 export const DEFAULT_VARIANT_OPTIONS: VariantOptions = { shapes: 2, seeds: 2, lean: 3, mirror: true, stands: true };
@@ -297,13 +326,15 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
         const mean = (f: (x: Stand) => number) => st.reduce((sum, x) => sum + f(x), 0) / Math.max(1, st.length);
         const stand: Stand = standing === "open" ? { ...OPEN_STAND } : { enclosure: mean((x) => x.enclosure), lopsided: mean((x) => x.lopsided), openX: 1, openZ: 0, canopy: mean((x) => x.canopy), gap: mean((x) => x.gap) };
         // (No more seeds than trees of this shape: a second variant nothing is fitted to is grown for nothing.)
-        const seeds = Math.max(1, Math.min(options.seeds, inShape.length));
+        const varied = formsVary(sp);
+        const seeds = Math.max(1, Math.min(varied ? Math.max(options.seeds, FORM_SEEDS) : options.seeds, inShape.length));
         for (let k = 0; k < seeds; k++) {
+          // (An open tree's seed as it always was; an edge or interior tree's its own; another set's mixed.)
+          const base = (s * 7919 + (c + 16 * which) * 104729 + k * 1299709 + 17 + Math.imul(Math.round(options.seed ?? 0), 0x2545f491)) >>> 0;
           variants.push({
             species: s,
             size: { height, crownRadius: centres[c][0] * height, crownBase: centres[c][1] * height, trunkRadius: trunkShare * height },
-            // (An open tree's seed as it always was; an edge or interior tree's its own.)
-            seed: (s * 7919 + (c + 16 * which) * 104729 + k * 1299709 + 17) >>> 0,
+            seed: varied ? spreadSeed(base, k, seeds, c, centres.length) : base,
             trees: 0,
             standing,
             stand,

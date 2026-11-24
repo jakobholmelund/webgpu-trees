@@ -325,7 +325,8 @@ grows within 12% of its photograph's outline, `test/outline.test.ts`). An
 old pine has given up its leader: the Scots, Torrey, Aleppo, Monterey and
 stone pines are grown as broadleaves, with needles. A stone pine's stem, sinuous
 or leaning a little as it is crooked, forks a third of the way up (`fork`, a share
-of its crown's base) into three thick crooked stems (`forkStems`, the stem's wood
+of its crown's base, each tree a little higher or lower: `forkSpread`) into two or
+three thick crooked stems (`forkStems` to `forkStemsMost`, each tree its own; the stem's wood
 shared among them by the pipe model, each half or more its thickness), each of which
 divides twice more in V-forks (`forkSplits`), rising and then leaning out further at
 each, their last arms the limbs that reach out under the umbrella: the dark fan of
@@ -492,7 +493,19 @@ grows as it did):
 - **`fork`**, **`forkStems`**, **`forkSplits`**: where a broadleaf's stem divides
   below its crown (a share of the crown's base), into how many stems (2 to 4),
   and how many times each divides again in V-forks before its arms are limbs: a
-  stone pine's sinuous stem forked into a few thick crooked stems.
+  stone pine's sinuous stem forked into a few thick crooked stems. Without
+  `forkSplits`, each stem is a trunk of its own with its share of the crown
+  (below).
+- **`forkShare`**, **`forkSpread`**, **`forkStemsMost`**: the share of its
+  trees whose trunk forks, how far one tree's fork strays from `fork` (either
+  way, a share of the crown's base: from near the ground to under the crown),
+  and the most stems a fork has (`forkStems` the least). Each tree decides
+  from its own seed (`formOf`): a parkland oak's forked trunk, a coast live
+  oak's or a Monterey cypress's two or three leaning trunks from near the
+  ground.
+- **`stemShare`**, **`stemRange`**: the share of its trees that grow as a
+  clump of a few stems from one root plate, and how many ([least, most], 2
+  to 4): a silver birch's or a black alder's stool, a eucalyptus's regrowth.
 - **`pads`**: how far its leaves gather into flat-topped pads, each branch
   off a great limb keeping only the leaves near its top, with air and bare
   wood under each: a Monterey cypress on a headland, an old Scots pine's
@@ -571,7 +584,9 @@ further if the tree would not fit), the **fairway** (one tree from 60 m),
 edge of a crown that comes down to the ground), and the **trunk** close, from
 its foot to a little above its first fork. Same sun, wind and moment for
 every cell, the package's own species and seeds: the same commit draws the
-same pixels. Beside each species are its botanical name, its regions and the
+same pixels (`?seed=7`, or by species `?seed=Oak:9,Silver birch:7`, draws
+another set: a forked trunk or a clump where the species has them). Beside
+each species are its botanical name, its regions and the
 links in `lab/REFERENCE.md` (with small copies the browser loads from
 Wikimedia Commons; none is kept here).
 
@@ -614,6 +629,30 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    reaches out to the outline. The trunk goes on up the crown as its leader,
    all the way if `leader` is 1. A shrub's stems, leaning out from feet
    spread within a third of the crown, are its scaffolds.
+
+   A tree whose trunk forks, or that grows as a clump, is decided by its own
+   seed (`formOf`: its species' `forkShare` and `stemShare`; in a closed wood
+   fewer, and those that fork do so higher, its stem drawn up). Its trunk
+   rises from one root plate to where its stems part (a clump's a little
+   over its root flare; a fork's where its form says, never under its root
+   plate nor within a fork's first piece of breast height). There they stand
+   side by side, each stepping out to its own side so its outer bark runs on
+   from the trunk's, and lean apart, eased in over a few trunk radii (a trunk
+   bent harder than its thickness folds over on itself), then turn up: an
+   excurrent tree's stems nearly upright, a decurrent one's leaning out to
+   some 38 degrees. Each is a tree's stem of its own: its leader rises to the
+   middle of its share of the crown, its great limbs (`scaffolds`, shared out)
+   leave it round its own side, and its wood keeps to its share (the part of
+   the crown nearer its share's middle than another's, by a little): one
+   crown, the stems' parts touching, not crowns heaped into a blob. The light
+   at a fork is shared by what each stem gathers, neither favoured. Their
+   radii: each stem a bole of its own, its area at the fork its share of the
+   trunk's (Leonardo, Δ 2), swelling a little into the trunk where it leaves
+   it; under breast height the stems' areas there together are the size's
+   `trunkRadius` (a clump's basal area), over it the trunk is measured there
+   as one stem is. The fit to the size keeps the fork where it grew.
+   `stemsAt(tree, y)` gives where its wood crosses a height and how thick:
+   at 1 m, a forked tree's stems for a host's colliders.
 3. **Growing from buds, in the light** (Palubicki et al. 2009, made light),
    eleven cycles of: every bud's light, from how much wood above shades its
    voxel (each node shades a pyramid under it); that light gathered down to
@@ -679,7 +718,13 @@ upper crowns to Rautiainen's exponents.
   and how high the crown starts (and, in a wood, how closed in they are);
   each shape is grown once a seed (two by default), at the shape's typical
   size (see *How a tree grows*), in the light its trees' neighbours leave
-  them. Leaves hang in clumps at the twigs, never in the air.
+  them. Leaves hang in clumps at the twigs, never in the air. A species
+  whose trees differ in form at the foot (`forkShare`, `stemShare`) is grown
+  from three seeds a shape at the least, each seed chosen so the shape's
+  variants are spread over its forms by their shares (`FORM_SEEDS`): a stand
+  of twelve shows its forked trunks and clumps among its single stems, not
+  two seeds that both came up one stem. `VariantOptions.seed` grows another
+  set of the same shapes (the gallery's `?seed=`, by species).
 - **Every tree is fitted to its own numbers.** Up the tree in two
   stretches (the trunk to its crown's base, the crown to its top), across
   to its crown radius, and the wood thickened to its trunk radius apart

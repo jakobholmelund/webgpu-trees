@@ -1450,6 +1450,51 @@ A South American feather palm (Atlantic and semideciduous forests of the Paraná
 
 **Sources:** Broschat et al., UF/IFAS ENH-767 (UFQP); Noblick 2017, *Phytotaxa* (NOB17); Frew, Botany Brisbane (BBNE); Virginia Tech factsheet 899 (VT); Broschat, ENH1182 (UFPP). Palmpedia, PACSOA and PalmWeb were not reachable.
 
+## Forked trunks and clumps of stems
+
+Many trees divide low into a few great trunks, or rise as a clump of stems from one root plate. The library decides this per tree from its seed (`forkShare`, `fork` ± `forkSpread`, `forkStems`..`forkStemsMost`; `stemShare`, `stemRange`). No free source gives a forking *frequency* for an open-grown tree of any of these species. The shares below are therefore `[est.]`: set from the sources' qualitative statements and checked against the reference photographs. In a closed wood, the library makes forks 60 % rarer and clumps 35 % rarer, and raises the remaining forks halfway towards the crown base. This follows the forest-versus-open contrast the sources draw: oak and beech are "drawn up" on one stem in woodland [S:TSO], and a coast live oak in a stand is "branchless up to 20 feet" [S:FEIS].
+
+| Species | forkShare | fork ± spread (share of crown base) | stems at a fork | stemShare | clump stems | Basis |
+|---|---|---|---|---|---|---|
+| Oak (*Q. robur*) | 0.35 | 0.7 ± 0.3 | 2–3 | – | – | TSO: open-grown trees form "a broad, spreading head of rugged branches"; it records trees with "two boles parting low" and "30 ft to fork" [S:TSO]. Parkland oaks often fork below 6 m [est.]. |
+| Beech (*F. sylvatica*) | 0.2 | 0.6 ± 0.35 | 2 | – | – | "Usually single-stemmed" [S:EUAT]. Open parkland trees are low-branched and spreading [S:TSO]. The "double solitary beech" reference photograph (lab/REFERENCE.md) shows two trees a few metres apart under one shared crown, each giving way to the other where they meet [obs.]. The library shares a forked tree's crown between its stems the same way. |
+| Silver birch (*B. pendula*) | – | – | – | 0.3 | 2–4 | Often multi-stemmed on heathland [obs.]. Birch is coppiced on short rotations of 6–12 years and re-sprouts best when young [S:EUCOP]. |
+| Black alder (*A. glutinosa*) | – | – | – | 0.3 | 2–4 | "Occasionally multi-stemmed"; coppice stools are recorded [S:TSO]. It "coppices well" [S:WT]. It sprouts abundantly up to about 40 years, on rotations of up to 60 years [S:EUCOP]. |
+| Weeping willow (*S. × sepulcralis*) | 0.4 | 0.7 ± 0.3 | 2–3 | – | – | *S. babylonica* has "the rugged trunk branching low" [S:TSO]. UF/IFAS advises training a single leader to get "a strong, central trunk", so an untrained tree divides [S:UFSB]. |
+| Eucalyptus (*E. globulus*, *E. camaldulensis*) | 0.2 | 0.8 ± 0.2 | 2 | 0.25 | 2–3 | The trunk often splits in the upper third [est.]. Blue gum sprouts from the stump, lignotuber and roots, and 70–80 % of cut stumps sprouted in Hawaiian coppice [S:FEIS]. River red gum is a "single-stemmed, large-boled" tree [S:ANBG], but is multistemmed on frosty sites [S:TSO]. California's planted gums are often regrowth from cut stumps, several stems to a stool, as in the Wildomar reference photograph (lab/REFERENCE.md) [obs.]. |
+| Monterey cypress (*H. macrocarpa*) | 0.45 | 0.35 ± 0.3 | 2–3 | – | – | "A few major limbs emerging from near the base of the trunk"; one New Zealand tree is "a very large multiple-trunk tree" [S:GDB]. Landscape trees are "typically one trunk" [S:UFMC]. Headland trees forking low into two or three great stems are [obs.]. |
+| Stone pine (*P. pinea*) | 1 | 0.72 ± 0.08 | 2–3 | – | – | The trunk is "often short and with numerous upward angled branches" [S:EUAT] and "commonly slightly sinuous" [S:GDB]. Neither source says the trunk forks into stems: the umbrella on a few thick stems is from the reference photographs [obs.]. The spread is kept narrow because the umbrella's flat top depends on it (test/pines.test.ts). |
+| Coast live oak (*Q. agrifolia*) | 0.45 | 0.45 ± 0.4 | 2–3 | 0.15 | 2–3 | Open-grown trunks are "usually 4 to 8 feet (1.2-2.8 m) tall" before the primary branches. A size table notes "Some trees had multiple stems". It sprouts from the root crown after top-kill or cutting [S:FEIS]. Several leaning trunks from near the ground are [obs.]. |
+| California sycamore (*P. racemosa*) | 0.45 | 0.35 ± 0.3 | 2–3 | 0.15 | 2–3 | Leaning, forked low or reclining in stream beds [obs.]. Search snippets from the CNPS San Diego and Glendale pages say "often multi-trunked", but those pages could not be read (403/404), so this is **not verified**. Neither TSO nor VT mentions trunk form. |
+
+**How the stems are shaped** (README, *How a tree grows*):
+- The trunk is one root plate up to where the stems part:
+  - a clump's stems part 1.4–2.2 flare heights up;
+  - a fork is never under the root plate, and never within a stem's first piece (0.2–1.4 trunk radii, short enough that a fork just over the root plate still ends under it) of breast height.
+- Each stem eases into its lean over 1.6 trunk radii, then turns up. At most it leans 12° (an excurrent tree's) to 38° (a decurrent tree's) where it leaves.
+- Each stem carries its own leader and great limbs over its own share of the crown.
+- Radii follow Leonardo's rule with Δ 2 at the fork. Under breast height, the stems' basal areas there sum to the measured trunk.
+
+**Spread at the foot**, for a host's colliders. These are the outer edges of the stems from the tree's axis, at the species' own size, over 8–24 forked or clumped seeds (mean / max, m):
+
+| Species, form | trunk r | at 1 m | at 2 m | at 3 m |
+|---|---|---|---|---|
+| Oak, forked | 0.45 | 0.46 / 0.46 | 0.49 / 0.57 | 0.87 / 1.19 |
+| Beech, forked | 0.45 | 0.47 / 0.51 | 0.55 / 0.93 | 0.92 / 1.37 |
+| Silver birch, clump | 0.2 | 0.25 / 0.30 | 0.50 / 0.63 | 0.74 / 0.95 |
+| Black alder, clump | 0.25 | 0.28 / 0.30 | 0.49 / 0.53 | 0.71 / 0.85 |
+| Weeping willow, forked | 0.5 | 0.59 / 0.65 | 1.32 / 1.87 | 2.36 / 3.33 |
+| Eucalyptus, forked | 0.4 | 0.41 / 0.41 | 0.39 / 0.39 | 0.37 / 0.37 |
+| Eucalyptus, clump | 0.4 | 0.41 / 0.43 | 0.71 / 0.82 | 1.04 / 1.27 |
+| Monterey cypress, forked | 0.6 | 0.65 / 0.72 | 1.00 / 2.09 | 1.74 / 2.30 |
+| Stone pine, forked (sinuous stem) | 0.55 | 0.73 / 0.81 | 0.84 / 0.97 | 0.88 / 1.04 |
+| Coast live oak, forked | 0.5 | 0.54 / 0.65 | 0.81 / 1.31 | 1.87 / 3.95 |
+| Coast live oak, clump | 0.5 | 0.60 / 0.64 | 1.19 / 1.26 | 2.00 / 2.81 |
+| California sycamore, forked | 0.5 | 0.53 / 0.61 | 0.63 / 1.20 | 1.07 / 1.84 |
+| California sycamore, clump | 0.5 | 0.58 / 0.61 | 0.95 / 1.12 | 1.40 / 1.68 |
+
+At 1 m, the stems still lie within 0.1–0.3 m of a single trunk cylinder, and within 0.4 m for the stone pine's sinuous stem. Higher up, they spread to 1–4 m. The willow's, the coast live oak's and the cypress's figures at 2–3 m include their lowest great limbs, because their crowns start at 1–3 m. Measured with `stemsAt(tree, y, 0.3)` (wood at least 0.3 of the trunk's radius). Trees fitted to another size scale these across by their crown radius.
+
 ---
 
 ## Parameters a grower needs
@@ -1536,9 +1581,9 @@ A South American feather palm (Atlantic and semideciduous forests of the Paraná
 |---|---|---|---|---|
 | EUAT | San-Miguel-Ayanz J. et al. (eds) 2016, *European Atlas of Forest Tree Species*, EU JRC | Beech, Norway spruce, Scots pine, black poplar, Douglas fir, black pine, stone pine, Sitka spruce, *E. globulus*, Aleppo pine, *Salix alba*. The oak, alder and birch chapters are over 10 MB and could not be fetched. No chapters exist for hawthorn, plane, *P. radiata*, *Q. rubra* or *P. strobus*. | https://forest.jrc.ec.europa.eu/en/european-atlas/ (chapters at `.../media/atlas/<Species>.pdf` or `ies-ows.jrc.ec.europa.eu/efdac/download/Atlas/pdf/`) | Open access. Reported as CC BY 4.0, but the copyright notice was not opened here; EC reuse policy (Decision 2011/833/EU) allows reuse with acknowledgement. Photos carry their own CC-BY credits. |
 | SILV | Burns & Honkala 1990, *Silvics of North America*, USDA Agric. Handbook 654 | Red oak (Sander) and sugar maple (Godman et al.): forest versus open form, forking, champion size. The srs.fs.usda.gov host did not resolve, so the Virginia Tech mirror was used. | https://dendro.cnre.vt.edu/DENDROLOGY/USDAFSSilvics/38.pdf, `/2.pdf` | Public domain (US Government work) |
-| FEIS | USDA Forest Service Fire Effects Information System species reviews | Coast live oak (open versus stand form), Monterey pine, sugar maple, red oak, white pine (two-thirds clear bole), white spruce, Douglas fir (crown base 20–40 m, self-pruning rates), Sitka spruce, California fan palm (Howard 1992, *wasfil*: size, skirt, fire). The *plarac* and *thupla* pages returned 404. | https://research.fs.usda.gov/feis/species-reviews/<code> | Public domain (US Government work) |
+| FEIS | USDA Forest Service Fire Effects Information System species reviews | Coast live oak (open versus stand form), Monterey pine, sugar maple, red oak, white pine (two-thirds clear bole), white spruce, Douglas fir (crown base 20–40 m, self-pruning rates), Sitka spruce, California fan palm (Howard 1992, *wasfil*: size, skirt, fire); coast live oak's multiple stems and root-crown sprouting; *E. globulus* (*eucglo*) sprouting from stumps and lignotuber. The *plarac* and *thupla* pages returned 404. | https://research.fs.usda.gov/feis/species-reviews/<code> | Public domain (US Government work) |
 | GDB | Earle C.J., *The Gymnosperm Database* | All conifers: sizes, crown, branching, needles, cones, bark | https://conifers.org/ | Free to read, © C.J. Earle. Reuse terms not checked; cite, do not copy text. |
-| TSO | *Trees and Shrubs Online* (International Dendrology Society; incl. Bean) | Oak, London plane, beech, alder, weeping willow, Lombardy poplar, California sycamore | https://www.treesandshrubsonline.org/ | Free to read, © IDS. Cite; do not copy text. |
+| TSO | *Trees and Shrubs Online* (International Dendrology Society; incl. Bean) | Oak, London plane, beech, alder, weeping willow, Lombardy poplar, California sycamore; forks and multiple stems (oak's recorded boles, alder's multi-stemmed trees and stools, *S. babylonica*'s low-branching trunk, *E. camaldulensis* multistemmed on frosty sites) | https://www.treesandshrubsonline.org/ | Free to read, © IDS. Cite; do not copy text. |
 | WT | Woodland Trust species pages | Hawthorn, silver birch. The gorse page returned 404. | https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/ | Free to read, © Woodland Trust |
 | NRCAN | Natural Resources Canada, *Trees, insects and diseases of Canada's forests* | Eastern white pine (#50), sugar maple (#86) | https://tidcf.nrcan.gc.ca/en/trees/factsheet/50, `/86` | Crown copyright (Canada). Free to read; reproduction terms not checked. |
 | VT | Virginia Tech Dendrology factsheets | Coast live oak (#548), California sycamore (#473), red oak (#38), sugar maple (#2), California fan palm (#598), queen palm (#899) | https://dendro.cnre.vt.edu/dendrology/syllabus/factsheet.cfm?ID=<n> | Free to read, © Virginia Tech |
@@ -1547,6 +1592,10 @@ A South American feather palm (Atlantic and semideciduous forests of the Paraná
 | HEM | Hemery, Savill & Pryor 2005, *For. Ecol. Manage.* 215:285–294, via the co-author's blog table | Open-grown crown diameter versus dbh for oak, beech, birch, poplar and others | https://gabrielhemery.com/how-big-will-this-tree-grow | Paper © Elsevier; blog free to read |
 | TALLO | Jucker T. et al. 2022, *Global Change Biology* 28:5254–5268; dataset Zenodo 10.5281/zenodo.6637599 (also github.com/selva-lab-repo/TALLO) | Biome medians of H and CR; column list; per-species medians of crown radius over height by height band, computed from Tallo.csv. | https://doi.org/10.5281/zenodo.6637599 | CC BY 4.0 |
 | BC2007 | Barthélémy & Caraglio 2007, *Annals of Botany* 99:375 | Sympodial *Platanus*, monopodial *Acer*; definitions of the architectural models | https://pmc.ncbi.nlm.nih.gov/articles/PMC2802949 | Open access (OUP); check the article licence before copying |
+| EUCOP | Nicolescu V.-N. et al. 2018, *Silvicultural guidelines for European coppice forests* (EuroCoppice, COST Action FP1301) | Birch coppice rotations (6–12 years; best re-sprouting under 20), black alder sprouting to about 40 years on rotations to 60 | https://www.eurocoppice.uni-freiburg.de/intern/coppiceineurope-volume/coppiceforestsineurope-2-1-nicolescu-silvicultural-guidelines-sept2018.pdf | Open access; licence not checked |
+| ANBG | Australian National Botanic Gardens, *Eucalyptus camaldulensis* (Water for a Healthy Country pages) | Single-stemmed and large-boled; straight-trunked in dense regeneration, more gnarled when isolated; no lignotuber | https://www.anbg.gov.au/cpbr/WfHC/Eucalyptus-camaldulensis/ | © Commonwealth of Australia; free to read |
+| UFMC | Gilman E.F. et al., *Hesperocyparis macrocarpa: Monterey Cypress*, UF/IFAS ENH383 (EDIS ST224), revised 2024 | Landscape form: "typically one trunk", columnar to pyramidal, spreading with age | https://ask.ifas.ufl.edu/publication/ST224 | As UFWF |
+| UFSB | Gilman E.F. et al., *Salix babylonica: Weeping Willow*, UF/IFAS ENH-734 (EDIS ST576) | Size; to be trained to a single leader for "a strong, central trunk" | https://ask.ifas.ufl.edu/publication/ST576 | As UFWF |
 | SG71 / BESK | *Silvae Genetica* 20(5–6) 1971; *Beskydy* 2015 (Mendel Univ.) | Norway spruce branching types (comb, brush, plate) and their frequencies (search summaries only) | https://www.thuenen.de/media/institute/fg/PDF/Silvae_Genetica/1971/Vol._20_Heft_5-6/20_5-6_204.pdf ; https://beskydy.mendelu.cz/media/pdf/beskyd_2015008010009.pdf | Journal terms; not checked |
 | UFWF | Gilman E.F., Watson D.G., Klein R.W. & Hilbert D.R., *Washingtonia filifera: Desert Palm*, UF/IFAS ENH-826 (EDIS ST669), revised April 2024 | Height, spread, crown, leaf type and colour, petticoat skirt, fire hazard, removal by law | https://ask.ifas.ufl.edu/publication/ST669 | Free to read, © UF/IFAS. No licence stated in the copy read; ENH1182 from the same series is CC BY-NC-ND 4.0. |
 | UFQP | Broschat T.K., Klein R.W. & Hilbert D.R., *Syagrus romanzoffiana: Queen Palm*, UF/IFAS ENH-767 (EDIS ST609), revised March 2024 | Height, spread, trunk diameter, not self-cleaning, fruit, pruning cautions | https://ask.ifas.ufl.edu/publication/ST609 | As UFWF |

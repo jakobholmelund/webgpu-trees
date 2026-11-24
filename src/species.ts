@@ -190,8 +190,35 @@ export interface TreeSpecies {
    * sways on the way up as `crooked` says. Left out: its great limbs leave it one by one, as `scaffolds` says.
    */
   forkStems?: number;
-  /** How many times each of those stems divides again in V-forks, rising then spreading, before its arms are limbs. Left out: once. */
+  /**
+   * How many times each of those stems divides again in V-forks, rising then spreading, before its arms are
+   * limbs (a stone pine's). Left out: its stems are trunks of their own, each leaning out from the fork and
+   * turning up, with its share of the crown, its own great limbs (`scaffolds`) and its own leader (a forked
+   * oak's two trunks, a coast live oak's leaning ones).
+   */
   forkSplits?: number;
+  /**
+   * The share of its trees whose trunk forks (`fork`, `forkStems`), 0..1: each tree's seed decides, so a
+   * stand is a mix (a parkland oak's forked trunk, a coast live oak's two or three leaning trunks). Fewer in
+   * a closed wood, where a tree is drawn up on one stem, and those fork higher. Left out: every tree if
+   * `fork` and `forkStems` are given, else none.
+   */
+  forkShare?: number;
+  /**
+   * How far one tree's fork strays from `fork`, either way, as a share of its crown base's height: a fork
+   * near the ground (one root plate, its trunks leaning apart from it) to one under the crown. Left out: 0.
+   */
+  forkSpread?: number;
+  /** The most stems a forked trunk divides into (`forkStems` the least), each tree its own. Left out: `forkStems`. */
+  forkStemsMost?: number;
+  /**
+   * The share of its trees that grow as a clump of a few stems from one root plate, 0..1 (a silver birch's or
+   * a black alder's from a stool): each a tree's stem, leaning out a little and turning up, with its share of
+   * one crown. Each tree's seed decides; fewer in a closed wood. Left out: none (a shrub's `stems` are its own).
+   */
+  stemShare?: number;
+  /** How many stems such a clump has, [least, most], 2..4. Left out: [2, 3]. */
+  stemRange?: [number, number];
   /**
    * How far its leaves gather into flat-topped pads, 0..1: each branch off a great limb keeps only the leaves
    * near its top, so the crown is shelves of foliage with air and bare wood under each (a Monterey cypress
@@ -300,6 +327,11 @@ export const OPTIONAL_SPECIES_FIELDS = {
   fork: "number",
   forkStems: "number",
   forkSplits: "number",
+  forkShare: "number",
+  forkSpread: "number",
+  forkStemsMost: "number",
+  stemShare: "number",
+  stemRange: "pair",
   pads: "number",
   clusters: "number",
   buttress: "number",
@@ -357,6 +389,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorlsPerMetre: 0,
     branchiness: 0.8,
     scaffolds: 8,
+    forkShare: 0.35,
+    fork: 0.7,
+    forkSpread: 0.3,
+    forkStems: 2,
+    forkStemsMost: 3,
     boleStubs: 0.8,
     limbAngle: [45, 85],
     limbCurve: -15,
@@ -424,6 +461,12 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     foliageDepth: 0.3,
     openness: 0.75,
     stems: 1,
+    forkShare: 0.2,
+    fork: 0.8,
+    forkSpread: 0.2,
+    forkStems: 2,
+    stemShare: 0.25,
+    stemRange: [2, 3],
     branchAngle: 32,
     branchAngleSpread: 14,
     bend: -0.15,
@@ -581,6 +624,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.15,
     openness: 0.08,
     stems: 1,
+    forkShare: 0.2,
+    fork: 0.6,
+    forkSpread: 0.35,
+    forkStems: 2,
     branchAngle: 45,
     branchAngleSpread: 12,
     bend: 0.05,
@@ -618,6 +665,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.3,
     openness: 0.6,
     stems: 1,
+    stemShare: 0.3,
+    stemRange: [2, 4],
     branchAngle: 40,
     branchAngleSpread: 12,
     bend: -0.35,
@@ -658,6 +707,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.3,
     openness: 0.3,
     stems: 1,
+    stemShare: 0.3,
+    stemRange: [2, 4],
     branchAngle: 55,
     branchAngleSpread: 12,
     bend: 0,
@@ -736,6 +787,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.35,
     openness: 0.35,
     stems: 1,
+    forkShare: 0.4,
+    fork: 0.7,
+    forkSpread: 0.3,
+    forkStems: 2,
+    forkStemsMost: 3,
     branchAngle: 50,
     branchAngleSpread: 15,
     bend: 0.1,
@@ -1008,6 +1064,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.35,
     openness: 0.15,
     stems: 1,
+    forkShare: 0.45,
+    fork: 0.35,
+    forkSpread: 0.3,
+    forkStems: 2,
+    forkStemsMost: 3,
     branchAngle: 45,
     branchAngleSpread: 12,
     bend: 0.15,
@@ -1199,7 +1260,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     zigzag: 5,
     canopyLift: 0.6,
     fork: 0.72,
-    forkStems: 3,
+    forkSpread: 0.08,
+    forkStems: 2,
+    forkStemsMost: 3,
     forkSplits: 2,
     leafKind: "pine",
     clumpSize: 2.2,
@@ -1310,6 +1373,13 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.55,
     openness: 0.2,
     stems: 1,
+    forkShare: 0.45,
+    fork: 0.45,
+    forkSpread: 0.4,
+    forkStems: 2,
+    forkStemsMost: 3,
+    stemShare: 0.15,
+    stemRange: [2, 3],
     branchAngle: 70,
     branchAngleSpread: 18,
     bend: -0.1,
@@ -1351,6 +1421,13 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     foliageDepth: 0.25,
     openness: 0.55,
     stems: 1,
+    forkShare: 0.45,
+    fork: 0.35,
+    forkSpread: 0.3,
+    forkStems: 2,
+    forkStemsMost: 3,
+    stemShare: 0.15,
+    stemRange: [2, 3],
     branchAngle: 55,
     branchAngleSpread: 20,
     bend: 0.05,
@@ -1621,6 +1698,7 @@ export function cloneSpecies(s: TreeSpecies): TreeSpecies {
     ...s,
     throughTint: [...s.throughTint],
     ...(s.limbAngle ? { limbAngle: [s.limbAngle[0], s.limbAngle[1]] as [number, number] } : {}),
+    ...(s.stemRange ? { stemRange: [s.stemRange[0], s.stemRange[1]] as [number, number] } : {}),
     ...(s.leafColors ? { leafColors: [...s.leafColors] } : {}),
     ...(s.regions ? { regions: [...s.regions] } : {}),
   };
@@ -1648,6 +1726,10 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.scaffolds !== undefined && !(Number.isInteger(s.scaffolds) && s.scaffolds >= 0 && s.scaffolds <= 12)) out.push("scaffolds must be a whole number 0..12");
   if (s.forkStems !== undefined && !(Number.isInteger(s.forkStems) && s.forkStems >= 1 && s.forkStems <= 4)) out.push("forkStems must be a whole number 1..4");
   if (s.forkSplits !== undefined && !(Number.isInteger(s.forkSplits) && s.forkSplits >= 0 && s.forkSplits <= 3)) out.push("forkSplits must be a whole number 0..3");
+  if (s.forkStemsMost !== undefined && !(Number.isInteger(s.forkStemsMost) && s.forkStemsMost >= (s.forkStems ?? 2) && s.forkStemsMost <= 4)) out.push("forkStemsMost must be a whole number from forkStems to 4");
+  if (s.forkSpread !== undefined && !(s.forkSpread >= 0 && s.forkSpread <= 1)) out.push("forkSpread must be 0..1");
+  if (s.stemRange !== undefined && !(s.stemRange.length === 2 && s.stemRange.every((n) => Number.isInteger(n) && n >= 2 && n <= 4) && s.stemRange[0] <= s.stemRange[1])) out.push("stemRange must be [least, most], whole numbers 2..4");
+  if ((s.forkShare ?? 0) + (s.stemShare ?? 0) > 1) out.push("forkShare and stemShare together must be 1 or less");
   if (s.shed !== undefined && !(s.shed >= 0 && s.shed <= 1)) out.push("shed must be 0..1");
   if (s.boleStubs !== undefined && !(s.boleStubs >= 0 && s.boleStubs <= 1)) out.push("boleStubs must be 0..1");
   if (s.limbAngle !== undefined && !(s.limbAngle.length === 2 && s.limbAngle.every((a) => a >= 0 && a <= 175))) out.push("limbAngle must be [top, base], each 0..175 degrees");
@@ -1655,7 +1737,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.zigzag !== undefined && !(s.zigzag >= 0 && s.zigzag <= 60)) out.push("zigzag must be 0..60 degrees");
   if (s.zigzagRun !== undefined && !(s.zigzagRun >= 0 && s.zigzagRun <= 5)) out.push("zigzagRun must be 0..5 m");
   if (s.phyllotaxis !== undefined && !["spiral", "opposite", "distichous"].includes(s.phyllotaxis)) out.push("phyllotaxis must be spiral, opposite or distichous");
-  for (const k of ["sprayHang", "canopyLift", "pads", "clusters", "buttress", "fork"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
+  for (const k of ["sprayHang", "canopyLift", "pads", "clusters", "buttress", "fork", "forkShare", "stemShare"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");
   if (!LEAF_KIND_ROWS.includes(s.leafKind)) out.push(`leafKind must be one of ${LEAF_KIND_ROWS.join(", ")}`);
   for (const k of ["foliageDepth", "openness", "leader", "branchiness", "crooked", "leafVariation", "treeVariation", "barkPale", "stiffness", "clumpSpread"] as const) {
