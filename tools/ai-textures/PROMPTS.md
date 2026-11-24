@@ -202,3 +202,91 @@ A top-down botanical scan of one eastern white pine (Pinus strobus) shoot laid f
 
 ### Northern red oak bark — file: `real-redoak-bark` (-1 used; -2, -3, -4 kept spare)
 A straight-on photographic texture of mature northern red oak (Quercus rubra) trunk bark, filling the whole square frame edge to edge: dark grey to grey-brown, with long, wide, flat-topped shiny grey ridges running straight up the trunk like ski tracks, separated by shallow darker furrows. Even diffuse light, no shadows, no perspective, no trunk edges visible.
+
+## 2048-pixel re-generations (added 2026-11-25)
+
+Made by the owner in the Antigravity app with Nano Banana, of pictures first made at 1024: two each, `-3` used and its
+near twin `-4` kept spare. Every prompt began "Make every image at the highest resolution you can (at least 2048
+pixels on the long side) and as PNG.", then the subject's own words, then the shared rule for its kind:
+
+- **Bark**: "a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail,
+  even diffuse light, no shadows, no perspective, no trunk edges visible"
+- **Palms**: "a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no
+  shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp,
+  even light"
+
+### European beech bark — file: `real-beech-bark` (-3 used, in place of -1)
+European beech bark (square): smooth silver-grey bark, faint darker grey mottling, a few small horizontal lenticel lines and pale lichen spots, very fine texture.
+
+### Eucalyptus bark — file: `real-eucalyptus-bark` (-3 used for the smooth upper stem, in place of -1; -2 stays the rough stocking)
+Tasmanian blue gum eucalyptus bark (square): smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places.
+
+### Scots pine upper bark — file: `real-scotspine-upper-bark` (-3 used, in place of -1; still graded to copper)
+Scots pine bark from high on the trunk (square): thin flaking papery plates of muted copper to rusty orange-brown bark peeling in small curls, natural and not oversaturated, with greyish-brown shadows between the flakes.
+
+### Black alder bark — file: `real-alder-bark` (-3 used, in place of -2)
+Black alder bark (square): dark grey-brown to almost black, broken into small rough square-ish plates by shallow fissures, a few pale lichen spots.
+
+### Coast live oak bark — file: `real-liveoak-bark` (-3 used, in place of -1)
+Coast live oak bark (square): smooth light grey to grey-brown, broken by shallow irregular vertical furrows into broad flat ridges, patches of pale green and grey lichen.
+
+### Torrey pine bark — file: `real-torreypine-bark` (-3 used, in place of -1)
+Torrey pine bark (square): deeply furrowed into broad flat reddish-brown to grey-brown scaly plates, darker in the furrows.
+
+### Sugar maple bark — file: `real-maple-bark` (-3 used, in place of -1)
+Sugar maple bark (square): grey to grey-brown, broken into long irregular vertical plates that curl away from the trunk at one edge, shaggy, with dark furrows between them.
+
+### Fan palm leaf — file: `real-fan-leaf` (-3 used, in place of -2; -1 stays the second fan)
+Mexican fan palm leaf (square): one round fan-shaped leaf about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips.
+
+### Queen palm frond — file: `real-queen-frond` (tall portrait, 1536 × 2730; -3 used, in place of -1)
+Queen palm frond (tall portrait): one long arching frond, a midrib with many soft, narrow, glossy green leaflets set in several planes along it so the frond looks plumose and feathery, the leaflets drooping softly.
+
+### Dead fan-palm skirt — file: `real-dead-fronds` (tall portrait, 1536 × 2730; -3 used, in place of -1)
+Dead hanging palm fronds (tall portrait): several dead dry fan-palm leaves hanging straight down side by side on long stalks, straw-tan to grey-brown, papery, folded and frayed, like the dead skirt of a Mexican fan palm.
+
+## The conifer batch: barks and shoots (added 2026-11-25)
+
+Made by the owner in the Antigravity app with Nano Banana, two of each, near twins: the barks' `-1` used (`-2` kept
+spare), both of each shoot's (a leaf set has two pictures at the least). 2048-pixel square barks, 1536 × 2730 shoots on
+magenta. The generation also asked for at least 2048 pixels and PNG; then the subject's own words and the shared rule
+for its kind:
+
+- **Bark**: "a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail,
+  even diffuse light, no shadows, no perspective, no trunk edges visible"
+- **Shoots**: "a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no
+  shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp,
+  even light"
+
+### Monterey pine bark — file: `real-montereypine-bark`
+Monterey pine bark (square): very thick dark grey-brown to almost black bark, deeply furrowed into long rough ridges, reddish-brown in the bottoms of the furrows.
+
+### Aleppo pine bark — file: `real-aleppo-bark`
+Aleppo pine bark (square): on an old trunk, deeply fissured dark grey-brown to reddish-brown bark broken into broad flat irregular plates.
+
+### Corsican pine bark — file: `real-corsican-bark`
+Corsican pine bark (square): dark grey to almost black bark broken into long irregular scaly plates by deep fissures, the plate faces lighter grey and slightly pinkish.
+
+### Eastern white pine bark — file: `real-whitepine-bark`
+Eastern white pine bark (square): mature dark grey bark deeply furrowed into long narrow rectangular ridges with flat tops, a few purplish-brown patches.
+
+### Sitka spruce bark — file: `real-sitka-bark`
+Sitka spruce bark (square): thin grey bark flaking in small rounded loose scales like a scattering of coins, reddish-brown beneath the scales.
+
+### White spruce bark — file: `real-whitespruce-bark`
+White spruce bark (square): thin grey bark broken into small flaky scales, a few resin spots, pale silvery-grey to light brown.
+
+### Monterey cypress bark — file: `real-cypress-bark`
+Monterey cypress bark (square): old trunk bark, grey to reddish-brown, made of long fibrous vertical strips and ridges, slightly shaggy, with lichen patches.
+
+### Sitka spruce shoot — file: `real-sitka-shoot` (tall portrait)
+Sitka spruce shoot (tall portrait): one branch tip with stiff, sharp, flattened blue-green needles 2 cm long standing out all round the twig, silvery-white underside showing on some.
+
+### White spruce shoot — file: `real-whitespruce-shoot` (tall portrait)
+White spruce shoot (tall portrait): one branch tip with short stiff four-sided blue-green needles about 1.5 cm long crowded on the upper side of the twig, slightly curved.
+
+### Douglas fir shoot — file: `real-douglas-shoot` (tall portrait)
+Douglas fir shoot (tall portrait): one branch tip with soft flat needles 2 to 3 cm long spreading all round the twig like a bottle brush, yellow-green to dark green, two pale lines underneath, a pointed brown bud at the tip.
+
+### Corsican pine shoot — file: `real-corsican-shoot` (tall portrait)
+Corsican pine shoot (tall portrait): one stout twig ending in a dense brush of long, stiff, straight dark green needles in pairs, 10 to 15 cm long, spreading forward.

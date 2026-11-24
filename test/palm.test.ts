@@ -177,7 +177,11 @@ test("the palms' pictures are in assets/, AI-generated and credited as such with
     assert.ok(manifest.bark.sets.some((s: { id: string }) => s.id === id), id);
     assert.ok(existsSync(new URL(`assets/bark/${id}.albedo.avif`, root)), id);
   }
-  for (const file of ["real-fan-leaf-2", "real-fan-leaf-1", "real-dead-fronds-1", "real-queen-frond-1", "real-pineapple-cut-2", "painterly-frond-2", "painterly-fan-1"]) {
+  for (const file of ["real-fan-leaf-1", "real-pineapple-cut-2", "painterly-frond-2", "painterly-fan-1"]) {
     assert.match(sources, new RegExp(`\`${file}\\.jpg\`[^\\n]*Nano Banana[^\\n]*2026-11-24\\. Prompt: ".{80,}"`), `${file}: tool, date and prompt in SOURCES.md`);
+  }
+  // (The owner's 2048-pixel generations of the first fan, the queen palm's frond and the dead skirt, 2026-11-25.)
+  for (const file of ["real-fan-leaf-3", "real-dead-fronds-3", "real-queen-frond-3"]) {
+    assert.match(sources, new RegExp(`\`${file}\\.png\`[^\\n]*Nano Banana[^\\n]*2026-11-25\\. Prompt: ".{80,}"`), `${file}: tool, date and prompt in SOURCES.md`);
   }
 });

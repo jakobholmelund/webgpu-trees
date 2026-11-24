@@ -22,7 +22,7 @@ test("every set the recipe makes is in the manifest, in the recipe's order", () 
   manifest.bark.sets.forEach((b, i) => assert.equal(b.layer, i));
 });
 
-test("every picture is there, an AVIF, under 1 MB; all of them under 18 MB", () => {
+test("every picture is there, an AVIF, under 1 MB; all of them under 22 MB", () => {
   let total = 0;
   for (const f of files) {
     assert.ok(existsSync(at(f)), `${f} missing`);
@@ -33,7 +33,7 @@ test("every picture is there, an AVIF, under 1 MB; all of them under 18 MB", () 
     total += n;
   }
   // (16.9 MB with the fifth batch of the owner's pictures: 24 bark sets and 39 leaf sets.)
-  assert.ok(total < 18e6, `${(total / 1e6).toFixed(1)} MB`);
+  assert.ok(total < 22e6, `${(total / 1e6).toFixed(1)} MB`);
 });
 
 test("bark tiles are a sensible size of bark (cm), leaves a sensible length (a palm frond's whole)", () => {

@@ -92,6 +92,11 @@ const generated = (id, file, title, prompt, extra = {}) => ({
 const ANTIGRAVITY = { tool: "Antigravity / gemini-3.8-flash image", date: "2026-11-24" };
 /** The pines' cushions and clumps were made by the owner in the Antigravity app with Nano Banana. */
 const NANO_ANTIGRAVITY = { tool: "Nano Banana via Antigravity", date: "2026-11-24" };
+/**
+ * The owner's 2048-pixel generations of pictures first made at 1024 (Nano Banana via Antigravity, 2026-11-25): each
+ * kept as `-3` with a near twin `-4` spare; the prompt each subject's own words, then the shared rule for its kind.
+ */
+const REGEN_2048 = { tool: "Nano Banana via Antigravity", date: "2026-11-25" };
 
 export const SOURCES = {
   // Barks.
@@ -109,20 +114,20 @@ export const SOURCES = {
   ai_eucalyptus_leaves: generated("eucalyptus-leaves-2", "eucalyptus-leaves-2.png", "Tasmanian blue gum adult leaves", "Six adult Tasmanian blue gum leaves laid flat on pure flat magenta…", { key: "magenta" }),
   ai_canary_frond: generated("canary-frond-2", "canary-frond-2.png", "Canary Island date palm frond", "One complete Canary Island date palm frond… on magenta…", { key: "magenta" }),
   // The palms' pictures (generated 2026-11-24; the prompts as given in tools/ai-textures/PROMPTS.md).
-  ai_fan_leaf: generated("real-fan-leaf-2", "real-fan-leaf-2.jpg", "Mexican fan palm leaf", "One Mexican fan palm (Washingtonia robusta) leaf laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. A round costapalmate fan about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips. The whole leaf inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_fan_leaf: generated("real-fan-leaf-3", "real-fan-leaf-3.png", "Mexican fan palm leaf", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Mexican fan palm leaf (square): one round fan-shaped leaf about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta" }),
   ai_fan_leaf_b: generated("real-fan-leaf-1", "real-fan-leaf-1.jpg", "Mexican fan palm leaf (a second)", "One Mexican fan palm (Washingtonia robusta) leaf laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. A round costapalmate fan about 1 m across on a short piece of spiny stalk, many stiff pleated bright green segments radiating from the centre, their outer thirds split and drooping, a few fine threads hanging from the tips. The whole leaf inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
-  ai_dead_fronds: generated("real-dead-fronds-1", "real-dead-fronds-1.jpg", "Dead hanging fan palm leaves", "Several dead dry palm fronds hanging straight down side by side, laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. Straw-tan to grey-brown, papery, folded and frayed fan leaves on long stalks, like the dead skirt of a Washingtonia fan palm. The whole group inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
-  ai_queen_frond: generated("real-queen-frond-1", "real-queen-frond-1.jpg", "Queen palm frond", "One queen palm (Syagrus romanzoffiana) frond laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. A long arching midrib with many soft, narrow, glossy green leaflets set in several planes along it so the frond looks plumose and feathery, the leaflets drooping softly. The whole frond inside the frame with a margin, no shadows on the background.", { key: "magenta" }),
+  ai_dead_fronds: generated("real-dead-fronds-3", "real-dead-fronds-3.png", "Dead hanging fan palm leaves", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Dead hanging palm fronds (tall portrait): several dead dry fan-palm leaves hanging straight down side by side on long stalks, straw-tan to grey-brown, papery, folded and frayed, like the dead skirt of a Mexican fan palm. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta" }),
+  ai_queen_frond: generated("real-queen-frond-3", "real-queen-frond-3.png", "Queen palm frond", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Queen palm frond (tall portrait): one long arching frond, a midrib with many soft, narrow, glossy green leaflets set in several planes along it so the frond looks plumose and feathery, the leaflets drooping softly. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta" }),
   ai_pineapple: generated("real-pineapple-cut-2", "real-pineapple-cut-2.jpg", "Canary date palm pineapple cut", "The pruned leaf-base crown (\"pineapple cut\") of a Canary Island date palm, photographed straight-on as a flat seamless tileable texture, square. Neatly trimmed short leaf stubs in a tight interlocking diamond spiral, fresh cut faces pale tan and cream, darker brown fibres between them. Even diffuse light, no cast shadows, no perspective, no edges visible. Photographic scan quality.", { crop: { x: 0.5, size: 1 } }),
   ai_paint_frond: generated("painterly-frond-2", "painterly-frond-2.jpg", "Painted feather palm frond", "A hand-painted stylized palm frond for a game tree, on a pure flat magenta #FF00FF background, tall 1:2. One arching feather palm frond, a curved yellow-green midrib from bottom to top with many narrow pointed leaflets on both sides angled forward in a V, longest in the middle; bright yellow-green on top, teal-green beneath, soft painted gradients. Flat orthographic, the whole frond inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
   ai_paint_fan: generated("painterly-fan-1", "painterly-fan-1.jpg", "Painted fan palm leaf", "A hand-painted stylized fan palm leaf for a game tree, on a pure flat magenta #FF00FF background, square. One round fan-shaped leaf of a Mexican fan palm on a short stalk, many pleated narrow segments radiating from the centre with their tips split and drooping, a few hanging threads; yellow-green on top, teal beneath, soft painted gradients. Flat orthographic, centred, inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
   // The realistic look's species no scan covers (generated 2026-11-24; the prompts as given in
   // tools/ai-textures/PROMPTS.md).
-  ai_beech_bark: generated("real-beech-bark-1", "real-beech-bark-1.jpg", "European beech bark", "European beech (Fagus sylvatica) bark, photographed straight-on as a flat seamless tileable texture, square. Smooth silver-grey bark filling the whole frame edge to edge, faint darker grey mottling, a few small horizontal lenticel lines and pale lichen spots, very fine texture. Even diffuse overcast light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality, neutral colour.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, relief: 0.35 } }),
+  ai_beech_bark: generated("real-beech-bark-3", "real-beech-bark-3.png", "European beech bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. European beech bark (square): smooth silver-grey bark, faint darker grey mottling, a few small horizontal lenticel lines and pale lichen spots, very fine texture. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 1, overlap: 0.16, relief: 0.35 } }),
   ai_eucalyptus_bark: generated("real-eucalyptus-bark-2", "real-eucalyptus-bark-2.jpg", "Tasmanian blue gum bark, rough and peeling", "Tasmanian blue gum (Eucalyptus globulus) trunk bark, photographed straight-on as a flat seamless tileable texture, square. Smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, streaks: true } }),
-  ai_eucalyptus_bark_upper: generated("real-eucalyptus-bark-1", "real-eucalyptus-bark-1.jpg", "Tasmanian blue gum bark, smooth and streaked", "Tasmanian blue gum (Eucalyptus globulus) trunk bark, photographed straight-on as a flat seamless tileable texture, square. Smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, streaks: true } }),
+  ai_eucalyptus_bark_upper: generated("real-eucalyptus-bark-3", "real-eucalyptus-bark-3.png", "Tasmanian blue gum bark, smooth and mottled", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Tasmanian blue gum eucalyptus bark (square): smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 1, overlap: 0.16, streaks: true } }),
   // (Generated far too saturated an orange: brought to a copper that sits with the scanned plates below it.)
-  ai_scotspine_upper: generated("real-scotspine-upper-bark-1", "real-scotspine-upper-bark-1.jpg", "Scots pine upper-stem bark", "Scots pine (Pinus sylvestris) bark from high on the stem, photographed straight-on as a flat seamless tileable texture, square. Thin flaking papery plates of bright orange to copper-red bark peeling in small curls, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16 }, grade: { saturation: 0.6, toward: [0.71, 0.39, 0.24] } }),
+  ai_scotspine_upper: generated("real-scotspine-upper-bark-3", "real-scotspine-upper-bark-3.png", "Scots pine upper-stem bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Scots pine bark from high on the trunk (square): thin flaking papery plates of muted copper to rusty orange-brown bark peeling in small curls, natural and not oversaturated, with greyish-brown shadows between the flakes. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 1, overlap: 0.16 }, grade: { saturation: 0.6, toward: [0.71, 0.39, 0.24] } }),
   ai_torrey_shoot: generated("real-torrey-shoot", ["real-torrey-shoot-3.jpg", "real-torrey-shoot-1.jpg"], "Torrey pine shoots", "One Torrey pine (Pinus torreyana) shoot laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. A stout grey-brown twig ending in a dense tuft of long stiff grey-green needles in bundles of five, 20–30 cm long, spreading forward like a brush. The whole shoot inside the frame with a margin, no shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
   ai_liveoak_leaves: generated("real-liveoak-leaves-2", "real-liveoak-leaves-2.jpg", "Coast live oak leaves", "Ten coast live oak (Quercus agrifolia) leaves laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. Each leaf small, 3–6 cm, oval, cupped and holly-like with spiny toothed edges, dark glossy green; arranged in rows, upright, not touching, each fully inside the frame with a margin. No shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
   // (Checked by the owner against a photograph of real plane leaves: broad pointed lobes, sparse coarse teeth, the swollen stalk base.)
@@ -147,8 +152,8 @@ export const SOURCES = {
   ai_poplar_leaves: generated("real-poplar-leaves", ["real-poplar-leaves-1.jpg", "real-poplar-leaves-2.jpg"], "Lombardy poplar leaves", "Ten Lombardy poplar (Populus nigra 'Italica') leaves laid flat: 5 to 8 cm, triangular to diamond-shaped, wider than long, with a long tapering tip, finely and regularly toothed edges, bright glossy green, a long flattened stalk. Laid flat and photographed from directly above like a botanical herbarium scan, leaves upright, side by side, not touching. Pure flat magenta #FF00FF background with no gradient and no shadow, the whole subject inside the frame with a clear margin, nothing else in frame, no text, photographic quality, even daylight from above.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
   // (Both barks shade darker towards their sides, as a trunk's curve does: the middle cut out, a little larger than the
   // tile, before it is made to tile.)
-  ai_alder_bark: generated("real-alder-bark-2", "real-alder-bark-2.jpg", "Black alder bark", "Mature black alder (Alnus glutinosa) trunk bark: dark grey-brown to almost black, broken into small rough square-ish plates by shallow fissures, a few pale lichen spots. Fill the whole frame edge to edge, straight-on, even diffuse light, no shadows, no perspective, no trunk edges visible, photographic scan quality.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
-  ai_liveoak_bark: generated("real-liveoak-bark-1", "real-liveoak-bark-1.jpg", "Coast live oak bark", "Mature coast live oak (Quercus agrifolia) trunk bark: smooth light grey to grey-brown, broken by shallow irregular vertical furrows into broad flat ridges, patches of pale green and grey lichen. Fill the whole frame edge to edge, straight-on, even diffuse light, no shadows, no perspective, no trunk edges visible, photographic scan quality.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
+  ai_alder_bark: generated("real-alder-bark-3", "real-alder-bark-3.png", "Black alder bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Black alder bark (square): dark grey-brown to almost black, broken into small rough square-ish plates by shallow fissures, a few pale lichen spots. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
+  ai_liveoak_bark: generated("real-liveoak-bark-3", "real-liveoak-bark-3.png", "Coast live oak bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Coast live oak bark (square): smooth light grey to grey-brown, broken by shallow irregular vertical furrows into broad flat ridges, patches of pale green and grey lichen. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
   // And six more of the owner's pictures (Nano Banana via Antigravity, 2026-11-24/25): each from one shared header for its
   // kind (a leaf sheet's, a bark's: tools/ai-textures/PROMPTS.md) and its subject's own words.
   ai_birch_leaves: generated("real-birch-leaves", ["real-birch-leaves-1.png", "real-birch-leaves-2.png"], "Silver birch leaves", "Silver birch leaves (square): twelve leaves, each 3 to 6 cm, triangular to diamond-shaped with a long pointed tip and a broad straight base, sharply double-toothed edges, fresh mid green, a thin stalk. As a top-down botanical herbarium scan on a pure flat magenta background with no gradient and no shadow, everything fully inside the frame with a clear margin, nothing else in frame, no text, photographic, even light; leaves laid flat, upright, side by side, not touching.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
@@ -159,8 +164,23 @@ export const SOURCES = {
   ai_birch_foot_bark: generated("real-birch-foot-bark-1", "real-birch-foot-bark-1.png", "Silver birch bark at the foot of an old trunk", "Silver birch bark from the base of an old trunk (square): thick rough blackish-grey bark broken by deep vertical fissures into rugged ridges, with a few small patches of white papery bark showing between the ridges. As a straight-on photographic texture filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
   ai_willow_bark: generated("real-willow-bark-1", "real-willow-bark-1.png", "Weeping willow bark", "Weeping willow bark (square): grey-brown, deeply furrowed into long thick interlacing vertical ridges forming a coarse net-like pattern. As a straight-on photographic texture filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
   ai_poplar_bark: generated("real-poplar-bark-1", "real-poplar-bark-1.png", "Lombardy poplar bark", "Lombardy poplar bark (square): dark grey, deeply and roughly furrowed into thick vertical ridges, with a few rounded burrs. As a straight-on photographic texture filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
-  ai_torreypine_bark: generated("real-torreypine-bark-1", "real-torreypine-bark-1.jpg", "Torrey pine bark", "Torrey pine bark (square): deeply furrowed into broad flat reddish-brown to grey-brown scaly plates, darker in the furrows. As a straight-on photographic texture filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
-  ai_maple_bark: generated("real-maple-bark-1", "real-maple-bark-1.jpg", "Sugar maple bark", "Sugar maple bark (square): grey to grey-brown, broken into long irregular vertical plates that curl away from the trunk at one edge, shaggy, with dark furrows between them. As a straight-on photographic texture filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
+  ai_torreypine_bark: generated("real-torreypine-bark-3", "real-torreypine-bark-3.png", "Torrey pine bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Torrey pine bark (square): deeply furrowed into broad flat reddish-brown to grey-brown scaly plates, darker in the furrows. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
+  ai_maple_bark: generated("real-maple-bark-3", "real-maple-bark-3.png", "Sugar maple bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Sugar maple bark (square): grey to grey-brown, broken into long irregular vertical plates that curl away from the trunk at one edge, shaggy, with dark furrows between them. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.8, overlap: 0.16 } }),
+  // The conifer batch: barks and shoots for the conifers that borrowed another's (Nano Banana via Antigravity,
+  // 2026-11-25; 2048-pixel barks, 1536 x 2730 shoots; each bark's `-1` used, its near twin `-2` kept spare, and both of
+  // each shoot's, two leaves to a set at the least, mirrored and turned apart on the cards; the prompts as given
+  // in tools/ai-textures/PROMPTS.md: the subject's own words, then the shared rule for its kind).
+  ai_montereypine_bark: generated("real-montereypine-bark-1", "real-montereypine-bark-1.png", "Monterey pine bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Monterey pine bark (square): very thick dark grey-brown to almost black bark, deeply furrowed into long rough ridges, reddish-brown in the bottoms of the furrows. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_aleppo_bark: generated("real-aleppo-bark-1", "real-aleppo-bark-1.png", "Aleppo pine bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Aleppo pine bark (square): on an old trunk, deeply fissured dark grey-brown to reddish-brown bark broken into broad flat irregular plates. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_corsican_bark: generated("real-corsican-bark-1", "real-corsican-bark-1.png", "Corsican pine bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Corsican pine bark (square): dark grey to almost black bark broken into long irregular scaly plates by deep fissures, the plate faces lighter grey and slightly pinkish. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_whitepine_bark: generated("real-whitepine-bark-1", "real-whitepine-bark-1.png", "Eastern white pine bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Eastern white pine bark (square): mature dark grey bark deeply furrowed into long narrow rectangular ridges with flat tops, a few purplish-brown patches. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_sitka_bark: generated("real-sitka-bark-1", "real-sitka-bark-1.png", "Sitka spruce bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Sitka spruce bark (square): thin grey bark flaking in small rounded loose scales like a scattering of coins, reddish-brown beneath the scales. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_whitespruce_bark: generated("real-whitespruce-bark-1", "real-whitespruce-bark-1.png", "White spruce bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. White spruce bark (square): thin grey bark broken into small flaky scales, a few resin spots, pale silvery-grey to light brown. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16 } }),
+  ai_cypress_bark: generated("real-cypress-bark-1", "real-cypress-bark-1.png", "Monterey cypress bark", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Monterey cypress bark (square): old trunk bark, grey to reddish-brown, made of long fibrous vertical strips and ridges, slightly shaggy, with lichen patches. As a straight-on photographic texture filling the whole square frame edge to edge, very sharp, fine detail, even diffuse light, no shadows, no perspective, no trunk edges visible.", { ...REGEN_2048, crop: { x: 0.5, size: 0.9, overlap: 0.16, streaks: true } }),
+  ai_sitka_shoot: generated("real-sitka-shoot", ["real-sitka-shoot-1.png", "real-sitka-shoot-2.png"], "Sitka spruce shoot", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Sitka spruce shoot (tall portrait): one branch tip with stiff, sharp, flattened blue-green needles 2 cm long standing out all round the twig, silvery-white underside showing on some. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta", unmix: true }),
+  ai_whitespruce_shoot: generated("real-whitespruce-shoot", ["real-whitespruce-shoot-1.png", "real-whitespruce-shoot-2.png"], "White spruce shoot", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. White spruce shoot (tall portrait): one branch tip with short stiff four-sided blue-green needles about 1.5 cm long crowded on the upper side of the twig, slightly curved. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta", unmix: true }),
+  ai_douglas_shoot: generated("real-douglas-shoot", ["real-douglas-shoot-1.png", "real-douglas-shoot-2.png"], "Douglas fir shoot", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Douglas fir shoot (tall portrait): one branch tip with soft flat needles 2 to 3 cm long spreading all round the twig like a bottle brush, yellow-green to dark green, two pale lines underneath, a pointed brown bud at the tip. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta", unmix: true }),
+  ai_corsican_shoot: generated("real-corsican-shoot", ["real-corsican-shoot-1.png", "real-corsican-shoot-2.png"], "Corsican pine shoot", "Make every image at the highest resolution you can (at least 2048 pixels on the long side) and as PNG. Corsican pine shoot (tall portrait): one stout twig ending in a dense brush of long, stiff, straight dark green needles in pairs, 10 to 15 cm long, spreading forward. As a top-down photograph like a botanical scan on a pure flat magenta background with no gradient and no shadow, the whole subject fully inside the frame with a clear margin, nothing else in frame, no text, very sharp, even light.", { ...REGEN_2048, key: "magenta", unmix: true }),
   // Leaves.
   LeafSet016: acg("LeafSet016", "2K", { title: "Leaf Set 016" }),
   LeafSet030: acg("LeafSet030", "2K", { title: "Leaf Set 030" }),
@@ -202,11 +222,11 @@ export const BARK = [
   {
     id: "eucalyptusUpper",
     source: "ai_eucalyptus_bark_upper",
-    look: "a blue gum's smooth upper stem: long cream, blue-grey and yellow-green streaks, a few ribbons hanging",
+    look: "a blue gum's smooth upper stem: cream, blue-grey and yellow-green patches, a few ribbons of brown bark hanging",
     for: ["Eucalyptus"],
-    // Streaks 3–15 cm wide on a blue gum's smooth stem: about ten across the tile.
+    // Smooth patches 5–30 cm on a blue gum's upper stem (MORPHOLOGY.md): some five or six across the tile here.
     tileCm: [85, 85],
-    tileFrom: "estimated: ~10 streaks across, a blue gum's 3–15 cm wide",
+    tileFrom: "estimated: ~5–6 patches across, a blue gum's smooth patches 5–30 cm",
     delight: 0.6,
   },
   {
@@ -261,7 +281,7 @@ export const BARK = [
     id: "pine",
     source: "pine_bark",
     look: "red-brown plates between dark fissures",
-    for: ["Scots pine", "Corsican pine", "Monterey pine", "Aleppo pine", "Eastern white pine"],
+    for: ["Scots pine"],
     delight: 0.6,
   },
   {
@@ -269,16 +289,17 @@ export const BARK = [
     source: "ai_scotspine_upper",
     look: "thin papery flakes, copper-orange, peeling in small curls (a Scots pine's upper stem and limbs)",
     for: ["Scots pine"],
-    // A Scots pine's upper flakes 1–5 cm (MORPHOLOGY.md): most here 60–150 texels of the 860.
-    tileCm: [30, 30],
-    tileFrom: "estimated: flakes ~2–5 cm, a Scots pine's upper flakes 1–5 cm",
+    // A Scots pine's upper flakes 1–5 cm (MORPHOLOGY.md): most here 30–80 texels of the 860 (the 2048-pixel picture's
+    // flakes are smaller in it than the first's).
+    tileCm: [45, 45],
+    tileFrom: "estimated: flakes ~1.5–4 cm, a Scots pine's upper flakes 1–5 cm",
     delight: 0.6,
   },
   {
     id: "spruce",
     source: "spruce",
     look: "small thin grey scales with orange-brown flakes",
-    for: ["Spruce", "Sitka spruce", "White spruce"],
+    for: ["Spruce"],
     // Scales 1–3 cm (Norway, white spruce), 3–10 cm (Sitka): about twenty across the tile.
     tileCm: [60, 60],
     tileFrom: "estimated: ~20 scales across, a spruce's 1–3 cm",
@@ -295,7 +316,7 @@ export const BARK = [
     id: "fibrous",
     source: "metasequoia_bark",
     look: "long red-brown fibrous strips peeling to grey",
-    for: ["Western red cedar", "Monterey cypress"],
+    for: ["Western red cedar"],
     delight: 0.6,
   },
   {
@@ -419,6 +440,77 @@ export const BARK = [
     tileFrom: "estimated: ~10 plates across, an old sugar maple's 3–8 cm",
     delight: 0.7,
   },
+  {
+    id: "montereyPine",
+    source: "ai_montereypine_bark",
+    look: "very thick dark grey-brown to near black bark, long rough ridges between deep furrows, reddish in their bottoms (an old Monterey pine's)",
+    for: ["Monterey pine"],
+    // (An old Monterey pine's long rectangular scaly ridges (MORPHOLOGY.md) 5–10 cm wide: some seven across the tile here.)
+    tileCm: [60, 60],
+    tileFrom: "estimated: ~7 ridges across, an old Monterey pine's 5–10 cm",
+    delight: 0.6,
+  },
+  {
+    id: "aleppoPine",
+    source: "ai_aleppo_bark",
+    look: "dark grey-brown to reddish-brown, broad flat irregular plates between deep fissures (an old Aleppo pine's)",
+    for: ["Aleppo pine"],
+    // (An old Aleppo pine's scaly plates (MORPHOLOGY.md) 5–10 cm: some eight across the tile here.)
+    tileCm: [60, 60],
+    tileFrom: "estimated: ~8 plates across, an old Aleppo pine's 5–10 cm",
+    delight: 0.6,
+  },
+  {
+    id: "corsicanPine",
+    source: "ai_corsican_bark",
+    look: "dark grey to near black, long irregular scaly plates between deep fissures, their faces paler grey and pinkish (an old Corsican pine's)",
+    for: ["Corsican pine"],
+    // (An old Corsican pine's large plates (MORPHOLOGY.md) 10–20 cm wide: some five across the tile here.)
+    tileCm: [75, 75],
+    tileFrom: "estimated: ~5 plates across, an old Corsican pine's 10–20 cm",
+    delight: 0.6,
+  },
+  {
+    id: "whitePine",
+    source: "ai_whitepine_bark",
+    look: "dark grey, long narrow flat-topped rectangular ridges between deep furrows, a few purplish-brown patches (an old eastern white pine's)",
+    for: ["Eastern white pine"],
+    // (An old white pine's long ridges (MORPHOLOGY.md) 2–5 cm wide: some fourteen across the tile here.)
+    tileCm: [50, 50],
+    tileFrom: "estimated: ~14 ridges across, an old white pine's 2–5 cm",
+    delight: 0.6,
+  },
+  {
+    id: "sitkaSpruce",
+    source: "ai_sitka_bark",
+    look: "thin grey bark flaking in small round loose scales like coins, reddish-brown beneath (a Sitka spruce's)",
+    for: ["Sitka spruce"],
+    // (A Sitka spruce's scales 3–10 cm (the spruce set's note): some twenty across the tile here, taken at the small end,
+    // as on a stem of the size a course has.)
+    tileCm: [70, 70],
+    tileFrom: "estimated: ~20 scales across, a Sitka spruce's 3–10 cm",
+    delight: 0.6,
+  },
+  {
+    id: "whiteSpruce",
+    source: "ai_whitespruce_bark",
+    look: "thin pale silvery-grey to light brown bark in small flaky scales, a few resin spots (a white spruce's)",
+    for: ["White spruce"],
+    // (A white spruce's scales 1–3 cm (MORPHOLOGY.md): some thirty across the tile here.)
+    tileCm: [50, 50],
+    tileFrom: "estimated: ~30 scales across, a white spruce's 1–3 cm",
+    delight: 0.6,
+  },
+  {
+    id: "cypress",
+    source: "ai_cypress_bark",
+    look: "grey to reddish-brown, long fibrous vertical strips and ridges, a little shaggy, lichen patches (an old Monterey cypress's)",
+    for: ["Monterey cypress"],
+    // (A Monterey cypress's long shallow fibrous ridges (MORPHOLOGY.md) 2–5 cm: some twelve across the tile here.)
+    tileCm: [50, 50],
+    tileFrom: "estimated: ~12 strips across, a Monterey cypress's 2–5 cm",
+    delight: 0.6,
+  },
 ];
 
 /**
@@ -474,7 +566,7 @@ export const LEAVES = [
     id: "fir",
     source: "fir_tree_01",
     look: "fir sprays, flat-needled",
-    for: ["Spruce", "Sitka spruce", "White spruce", "Douglas fir"],
+    for: ["Spruce"],
     base: "down",
     px: 448,
     lengthCm: 25,
@@ -501,7 +593,7 @@ export const LEAVES = [
   { id: "pineClumpLight", source: "ai_pine_clump_light", look: "an open grey-green Aleppo pine clump, its twigs showing", for: ["Aleppo pine"], base: "down", px: 512, lengthCm: 150, deskew: false, whole: true },
   { id: "scotsPineClump", source: "ai_scotspine_clump", look: "a dense blue-green Scots pine clump of short paired needles on a thin orange-brown branch", for: ["Scots pine"], base: "down", px: 512, lengthCm: 150, deskew: false, whole: true },
   { id: "cypressPad", source: "ai_cypress_pad", look: "a flat-topped Monterey cypress shelf of dense scale-leaf cords, flat beneath", for: ["Monterey cypress"], base: "down", px: 220, lengthCm: 90, deskew: false, whole: true },
-  { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine", "Corsican pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
+  { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
   // (Two pictures each, set side by side: the first eight leaves in reading order, along both pictures' top rows.)
   { id: "hawthorn", source: "ai_hawthorn_leaves", look: "small hawthorn leaves deeply cut into three to seven narrow lobes, a wedge-shaped base", for: ["Hawthorn"], base: "down", px: 256, lengthCm: 5, bases: HAWTHORN_BASES },
   { id: "alder", source: "ai_alder_leaves", look: "almost round black alder leaves, flat or notched at the tip, double-toothed, straight parallel veins, dark glossy green", for: ["Black alder"], base: "down", px: 288, lengthCm: 9, bases: ALDER_BASES },
@@ -512,6 +604,12 @@ export const LEAVES = [
   { id: "birch", source: "ai_birch_leaves", look: "silver birch leaves, triangular to diamond-shaped, a long pointed tip, sharply double-toothed, on thin stalks", for: ["Silver birch"], base: "down", px: 288, lengthCm: 8 },
   { id: "willow", source: "ai_willow_leaves", look: "long very narrow weeping willow leaves, finely toothed, two of them showing the pale grey-green underside", for: ["Weeping willow"], base: "down", px: 448, lengthCm: 14 },
   // (Each picture one shoot, its brush of needles at its end: laid one to a tuft, sprays.ts `tuftPicture`.)
+  // (The conifer batch's shoots, each picture one branch tip, one to a sprite: a spruce's and a Douglas fir's whole
+  // sprays, as a cypress's are; a Corsican pine's brush, laid one to a tuft, as a white pine's.)
+  { id: "sitkaShoot", source: "ai_sitka_shoot", look: "a Sitka spruce branch tip: stiff sharp flattened blue-green needles all round the twig, side shoots", for: ["Sitka spruce"], base: "down", px: 512, lengthCm: 28, deskew: false, whole: true },
+  { id: "whiteSpruceShoot", source: "ai_whitespruce_shoot", look: "a white spruce branch tip: short stiff blue-green needles crowded on the twig's upper side", for: ["White spruce"], base: "down", px: 512, lengthCm: 22, deskew: false, whole: true },
+  { id: "douglasShoot", source: "ai_douglas_shoot", look: "a Douglas fir branch tip: soft flat yellow-green needles all round the twig like a bottle brush, a pointed brown bud", for: ["Douglas fir"], base: "down", px: 512, lengthCm: 25, deskew: false, whole: true },
+  { id: "corsicanShoot", source: "ai_corsican_shoot", look: "a Corsican pine shoot: a stout twig ending in a dense brush of long stiff straight dark green needles in pairs", for: ["Corsican pine"], base: "down", px: 512, lengthCm: 32, deskew: false, whole: true },
   { id: "whitePine", source: "ai_whitepine_shoot", look: "eastern white pine shoots: a slender twig ending in a soft feathery brush of fine blue-green needles", for: ["Eastern white pine"], base: "down", px: 448, lengthCm: 30, deskew: false, whole: true },
   // (Each picture one sprig: one to a sprite. Its yellow flowers kept as such: sprays.ts `Layer.flower`.)
   { id: "gorse", source: "ai_gorse_sprig", look: "a spiny gorse sprig, clusters of yellow pea flowers along its upper half", for: ["Gorse"], base: "down", px: 512, lengthCm: 30, deskew: false, whole: true },
