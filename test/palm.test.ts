@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { bakeLight, leafAreaIndex } from "../src/light.ts";
-import { FROND_CLASSES, GOLDEN_ANGLE, PRUNINGS, type Pruning, frondSurface, growPalm } from "../src/palm.ts";
+import { FROND_CLASSES, GOLDEN_ANGLE, PRUNINGS, STEM_BOOTS, type Pruning, frondSurface, growPalm } from "../src/palm.ts";
 import { PALM_ATLAS, PALM_PICTURES } from "../src/palmAtlas.ts";
 import { palmPieces } from "../src/palmGeometry.ts";
 import { growTree } from "../src/grow.ts";
@@ -183,5 +183,40 @@ test("the palms' pictures are in assets/, AI-generated and credited as such with
   // (The owner's 2048-pixel generations of the first fan, the queen palm's frond and the dead skirt, 2026-11-25.)
   for (const file of ["real-fan-leaf-3", "real-dead-fronds-3", "real-queen-frond-3"]) {
     assert.match(sources, new RegExp(`\`${file}\\.png\`[^\\n]*Nano Banana[^\\n]*2026-11-25\\. Prompt: ".{80,}"`), `${file}: tool, date and prompt in SOURCES.md`);
+  }
+});
+
+test("a fan palm's leaves leave its stem down the top 2 m of it (SMM), round its collar of boots, wider than its stem", () => {
+  const sp = ALL_SPECIES.find((s) => s.name === "Mexican fan palm")!;
+  for (const seed of [1, 2, 3]) {
+    const p = growPalm(sp, sizeOf(sp), seed).palm!;
+    const feet = p.fronds.filter((f) => f.cls !== "dead").map((f) => f.points[0][1]);
+    const span = Math.max(...feet) - Math.min(...feet);
+    assert.ok(span >= 1.2 && span <= 2.4, `seed ${seed}: its leaves' feet span ${span.toFixed(2)} m of its stem`);
+    // (Its collar: the crown shaft, its boots, half again as wide as its stem below them at the least.)
+    const st = p.stem;
+    const below = st.radius[st.y.findIndex((y) => y >= p.boots!.y0) - 1];
+    const collar = Math.max(...st.radius.filter((_, i) => st.surface[i] === STEM_BOOTS));
+    assert.ok(collar >= 1.5 * below, `seed ${seed}: its collar ${collar.toFixed(2)} m round on a stem ${below.toFixed(2)} m`);
+  }
+});
+
+test("a skinned fan palm's head too shallow for its leaves to hang keeps them long and loses its lowest; a deep one keeps all", () => {
+  const sp = ALL_SPECIES.find((s) => s.name === "Mexican fan palm")!;
+  // (Its own head, 6 m deep and 3 m round: every green leaf it carries.)
+  const deep = growPalm(sp, sizeOf(sp), 1).palm!;
+  assert.equal(deep.fronds.filter((f) => f.cls !== "dead").length, sp.whorl);
+  // (A survey's head 3 m deep on an 18 m palm, and 2.5 m on a 12 m one: its leaves out to most of its radius,
+  // a few of the lowest cut, rather than every one shortened to hang inside it.)
+  for (const size of [
+    { height: 18, crownRadius: 3, crownBase: 15, trunkRadius: 0.26 },
+    { height: 12, crownRadius: 3, crownBase: 9.5, trunkRadius: 0.2 },
+  ]) {
+    const p = growPalm(sp, size, 1).palm!;
+    let reach = 0;
+    for (const f of p.fronds) for (const q of frondSurface(f)) reach = Math.max(reach, Math.hypot(q[0], q[2]));
+    const green = p.fronds.filter((f) => f.cls !== "dead").length;
+    assert.ok(reach >= 0.65 * size.crownRadius, `${size.height}/${size.crownBase}: it reaches ${reach.toFixed(2)} of ${size.crownRadius}`);
+    assert.ok(green < sp.whorl && green >= 0.6 * sp.whorl, `${size.height}/${size.crownBase}: ${green} of ${sp.whorl} green leaves`);
   }
 });

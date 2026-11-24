@@ -532,10 +532,10 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   // (A skinned fan palm's crew may cut its green leaves that hang well below the level too, to "nine and three"
   // (ANSI A300: none with its tip above the level). So a head too shallow for its leaves to hang (a survey's
   // crown base high under its top: less deep than PALM_HANG_DEEP of its radius) may keep its leaves their
-  // length, out to its crown's radius, and lose its lowest instead, as the fit finds best: the shallower,
-  // the more. A head deep enough keeps them all.)
+  // length, out to its crown's radius, and lose its lowest instead (down to "ten and two" at the most), as
+  // the fit finds best. A head deep enough keeps them all.)
   const shallow = (H - base) / R;
-  const cuts = leaf !== "fan" || pruning !== "skinned" || shallow >= PALM_HANG_DEEP ? [-90] : shallow >= 1 ? [-90, -30] : [-90, -30, -12];
+  const cuts = leaf !== "fan" || pruning !== "skinned" || shallow >= PALM_HANG_DEEP ? [-90] : [-90, -30, -12, 5];
   for (const cut of cuts) {
     const green = cut <= -90 ? kept : kept.filter((p) => p.cls === "spear" || p.rise > cut * DEG);
     if (green.length < 0.5 * kept.length) continue;
