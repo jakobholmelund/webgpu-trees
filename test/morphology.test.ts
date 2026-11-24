@@ -361,7 +361,7 @@ const TALLO: Record<string, Record<string, number>> = {
   Spruce: { "18-25": 0.1 },
   "Scots pine": { "18-25": 0.1, "10-18": 0.15 },
   Beech: { "18-25": 0.15 },
-  "Silver birch": { "10-18": 0.12 },
+  "Silver birch": { "10-18": 0.12, "18-25": 0.12 },
   "Black alder": { "10-18": 0.11 },
   Hawthorn: { "3-10": 0.25 },
   "Corsican pine": { "10-18": 0.2, "18-25": 0.16 },
@@ -451,12 +451,44 @@ function overhung(t: GrownTree): number {
   return n / Math.max(1, c.count);
 }
 
+/**
+ * How thick a tree's pads are: for each branch off a great limb (or off a stem) bearing three clumps or more, how
+ * far its clumps' centres span in height, in their radii; the median of them. A pad is a shelf, thin.
+ */
+function padThickness(t: GrownTree): number {
+  const k = t.skeleton;
+  const c = t.clumps;
+  const padOf = (n: number) => {
+    let last = -1;
+    for (let p = n; p >= 0 && k.order[p] >= 2; p = k.parent[p]) last = p;
+    return last;
+  };
+  const pads = new Map<number, number[]>();
+  for (let i = 0; i < c.count; i++) {
+    const p = padOf(c.node[i]);
+    if (p >= 0) pads.set(p, [...(pads.get(p) ?? []), i]);
+  }
+  const spans: number[] = [];
+  for (const list of pads.values()) {
+    if (list.length < 3) continue;
+    const ys = list.map((i) => c.y[i]);
+    spans.push((Math.max(...ys) - Math.min(...ys)) / (list.reduce((s, i) => s + c.radius[i], 0) / list.length));
+  }
+  return median(spans);
+}
+
 test("Monterey cypress: its foliage in flat pads with air under them ([obs.], against the same tree grown without pads)", () => {
   const sp = species("Monterey cypress");
   const flat = { ...sp, pads: 0, canopyLift: 0 };
+  const evenTrees = SEEDS.map((s) => growTree(flat, ownSize(sp), s));
   const padded = median(trees(sp).map(overhung));
-  const even = median(SEEDS.map((s) => overhung(growTree(flat, ownSize(sp), s))));
-  console.log(`pads Monterey cypress: ${(padded * 100).toFixed(0)}% of clumps overhung, ${(even * 100).toFixed(0)}% without pads`);
+  const even = median(evenTrees.map(overhung));
+  const thin = median(trees(sp).map(padThickness));
+  const thick = median(evenTrees.map(padThickness));
+  console.log(`pads Monterey cypress: ${(padded * 100).toFixed(0)}% of clumps overhung, ${(even * 100).toFixed(0)}% without pads; its pads ${thin.toFixed(1)} clumps' radii thick, ${thick.toFixed(1)} without`);
+  // Each pad a shelf: its leaves gathered near its branch's top, well under as thick as that branch's leaves without pads ...
+  assert.ok(thin <= 0.6 * thick, `pads ${thin.toFixed(1)} radii thick, ${thick.toFixed(1)} without`);
+  // ... with air under it: fewer clumps with another just over them.
   assert.ok(padded <= 0.7 * even, `${(padded * 100).toFixed(0)}% overhung, ${(even * 100).toFixed(0)}% without pads`);
 });
 

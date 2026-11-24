@@ -88,13 +88,24 @@ test("a weeping crown's sprays hang less over its top (`hangTop`), and as they d
 
 test("a padded crown's sprays lie level in thin shelves (`habit.pads`)", () => {
   const sp = species("Monterey cypress");
-  const tree = growTree(sp, own(sp), 1);
-  assert.ok((tree.habit?.pads ?? 0) > 0.5);
-  const flat = cards(tree, fixed());
-  const round = cards({ ...tree, habit: undefined }, fixed());
-  const steep = (cs: typeof flat) => mean(cs.filter((c) => !c.big).map((c) => Math.abs(c.twig[1])));
-  console.log(`pad cards: twigs ${steep(flat).toFixed(2)} up or down, ${steep(round).toFixed(2)} without pads`);
-  assert.ok(steep(flat) < 0.6 * steep(round), `${steep(flat).toFixed(2)} against ${steep(round).toFixed(2)}`);
+  // (At its own size, a headland tree's low wide crown, and at a sheltered one's, deeper than it is wide, as a
+  // survey may hand over for a tree inland.)
+  for (const [label, size] of [
+    ["its own size", own(sp)],
+    ["sheltered", { height: 18, crownRadius: 6, crownBase: 3, trunkRadius: 0.6 }],
+  ] as const) {
+    const tree = growTree(sp, size, 1);
+    assert.ok((tree.habit?.pads ?? 0) > 0.5);
+    const flat = cards(tree, fixed());
+    const round = cards({ ...tree, habit: undefined }, fixed());
+    const steep = (cs: typeof flat) => mean(cs.filter((c) => !c.big).map((c) => Math.abs(c.twig[1])));
+    console.log(`pad cards, ${label}: twigs ${steep(flat).toFixed(2)} up or down, ${steep(round).toFixed(2)} without pads`);
+    // (A third flatter and more. A low wide crown's clumps face the sky over most of it, so its twigs lie
+    // flatter without pads than a tall crown's (0.40 of upright, the 18 m tree's it was 0.43), and its pads have less
+    // to level: held to 0.65 of that there, to 0.6 in a deep crown.)
+    const most = label === "sheltered" ? 0.6 : 0.65;
+    assert.ok(steep(flat) < most * steep(round), `${label}: ${steep(flat).toFixed(2)} against ${steep(round).toFixed(2)}`);
+  }
 });
 
 test("a spruce's boughs hang their curtains: its sheets' edges fall further than a fir's, more low down, its tops still up", () => {

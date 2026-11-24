@@ -174,7 +174,11 @@ const FORMS: Readonly<Record<PalmLeaf, LeafForm>> = {
   // (A blade 0.6–1.35 m across on a leaf 2–2.5 m long, its stalk about half of it (W. robusta; W. filifera's
   // twice as long, its blade 1–1.8 m): MORPHOLOGY.md 23 and 31. The old green leaves hang 30–60 degrees below
   // the level before they die.)
-  fan: { reach: 1.0, width: 0.31, bare: 0.55, fold: 9 * DEG, arch: 18 * DEG, rise: [84, 62, 22, -48], knob: 0.12 },
+  // (The owner's reference pictures of a course's W. robusta have its head a sunburst of fans held out, not up:
+  // its young leaves at 50 degrees over the level, its mature at 15, within the 20–60 degrees from upright of
+  // MORPHOLOGY.md 23 for the green crown, at its wide end; their feet down the top 2 m of its stem (SMM), round
+  // its collar of boots, not all from its tip.)
+  fan: { reach: 1.0, width: 0.31, bare: 0.55, fold: 9 * DEG, arch: 18 * DEG, rise: [84, 50, 15, -48], knob: 0.6 },
 };
 
 /** A species' palm leaf (feather unless it says fan). */
@@ -239,6 +243,13 @@ interface FrondPlan {
   /** A fan's blade turned about its own line (radians). */
   roll: number;
 }
+
+/**
+ * A skinned fan palm's head less deep than this many of its radii may have its hanging green leaves cut
+ * (`growPalm`'s fit), at this cost to the fit for each share of them cut.
+ */
+const PALM_HANG_DEEP = 1.4;
+const PALM_CUT_COST = 0.6;
 
 /** Points along a frond's rachis: POINTS pieces, the last ones shorter (a frond bends most towards its tip). */
 const POINTS = 14;
@@ -518,15 +529,27 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   };
   let best = { score: Infinity, L: 0, plans: kept };
   const depthBox = Math.max(0.01, H - base);
-  for (const k of leaf === "fan" ? [0.5, 0.75, 1, 1.3, 1.75] : pruning === "pineapple" ? [0.5, 0.7, 0.85, 1, 1.15, 1.3] : [0.45, 0.65, 0.85, 1, 1.2, 1.45, 1.8]) {
-    const plans = kept.map((p) => drooped(p, k));
-    const L = longest(plans);
-    const e = extent(plans, L);
-    const heartY = H - e.top;
-    const fillR = e.reach / R;
-    const fillD = (H - (heartY + e.low)) / depthBox;
-    const score = 2 * (1 - fillR) + (1 - fillD) + 0.3 * Math.abs(Math.log(k));
-    if (score < best.score) best = { score, L, plans };
+  // (A skinned fan palm's crew may cut its green leaves that hang well below the level too, to "nine and three"
+  // (ANSI A300: none with its tip above the level). So a head too shallow for its leaves to hang (a survey's
+  // crown base high under its top: less deep than PALM_HANG_DEEP of its radius) may keep its leaves their
+  // length, out to its crown's radius, and lose its lowest instead, as the fit finds best: the shallower,
+  // the more. A head deep enough keeps them all.)
+  const shallow = (H - base) / R;
+  const cuts = leaf !== "fan" || pruning !== "skinned" || shallow >= PALM_HANG_DEEP ? [-90] : shallow >= 1 ? [-90, -30] : [-90, -30, -12];
+  for (const cut of cuts) {
+    const green = cut <= -90 ? kept : kept.filter((p) => p.cls === "spear" || p.rise > cut * DEG);
+    if (green.length < 0.5 * kept.length) continue;
+    const lost = 1 - green.length / kept.length;
+    for (const k of leaf === "fan" ? [0.5, 0.75, 1, 1.3, 1.75] : pruning === "pineapple" ? [0.5, 0.7, 0.85, 1, 1.15, 1.3] : [0.45, 0.65, 0.85, 1, 1.2, 1.45, 1.8]) {
+      const plans = green.map((p) => drooped(p, k));
+      const L = longest(plans);
+      const e = extent(plans, L);
+      const heartY = H - e.top;
+      const fillR = e.reach / R;
+      const fillD = (H - (heartY + e.low)) / depthBox;
+      const score = 2 * (1 - fillR) + (1 - fillD) + 0.3 * Math.abs(Math.log(k)) + PALM_CUT_COST * lost;
+      if (score < best.score) best = { score, L, plans };
+    }
   }
   // (Laid on the stem as it is, and held in if the stem's own bow and girth carry it past its crown's radius.)
   let L = best.L;
@@ -592,16 +615,18 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
     const [cx, cz] = stemAt(Math.min(y, heartY), heartY);
     let r = stemR(Math.min(y, heartY), heartY);
     let surface = STEM_BARK;
-    // (The crown shaft: the leaves' bases wrapping the stem's top, swelling a little, rounding over at the heart.)
+    // (The crown shaft: the leaves' bases wrapping the stem's top, swelling, rounding over at the heart; a fan
+    // palm's, unless its bases are trimmed to a ball, its broad collar of split boots, near twice the stem across.)
     if (y > shaft) {
       const u = (y - shaft) / Math.max(1e-3, top - shaft);
-      r *= (1 + (leaf === "fan" ? 0.22 : 0.35) * Math.sin(Math.PI * Math.min(1, u * 0.85 + 0.15))) * Math.sqrt(Math.max(0.04, 1 - Math.pow(Math.max(0, u - 0.55) / 0.45, 2)));
+      r *= (1 + (leaf === "fan" ? (pruning === "pineapple" ? 0.22 : 0.75) : 0.35) * Math.sin(Math.PI * Math.min(1, u * 0.85 + 0.15))) * Math.sqrt(Math.max(0.04, 1 - Math.pow(Math.max(0, u - 0.55) / 0.45, 2)));
       surface = STEM_BOOTS;
     }
     if (boots && y >= boots.y0 && y <= boots.y1) {
       surface = STEM_BOOTS;
-      // (Boots stand out from the stem.)
-      if (y <= shaft) r *= 1.12;
+      // (Boots stand out from the stem, the more the nearer the crown: a fan palm's collar of split leaf bases
+      // under its green, as wide again as its stem at the top.)
+      if (y <= shaft) r *= 1.12 + (leaf === "fan" ? 0.55 * Math.pow(Math.max(0, (y - boots.y0) / Math.max(1e-3, shaft - boots.y0)), 1.5) : 0);
     }
     if (ball && y >= ball.y0 - 1e-6 && y <= ball.y1 + 1e-6) {
       const u = (y - ball.y0) / (ball.y1 - ball.y0);

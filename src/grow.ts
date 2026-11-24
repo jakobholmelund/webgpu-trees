@@ -175,6 +175,10 @@ const STEM_JOIN_FALL = 0.5;
 const STEM_EASE_LEAST = 0.45;
 /** A trunk is not forked this close under breast height or over it (m): measured, it is one trunk or its stems. */
 const FORK_CLEAR_BH = 0.3;
+/** How a leaning trunk eases upright (`lean`): its slope falls as (1 - its height over the height it is upright by) to this power. */
+const LEAN_EASE = 1.5;
+/** ... and goes aside by then no further than this share of its crown's radius. */
+const LEAN_OUT = 0.3;
 /** How far a forked stem sways, at crooked 1, as a share of its height to the fork: a sinuous or leaning stem. */
 const STEM_SWAY = 0.2;
 /** How much wider than the species' angle the lowest scaffold leaves (and narrower the highest). */
@@ -184,6 +188,8 @@ const SCAFFOLD_CURVE = 35 * DEG;
 const SCAFFOLD_ARCH = 20 * DEG;
 /** A crown narrower than this for its depth (radius over depth) is a column: its limbs rise steeply and arch little. */
 const NARROW = 0.35;
+/** A crown at least this wide for its depth (radius over depth) is lifted as its species says (`canopyLift`); narrower, less. */
+const LIFT_WIDE = 0.8;
 /** Wood further than this share of the crown's depth below its base, or further out than this share of its radius, has strayed and is shed (`shedStrays`). */
 const STRAY_BELOW = 0.12;
 /** A crown narrower than this (radius, m) is lit through: leaves to its middle. */
@@ -209,6 +215,8 @@ const LEAF_REACH_DEPTH = 5;
 /** A pad's leaves are those within this many clump radii of its top, at pads 1, and this many more at pads 0. */
 const PAD_THIN = 0.9;
 const PAD_THICK = 7;
+/** The most a crown lit through (small or narrow) is in pads, whatever its species' `pads`. */
+const PAD_LIT = 0.9;
 /**
  * Bunches (`clusters` 1): a branch's leaves only this share of its foliage depth's reach from its twigs' ends;
  * this share of branches bare; each bunch's clump this much bigger, and hanging this many of its radii under
@@ -903,6 +911,28 @@ function cone(axis: V3, angle: number, azimuth: number): V3 {
 // Broadleaves and shrubs: growing by buds, in the light.
 
 /**
+ * A leaning trunk (`lean`): as far as its species says at its foot, its own way round (from `rng`, drawn only
+ * when it leans), easing back upright by `to` metres up (its fork, or where its limbs leave it), a curve; so
+ * its crown stands near over its foot: no further aside by then than LEAN_OUT of its crown's radius `R` (a tall
+ * bole under a narrow crown leans less). Its slope (x, z per metre up) at a height, and how far it has gone
+ * aside by then. Not in a stand (`inStand`), where its neighbours draw it up.
+ */
+function leanOf(sp: TreeSpecies, inStand: boolean, rng: Random, to: number, R: number): { slope: (y: number) => [number, number]; at: (y: number) => [number, number] } {
+  const h = Math.max(0.01, to);
+  const t = (sp.lean ?? 0) > 0 && !inStand ? Math.min(Math.tan(Math.min(35, sp.lean ?? 0) * DEG), (LEAN_OUT * R * (LEAN_EASE + 1)) / h) : 0;
+  if (t === 0) return { slope: () => [0, 0], at: () => [0, 0] };
+  const a = rng.range(0, 2 * Math.PI);
+  const ease = (y: number) => Math.max(0, 1 - y / h);
+  return {
+    slope: (y) => [t * ease(y) ** LEAN_EASE * Math.cos(a), t * ease(y) ** LEAN_EASE * Math.sin(a)],
+    at: (y) => {
+      const d = (t * h * (1 - ease(Math.min(y, h)) ** (LEAN_EASE + 1))) / (LEAN_EASE + 1);
+      return [d * Math.cos(a), d * Math.sin(a)];
+    },
+  };
+}
+
+/**
  * How many great limbs (scaffolds) a broadleaf's trunk carries into its crown: its row's `scaffolds`, or 4
  * and one more for every third of its leader. A shrub's (or a stool's) stems are its scaffolds: it has none
  * besides.
@@ -1391,9 +1421,13 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const yLow = yF >= breastHeight(size) ? yF : yF - apart * (n - 2);
       let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
       lBud[at] = 0;
+      // (A leaning tree's trunk, `lean`, leans under its fork, easing upright to it.)
+      const leaning = leanOf(sp, liveAt !== null, rng, yLow, R);
       const steps = Math.max(1, Math.ceil(yLow / TRUNK_STEP));
       for (let k = 1; k <= steps; k++) {
-        at = add(0, (yLow * k) / steps, 0, at, true, 0, [0, 1, 0]);
+        const y = (yLow * k) / steps;
+        const o = leaning.at(y);
+        at = add(o[0], y, o[1], at, true, 0, norm([o[0] - px[at], y - py[at], o[1] - pz[at]]));
         lBud[at] = 0;
       }
       const below: number[] = [];
@@ -1525,11 +1559,14 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     lBud[at] = 0;
     let wx = 0;
     let wz = 0;
+    // (A leaning stem, `lean`, easing upright by where its limbs leave it.)
+    const leaning = leanOf(sp, liveAt !== null, rng, Math.max(L, yLo), R);
     for (const lv of levels) {
       const j = rng.onSphere();
       wx = 0.6 * wx + 0.08 * sp.crooked * j[0];
       wz = 0.6 * wz + 0.08 * sp.crooked * j[2];
-      const d = norm([wx, 1, wz]);
+      const sl = leaning.slope(0.5 * (py[at] + lv.y));
+      const d = norm([wx + sl[0], 1, wz + sl[1]]);
       const len = (lv.y - py[at]) / d[1];
       at = add(px[at] + d[0] * len, lv.y, pz[at] + d[2] * len, at, true, 0, d);
       if (lv.scaffold >= 0) {
@@ -1809,7 +1846,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   // wood under it. A pad is a branch's shoots, by the branch that leaves the limb.)
   const padTop = new Map<number, number>();
   const padOf = new Int32Array(count).fill(-1);
-  const padding = sp.pads ?? 0;
+  // (Less in a crown lit through, a small or narrow one, `PAD_LIT` at most: a tree grown in shelter or in a wood
+  // is not shaped into such thin shelves, and kept to their tops so small a crown is a few balls.)
+  const padding = lit ? Math.min(PAD_LIT, sp.pads ?? 0) : (sp.pads ?? 0);
   // (Bunches only where the crown has room for them: a small or narrow crown, a tree grown in a wood, is many
   // sprays all through it, as below.)
   const clustering = Math.min(1, Math.max(0, sp.clusters ?? 0)) * (R / depth < NARROW || R < SMALL_CROWN ? CLUSTER_NARROW : 1);
@@ -2744,10 +2783,14 @@ function clotheTop(size: TreeSize, w: Wood, h: Hung, keep: number[]): number[] {
  * The crown's underside cleared (`canopyLift`), so its limbs show beneath it: no leaves under a bowl from
  * the lowest leaves at the crown's rim up to that share of the way to its heart at its middle. Reckoned on
  * the leaves as grown and bowed, from the lowest of them (the fit then sets those at the crown's base), and
- * marked by moving them out of the crown, below it, where thinning drops them.
+ * marked by moving them out of the crown, below it, where thinning drops them. Only an open-grown crown is
+ * lifted so: one narrower than it is deep (a tree grown in a wood or in shelter, as a survey may hand over)
+ * keeps its leaves down its middle, the lift fading from a crown as wide as LIFT_WIDE of its depth to none
+ * at a column's (NARROW); cleared, a narrow crown's bowl is most of it.
  */
 function liftCanopy(sp: TreeSpecies, size: TreeSize, h: Hung): void {
-  const L = sp.canopyLift ?? 0;
+  const wide = size.crownRadius / Math.max(0.01, size.height - size.crownBase);
+  const L = (sp.canopyLift ?? 0) * Math.min(1, Math.max(0, (wide - NARROW) / (LIFT_WIDE - NARROW)));
   if (L <= 0 || h.node.length === 0) return;
   let low = Infinity;
   let top = -Infinity;

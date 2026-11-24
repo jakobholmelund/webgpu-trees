@@ -365,9 +365,9 @@ bare limb stands over its dome of leaves in any variant a course grows
 as their clump is hung (`FixedCards.lift`), not from the wood under it.
 
 What the grower cannot do yet, so those rows come as close as their data
-allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
-most 3 degrees), several trunks from one foot (a sycamore's, a coast live
-oak's).
+allows: a lean that carries its crown with it (Torrey, Aleppo; a host leans a
+tree at most 3 degrees; `lean` bends the trunk and stands the crown over its
+foot).
 
 ## Palms
 
@@ -400,7 +400,9 @@ deep narrow one lets them hang.
   hanging under the green (a fan palm's skirt as far down its stem as `skirt`
   says); `skirt`, cut back to a short skirt; `skinned`, the dead and drooping
   leaves cut and its stem cleaned, a collar of boots (old leaf bases) left
-  under a fan palm's crown; `pineapple`, cut back to the leaves above the level,
+  under a fan palm's crown, its leaves' feet down its top 2 m round it (a head
+  too shallow for its leaves to hang, less deep than 1.4 of its radius, may
+  lose its lowest green ones instead of having them all shortened); `pineapple`, cut back to the leaves above the level,
   its leaf bases trimmed into a ball under the crown. Left out, as courses keep
   them: a Canary palm pineapple cut, the others skinned. Trees kept otherwise
   than their species are their own variants.
@@ -494,7 +496,9 @@ grows as it did):
   down, so a Norway spruce is a closed dark cone and not tiers of lace.
 - **`canopyLift`**: how much of the crown's underside is cleared of leaves,
   a bowl from its rim up into its middle, so its limbs show beneath it: a
-  stone pine's umbrella on its bare vase of limbs.
+  stone pine's umbrella on its bare vase of limbs, a headland cypress's. Only an
+  open-grown crown: fitted narrower than 0.8 of its depth it is lifted less,
+  and not at all as a column (radius under 0.35 of its depth).
 - **`fork`**, **`forkStems`**, **`forkSplits`**: where a broadleaf's stem divides
   below its crown (a share of the crown's base), into how many stems (2 to 4),
   and how many times each divides again in V-forks before its arms are limbs: a
@@ -514,7 +518,13 @@ grows as it did):
 - **`pads`**: how far its leaves gather into flat-topped pads, each branch
   off a great limb keeping only the leaves near its top, with air and bare
   wood under each: a Monterey cypress on a headland, an old Scots pine's
-  plates, a Torrey pine's tufts on bare limbs.
+  plates, a Torrey pine's tufts on bare limbs. A small or narrow crown, lit
+  through, is in pads 0.9 at most.
+- **`lean`**: how far a tree of one stem leans at its foot (degrees), its
+  trunk easing back upright by its crown (or its fork) so its crown stands
+  near over its foot, each tree its own way: a California sycamore's. A tall
+  bole under a narrow crown leans less (no further aside than 0.3 of its
+  crown's radius), and none in a stand.
 - **`clusters`**: how far its leaves gather into a few bunches hanging at its
   branches' ends, with sky between them: each branch off a great limb keeps
   its leaves only on its last shoots, the bunch bigger and hanging a little
