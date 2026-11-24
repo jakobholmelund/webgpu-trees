@@ -98,3 +98,23 @@ export function readPreset(value: unknown): Preset | string {
     variants: { ...DEFAULT_VARIANT_OPTIONS, ...variants },
   };
 }
+
+/**
+ * A kept preset's species brought up to the package's: a species it knows by name takes every field added
+ * since it was kept (a palm's leaf and pruning, a limb's curve) that it leaves out, and the package's
+ * species it has not heard of are added after its own. Everything it does set stays as it was set.
+ * Without this a preset kept before a field existed grows its trees without it: a fan palm with no fan.
+ */
+export function upToDate(kept: TreeSpecies[], starters: readonly TreeSpecies[]): TreeSpecies[] {
+  const byName = new Map(starters.map((s) => [s.name, s]));
+  const out = kept.map((s) => {
+    const starter = byName.get(s.name);
+    if (!starter) return cloneSpecies(s);
+    const filled = cloneSpecies(s) as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(cloneSpecies(starter))) if (!(key in filled)) filled[key] = value;
+    return filled as unknown as TreeSpecies;
+  });
+  const names = new Set(kept.map((s) => s.name));
+  for (const s of starters) if (!names.has(s.name)) out.push(cloneSpecies(s));
+  return out;
+}

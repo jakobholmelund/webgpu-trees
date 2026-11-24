@@ -46,7 +46,7 @@ import {
 import { course, grove, oneTree, specimenRow, specimens, woodland } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
 import { SKY as SKY_HEX, makeGround, makeSky, sunAt, tintsFor } from "./stage";
-import { ARCHITECTURES, type Preset, SHAPES, readPreset } from "./presets";
+import { ARCHITECTURES, type Preset, SHAPES, readPreset, upToDate } from "./presets";
 
 // (v3: the styles: four looks, and the style has lobe, bulge, warm, cool, chroma, rim and sprigs.)
 const STORE_KEY = "tree-lab-preset-v3";
@@ -116,7 +116,8 @@ async function start() {
     try {
       const kept = localStorage.getItem(STORE_KEY);
       const p = kept ? readPreset(JSON.parse(kept)) : null;
-      if (p && typeof p !== "string") applyPreset(p);
+      // (Kept before some species or fields were added: those come from the package's own.)
+      if (p && typeof p !== "string") applyPreset({ ...p, species: upToDate(p.species, ALL_SPECIES) });
     } catch {
       // Nothing kept, or not readable: the starter species stand.
     }
