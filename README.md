@@ -225,8 +225,7 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    model alone, reckoned in a small crown's short internodes, swelled a
    long clean bole to many times its top's thickness: a thread under the
    crown.) A species that keeps them (`boleStubs`: birch, oak, alder) has
-   dead stubs and the odd small twig along a long bole, more just under
-   the crown; leafless.
+   dead stubs along a long bole, more just under the crown.
 
 `test/structure.test.ts` holds the wood to what measured trees are: every
 species' forks to Leonardo's rule, a broadleaf's great limbs straight

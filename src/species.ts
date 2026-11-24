@@ -121,9 +121,9 @@ export interface TreeSpecies {
    */
   shed?: number;
   /**
-   * How many dead branch stubs and small twigs a long clean bole keeps, 0..1: the lower branches a tree
-   * grown in a wood has lost, broken off short, and the odd shoot from a dormant bud on its stem (a
-   * birch's, an oak's, an alder's). A pine or a beech prunes itself clean: 0 or left out, none.
+   * How many dead branch stubs a long clean bole keeps, 0..1: the lower branches a tree grown in a wood
+   * has lost, broken off short (a birch's, an oak's, an alder's). A pine or a beech prunes itself clean:
+   * 0 or left out, none.
    */
   boleStubs?: number;
 

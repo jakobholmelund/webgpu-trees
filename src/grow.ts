@@ -42,7 +42,7 @@
 // of the branches it has shed, and of the twigs it once bore. A bole under a
 // high crown has its own taper (its growth over years, not its crown's
 // twigs), and the crown's wood meets it; a species that keeps them has dead
-// stubs and the odd twig along a long clean bole.
+// stubs along a long clean bole.
 //
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
@@ -288,10 +288,8 @@ const STUB_FROM = 1;
 const STUB_TOP = 0.96;
 /** A stub's least radius, as a share of the trunk's at its foot: thin enough to be a stub, thick enough to be drawn close to. */
 const STUB_THINNEST = 0.08;
-/** The share of stubs that a living twig goes on from. */
-const STUB_TWIG = 0.3;
 /** The longest a stub is (m): what is left of a dead branch once the wind has had the rest. */
-const STUB_LONGEST = 0.6;
+const STUB_LONGEST = 0.45;
 
 /** Where a trunk's radius is measured (m): breast height. */
 export const BREAST_HEIGHT = 1.3;
@@ -2008,10 +2006,11 @@ function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
 }
 
 /**
- * Dead stubs and small twigs on a long clean bole, as many as the species keeps (`boleStubs`): the lower
- * branches a tree grown in a wood once had, died back in the shade above and broken off short, and the odd
- * shoot from a dormant bud. More of them high on the bole, under the crown, where they died last; the
- * low ones have long since rotted off and healed over. Wood only: no leaves below the crown's base.
+ * Dead stubs on a long clean bole, as many as the species keeps (`boleStubs`): the lower branches a tree
+ * grown in a wood once had, died back in the shade above and broken off short. More of them high on the
+ * bole, under the crown, where they died last; the low ones have long since rotted off and healed over.
+ * Wood only: no leaves below the crown's base. (No living shoots from dormant buds: a leafless one reads
+ * as a bare twig.)
  */
 function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
   const amount = Math.min(1, Math.max(0, sp.boleStubs ?? 0));
@@ -2043,7 +2042,6 @@ function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
   const z: number[] = [];
   const radius: number[] = [];
   const parent: number[] = [];
-  let n = sk.count;
   for (let k = 0; k < count; k++) {
     // (Squared towards the top: most stubs are just under the crown.)
     const want = from + length * Math.sqrt(rng.next());
@@ -2051,8 +2049,10 @@ function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
     for (const b of bole) if (Math.abs(sk.y[b] - want) < Math.abs(sk.y[at] - want)) at = b;
     if (sk.y[at] < from - 0.3) continue;
     const rb = sk.radius[at];
-    const r0 = Math.min(0.6 * rb, Math.max(STUB_THINNEST * foot, rb * rng.range(0.2, 0.38)));
-    const len = Math.min(STUB_LONGEST, rb * rng.range(3, 8)) * (0.6 + 0.4 * ((sk.y[at] - from) / Math.max(0.01, length)));
+    // (A dead branch's stub is a thin one's: the thick lower limbs of a tree grown in a wood were few, and
+    // what they leave is a scar, not a peg.)
+    const r0 = Math.min(0.3 * rb, Math.max(STUB_THINNEST * foot, rb * rng.range(0.1, 0.2)));
+    const len = Math.min(STUB_LONGEST, r0 * rng.range(5, 12)) * (0.6 + 0.4 * ((sk.y[at] - from) / Math.max(0.01, length)));
     // Off at the species' angle and a little lower: a dead branch has stopped turning to the light.
     const angle = Math.min(100 * DEG, (sp.branchAngle + rng.range(5, 35)) * DEG);
     const d = cone([0, 1, 0], angle, rng.range(0, 2 * Math.PI));
@@ -2064,18 +2064,14 @@ function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
     z.push(az);
     radius.push(r0);
     parent.push(at);
-    const stub = n++;
-    // Now and then a living twig goes on from it, thinner, turning up.
-    if (rng.chance(STUB_TWIG)) {
-      const t = norm([d[0], d[1] + 0.9, d[2]]);
-      const tl = len * rng.range(0.5, 1);
-      x.push(ax + t[0] * tl);
-      y.push(ay + t[1] * tl);
-      z.push(az + t[2] * tl);
-      radius.push(0.6 * r0);
-      parent.push(stub);
-      n++;
-    }
+    // (Broken off, not sawn: its end narrows over a little more, ragged, so its tube does not end in an open
+    // ring.)
+    const tip = r0 * rng.range(1, 2);
+    x.push(ax + d[0] * tip);
+    y.push(ay + d[1] * tip);
+    z.push(az + d[2] * tip);
+    radius.push(r0 * 0.35);
+    parent.push(-1 - (x.length - 2));
   }
   const m = x.length;
   if (m === 0) return tree;
@@ -2097,7 +2093,8 @@ function boleStubs(sp: TreeSpecies, tree: GrownTree, rng: Random): GrownTree {
   };
   for (let k = 0; k < m; k++) {
     const i = sk.count + k;
-    const p = parent[k];
+    // (A negative parent is one of these new nodes: the stub a tip ends.)
+    const p = parent[k] < 0 ? sk.count + (-1 - parent[k]) : parent[k];
     out.x[i] = x[k];
     out.y[i] = y[k];
     out.z[i] = z[k];

@@ -139,7 +139,8 @@ for (const sp of ALL_SPECIES) {
         const mine = new Int32Array(t.skeleton.count).fill(-1);
         twigs.forEach((list, c) => list.forEach((i) => (mine[i] = c)));
         // Each end bears a clump, or is inside one (and so bears its leaves) ...
-        const bare = ends(t).filter((i) => mine[i] < 0);
+        // (Dead stubs on a clean bole, below the crown, bear no leaves: `boleStubs`.)
+        const bare = ends(t).filter((i) => mine[i] < 0 && t.skeleton.y[i] >= t.size.crownBase);
         assert.equal(bare.length, 0, `${bare.length} twigs end with no clump on them or round them (more than ${IN_CLUMP} of a clump's radius from its centre)`);
         // ... and a card's foot is at it, and a painted dab over it.
         const k = t.skeleton;
@@ -156,6 +157,7 @@ for (const sp of ALL_SPECIES) {
         const dp = D.attributes.position.array;
         const dd = D.attributes.aDab.array;
         for (const i of ends(t)) {
+          if (mine[i] < 0) continue;
           const r = cl.radius[mine[i]];
           let foot = Infinity;
           for (let f = 0; f < feet.length; f += 3) foot = Math.min(foot, Math.hypot(feet[f] - k.x[i], feet[f + 1] - k.y[i], feet[f + 2] - k.z[i]));
