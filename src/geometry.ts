@@ -10,6 +10,7 @@
 // A dab's corners all carry the dab's centre: it is turned to face the eye
 // in the shader, and lit as one thing, the way a brush lays a dab.
 
+import { flareHeight } from "./grow.ts";
 import { hash01 } from "./variants.ts";
 import { type GrownTree } from "./tree.ts";
 
@@ -23,8 +24,14 @@ export interface TierShape {
   gather: number;
   /** Wood thinner than this share of the trunk is not drawn. 1 or more: no wood, only a stroke for the trunk. */
   woodFrom: number;
-  /** Sides to a tube of wood: the trunk's, and the thinnest's. */
+  /** Sides to a tube of wood: the trunk's, and the thinnest's (between, by its radius to the trunk's to the 3/4). */
   sides: [number, number];
+  /** The most a tube of thick wood turns between two of its rings (degrees); thin wood a little further. */
+  turn: number;
+  /** The most rings a piece of wood between two nodes is cut into: thick wood's, and thin's. */
+  rings: [number, number];
+  /** Rounded wood: a collar where a limb leaves its parent, buttresses round a stem's foot. */
+  round: boolean;
 }
 
 // (Near, all the wood: every leaf grows from a twig, and a twig left out leaves its leaves in the air and the
@@ -32,9 +39,9 @@ export interface TierShape {
 // `keepThin`). Mid, the branches that are still a pixel or so across where a tree is handed to it, reaching
 // up into the leaves; its twigs would be under a pixel there, and only cost.)
 export const TIER_SHAPES: readonly TierShape[] = [
-  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0, sides: [7, 4] },
-  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.1, sides: [5, 3] },
-  { dabsPerClump: 0, dabSize: 1, gather: 16, woodFrom: 9, sides: [3, 3] },
+  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0, sides: [16, 4], turn: 9, rings: [8, 3], round: true },
+  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.1, sides: [7, 3], turn: 18, rings: [3, 1], round: false },
+  { dabsPerClump: 0, dabSize: 1, gather: 16, woodFrom: 9, sides: [3, 3], turn: 30, rings: [1, 1], round: false },
 ];
 
 /** A run of one variant's pieces in a buffer: what one indirect draw draws. */
@@ -243,74 +250,498 @@ export function gatherClumps(tree: GrownTree, count: number): { centre: number[]
   return out;
 }
 
+/** A sample of a drawn centre line, in a line's array: where it is (3), which way the wood runs (3), its radius, how fast that changes along it (per m), and how far along the wood from the ground it is. */
+export const LINE_STRIDE = 9;
+
+const DEG = Math.PI / 180;
+/** Wood at least this thick (m) is thick: it turns by a tier's `turn` between rings, and thinner wood by `THIN_TURN` times that. */
+const THICK = 0.035;
+const THIN_TURN = 1.6;
+/** Wood thinner than this (m) is a twig, with a tier's least sides. */
+const TWIG = 0.02;
+/** How far a limb's tube, where it leaves its parent's, is turned towards the way its parent runs: it leaves in a curve, not at an angle. */
+const LEAVE = 0.35;
 /**
- * The wood of every variant at one distance, as tubes. Each vertex: `position` a point on a branch's centre
- * line; `aRadial` which way the surface lies from it, and the branch's radius there; `aLimb` the foot of the
- * limb it is on (a stem's: below its foot), and its variant; `aWood` how far along the wood from the ground
- * (m), its order, a number of its own, and how far up the tube's length it is.
+ * A fork: a limb nearly as thick as its parent there (from the first share of its radius to the second) is
+ * the parent dividing, not a limb put out of its side. Its tube starts back inside the parent's, up to a
+ * parent's radius back, running the parent's way, and bends out of it.
+ */
+const FORK: [number, number] = [0.35, 0.85];
+/** A limb's collar: how much thicker it is where it leaves its parent (at most), in how many of its radii past its parent's surface the swelling falls by e (a trumpet's flare, not a bulb), and the thinnest that has one (m). */
+const COLLAR = 0.5;
+const COLLAR_FALL = 0.9;
+const COLLAR_FROM = 0.025;
+/** A stem's buttresses: how much they swell it at the ground, over how much of its flare's height they ease away, and how far the foot goes on under the ground (m, and its radii). */
+const BUTTRESS = 0.9;
+const BUTTRESS_RISE = 0.55;
+/** How wide a buttress is round the stem, in its share of the spacing between them; more sides go round a stem's foot to draw them. */
+const BUTTRESS_WIDTH = 0.17;
+const BUTTRESS_SIDES = 16;
+const UNDERGROUND = 0.15;
+const UNDERGROUND_RADII = 0.4;
+/** A cap closing a tube's end: a ring this far round from its side towards its tip (rad), on wood with at least `CAP_RING_SIDES` sides. */
+const CAP_RING = 55 * DEG;
+const CAP_RING_SIDES = 6;
+
+/**
+ * The wood's centre lines as a tier draws them. Each node drawn has a line from its parent's node to it,
+ * both ends included (`LINE_STRIDE` numbers to a sample): a curve through the nodes, as a cubic Hermite
+ * piece whose ends run the way the wood runs through each node, so a tube bends through a node and does not
+ * kink there; a limb leaves its parent at the parent's centre line, bending out of it, its collar thickening
+ * it where it leaves. Cut into as many samples as it needs to turn no more than the tier's `turn` between
+ * two. `main` is the child each node's tube runs on into (its thickest); a node's line is null if the tier
+ * does not draw it (or it is a stem's foot).
+ */
+export interface WoodLines {
+  line: (Float64Array | null)[];
+  main: Int32Array;
+  /**
+   * Where each limb's line starts on its parent's: the parent's sample just before it (the line's start lies
+   * on the piece from it to the next), or -1 if it starts at the parent's node itself.
+   */
+  from: Int32Array;
+}
+
+export function woodLines(tree: GrownTree, shape: TierShape): WoodLines {
+  const sk = tree.skeleton;
+  const n = sk.count;
+  const R = sk.radius;
+  const trunk = R[0] || tree.size.trunkRadius;
+  const thinnest = trunk * shape.woodFrom;
+  const line: (Float64Array | null)[] = new Array(n).fill(null);
+  const main = mainChildren(sk);
+  const from = new Int32Array(n).fill(-1);
+  if (shape.woodFrom >= 1) return { line, main, from };
+  const drawn = (i: number) => i >= 0 && sk.parent[i] >= 0 && R[i] >= thinnest;
+  const len = new Float64Array(n);
+  const dirIn: number[][] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = sk.parent[i];
+    if (p < 0) {
+      const c = main[i];
+      dirIn[i] = c >= 0 ? norm([sk.x[c] - sk.x[i], sk.y[c] - sk.y[i], sk.z[c] - sk.z[i]]) : [0, 1, 0];
+      continue;
+    }
+    const d = [sk.x[i] - sk.x[p], sk.y[i] - sk.y[p], sk.z[i] - sk.z[p]];
+    len[i] = Math.hypot(d[0], d[1], d[2]);
+    dirIn[i] = len[i] > 1e-6 ? [d[0] / len[i], d[1] / len[i], d[2] / len[i]] : dirIn[p];
+  }
+  // (The way a tube runs through each node: halfway between the pieces either side, if it runs on.)
+  const tan: number[][] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const c = main[i];
+    tan[i] = sk.parent[i] >= 0 && drawn(c) ? norm(add(dirIn[i], dirIn[c])) : dirIn[i];
+  }
+  // (How fast its radius falls along it there: between the pieces either side, flat where it swells.)
+  const slope = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = sk.parent[i];
+    const c = main[i];
+    if (p < 0) {
+      slope[i] = c >= 0 && len[c] > 1e-6 ? (R[c] - R[i]) / len[c] : 0;
+      continue;
+    }
+    const before = main[p] === i ? R[p] : R[i];
+    if (drawn(c)) {
+      const g = (R[c] - before) / Math.max(1e-6, len[i] + len[c]);
+      slope[i] = (before - R[i]) * (R[i] - R[c]) >= 0 ? g : 0;
+    } else slope[i] = (R[i] - before) / Math.max(1e-6, len[i]);
+  }
+  const hf = flareHeight(tree.size);
+  for (let i = 0; i < n; i++) {
+    if (!drawn(i)) continue;
+    const p = sk.parent[i];
+    const lateral = main[p] !== i;
+    const b = [sk.x[i], sk.y[i], sk.z[i]];
+    let a = [sk.x[p], sk.y[p], sk.z[p]];
+    let ta = tan[p];
+    let back = 0;
+    let fork = 0;
+    if (lateral) {
+      // (A fork's tube starts back inside its parent's, so the two part as one divides; a limb's at its parent's centre.)
+      const u = Math.min(1, Math.max(0, (R[i] / R[p] - FORK[0]) / (FORK[1] - FORK[0])));
+      fork = u * u * (3 - 2 * u);
+      back = fork * Math.min(R[p], sk.parent[p] >= 0 ? 0.8 * len[p] : R[p]);
+      // (Back along the parent's own line as drawn, so it starts on the parent's wood.)
+      let way = tan[p];
+      const pl = line[p];
+      if (back > 0 && pl) {
+        let left = back;
+        let o = pl.length - LINE_STRIDE;
+        while (o > 0) {
+          const q = o - LINE_STRIDE;
+          const piece = Math.hypot(pl[o] - pl[q], pl[o + 1] - pl[q + 1], pl[o + 2] - pl[q + 2]);
+          if (left <= piece || q === 0) {
+            const f = Math.min(1, left / Math.max(piece, 1e-9));
+            a = [pl[o] + (pl[q] - pl[o]) * f, pl[o + 1] + (pl[q + 1] - pl[o + 1]) * f, pl[o + 2] + (pl[q + 2] - pl[o + 2]) * f];
+            way = [pl[q + 3], pl[q + 4], pl[q + 5]];
+            from[i] = q / LINE_STRIDE;
+            break;
+          }
+          left -= piece;
+          o = q;
+        }
+      } else if (back > 0) a = sub(a, scale(tan[p], back));
+      const chord = norm(sub(b, a));
+      ta = norm(add(chord, scale(way, LEAVE + 1.5 * fork)));
+      if (dot(ta, chord) < 0.3) ta = chord;
+    }
+    const L = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), 1e-6);
+    const tb = tan[i];
+    const r0 = lateral ? R[i] : R[p];
+    const g0 = lateral ? 0 : slope[p];
+    const r1 = R[i];
+    const g1 = slope[i];
+    const thick = Math.max(r0, r1) >= THICK;
+    // (How far it turns along its length, and where: rings go at even steps of its turning, so where it bends
+    // hardest, near a node it leaves at an angle, they come closest.)
+    const FINE = 24;
+    const turned = [0];
+    let before = ta;
+    for (let q = 1; q <= FINE; q++) {
+      const t = q / FINE;
+      const t2 = t * t;
+      const w0 = 6 * t2 - 6 * t;
+      const w1 = (3 * t2 - 4 * t + 1) * L;
+      const w2 = -6 * t2 + 6 * t;
+      const w3 = (3 * t2 - 2 * t) * L;
+      const way = norm([w0 * a[0] + w1 * ta[0] + w2 * b[0] + w3 * tb[0], w0 * a[1] + w1 * ta[1] + w2 * b[1] + w3 * tb[1], w0 * a[2] + w1 * ta[2] + w2 * b[2] + w3 * tb[2]]);
+      turned.push(turned[q - 1] + Math.acos(Math.min(1, Math.max(-1, dot(before, way)))));
+      before = way;
+    }
+    const turn = turned[FINE];
+    let k = Math.ceil(turn / (shape.turn * DEG * (thick ? 1 : THIN_TURN)) - 1e-9);
+    k = Math.min(Math.max(k, 1), thick ? shape.rings[0] : shape.rings[1]);
+    const ts: number[] = [0];
+    for (let q = 1, j = 1; q < k; q++) {
+      const want = (turn * q) / k;
+      while (j < FINE && turned[j] < want) j++;
+      const f = (want - turned[j - 1]) / Math.max(1e-9, turned[j] - turned[j - 1]);
+      ts.push((j - 1 + Math.min(1, Math.max(0, f))) / FINE);
+    }
+    ts.push(1);
+    // (A stem's foot in finer rings, where its buttresses ease away.)
+    if (shape.round && sk.order[i] === 0 && sk.y[p] - sk.y[sk.limb[i]] < 2 * hf) {
+      const m = Math.min(6, Math.ceil(L / (0.3 * hf)));
+      for (let q = 1; q < m; q++) ts.push(q / m);
+    }
+    // (A limb's collar: swollen inside its parent and where it leaves its surface, falling away fast out of
+    // it and then slowly, as a trumpet flares, to nothing by the next node.)
+    let collar = { from: 0, C: 0, fall: 1, gone: 1 };
+    if (lateral && shape.round && r1 >= COLLAR_FROM) {
+      const rp = R[p];
+      const c = dot(norm(sub(b, a)), tan[p]);
+      const sinA = Math.sqrt(Math.max(0, 1 - c * c));
+      const from = Math.min(back + rp / Math.max(sinA, 0.25) - 0.5 * r1, 0.6 * L);
+      // (None on a fork: its two tubes run on together inside the parent's, and one swollen would show round the other.)
+      const C = Math.min(COLLAR * (1 - fork), Math.max(0, (rp * 0.97) / r1 - 1));
+      const fall = COLLAR_FALL * r1;
+      if (C > 0.02 && L - from > 0.5 * fall) {
+        collar = { from, C, fall, gone: Math.exp(-(L - from) / fall) };
+        for (const f of [0, 0.7, 1.6, 3]) if (from + f * fall < L) ts.push((from + f * fall) / L);
+      }
+    }
+    ts.sort((a, b) => a - b);
+    const kept = ts.filter((t, j) => t <= 1 && (j === 0 || t - ts[j - 1] > 0.02 || t === 1));
+    for (let j = kept.length - 2; j > 0; j--) if (kept[j + 1] - kept[j] <= 0.02) kept.splice(j, 1);
+    const out = new Float64Array(kept.length * LINE_STRIDE);
+    const lo = Math.min(r0, r1);
+    const hi = Math.max(r0, r1);
+    kept.forEach((t, q) => {
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1;
+      const h10 = t3 - 2 * t2 + t;
+      const h01 = -2 * t3 + 3 * t2;
+      const h11 = t3 - t2;
+      const d00 = 6 * t2 - 6 * t;
+      const d10 = 3 * t2 - 4 * t + 1;
+      const d01 = -6 * t2 + 6 * t;
+      const d11 = 3 * t2 - 2 * t;
+      const o = q * LINE_STRIDE;
+      const dv = [0, 0, 0];
+      for (let x = 0; x < 3; x++) {
+        out[o + x] = h00 * a[x] + h10 * L * ta[x] + h01 * b[x] + h11 * L * tb[x];
+        dv[x] = d00 * a[x] + d10 * L * ta[x] + d01 * b[x] + d11 * L * tb[x];
+      }
+      const d = norm(dv);
+      out[o + 3] = d[0];
+      out[o + 4] = d[1];
+      out[o + 5] = d[2];
+      let r = h00 * r0 + h10 * L * g0 + h01 * r1 + h11 * L * g1;
+      let g = (d00 * r0 + d10 * L * g0 + d01 * r1 + d11 * L * g1) / L;
+      if (r < lo || r > hi) {
+        r = Math.min(hi, Math.max(lo, r));
+        g = 0;
+      }
+      const s = t * L;
+      if (collar.C > 0) {
+        const x = Math.exp(-Math.max(0, s - collar.from) / collar.fall);
+        const f = 1 + (collar.C * (x - collar.gone)) / (1 - collar.gone);
+        const df = s > collar.from ? (-collar.C * x) / collar.fall / (1 - collar.gone) : 0;
+        g = g * f + r * df;
+        r *= f;
+      }
+      out[o + 6] = r;
+      out[o + 7] = g;
+      out[o + 8] = sk.along[p] + s - back;
+    });
+    line[i] = out;
+  }
+  return { line, main, from };
+}
+
+/**
+ * The child each node's wood runs on into: the thickest, as it is the one going straightest on (a leader a
+ * little thinner than a limb leaving at an angle carries the stem on; the limb leaves it).
+ */
+function mainChildren(sk: GrownTree["skeleton"]): Int32Array {
+  const n = sk.count;
+  const main = new Int32Array(n).fill(-1);
+  const score = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = sk.parent[i];
+    if (p < 0) continue;
+    const g = sk.parent[p];
+    const into = g < 0 ? [0, 1, 0] : norm([sk.x[p] - sk.x[g], sk.y[p] - sk.y[g], sk.z[p] - sk.z[g]]);
+    const out = norm([sk.x[i] - sk.x[p], sk.y[i] - sk.y[p], sk.z[i] - sk.z[p]]);
+    score[i] = sk.radius[i] * (0.5 + 0.5 * dot(into, out));
+    if (main[p] < 0 || score[i] > score[main[p]]) main[p] = i;
+  }
+  return main;
+}
+
+/**
+ * How many sides a tier gives wood of radius `r` on a tree whose trunk's is `trunk`: a twig the least (most of
+ * the wood is twigs, and a twig is a few pixels across even close to), wood thicker than that more, the more
+ * of the trunk's radius it has, up to the most on the trunk itself.
+ */
+function sidesFor(shape: TierShape, r: number, trunk: number): number {
+  const [most, least] = shape.sides;
+  if (r < TWIG) return least;
+  return Math.max(least, Math.min(most, Math.round(least + 1 + (most - least - 1) * Math.min(1, r / trunk) ** 0.75)));
+}
+
+/**
+ * A stem's buttresses: lobes round its foot where its roots run off, each its own size and a little off even
+ * spacing. Gives how much they widen the stem at an angle round it (1 none) and a height above its foot,
+ * how fast that changes round it (per radian) and up it (per m).
+ */
+function buttresses(seed: number, hf: number): (angle: number, h: number) => [number, number, number] {
+  const count = 4 + Math.floor(hash01(seed, 17) * 3);
+  const step = (Math.PI * 2) / count;
+  const at: number[] = [];
+  const size: number[] = [];
+  for (let k = 0; k < count; k++) {
+    at.push(step * (k + (hash01(seed + k, 18) - 0.5) * 0.7));
+    size.push(0.35 + 0.65 * hash01(seed + k, 19));
+  }
+  const sigma = step * BUTTRESS_WIDTH;
+  const rise = BUTTRESS_RISE * hf;
+  return (angle, h) => {
+    let lobe = 0;
+    let dLobe = 0;
+    for (let k = 0; k < count; k++) {
+      let d = angle - at[k];
+      d -= Math.round(d / (Math.PI * 2)) * Math.PI * 2;
+      const g = size[k] * Math.exp(-0.5 * (d / sigma) ** 2);
+      lobe += g;
+      dLobe += (-g * d) / (sigma * sigma);
+    }
+    const A = BUTTRESS * Math.exp(-Math.max(0, h) / rise);
+    const dA = h > 0 ? -A / rise : 0;
+    return [1 + A * (lobe - 0.12), A * dLobe, dA * (lobe - 0.12)];
+  };
+}
+
+/**
+ * The wood of every variant at one distance, as tubes along the curves `woodLines` draws: one tube from each
+ * stem's foot, and from where each limb leaves its parent, on through each node's thickest child, its rings
+ * as many-sided as the wood is thick there (a ring with fewer sides than the one before it is stitched to
+ * it), each tube's end closed in a rounded cap. Each vertex: `position` a point on the centre line;
+ * `aRadial` which way the surface lies from it (as long as the surface swells there: buttresses), and the
+ * radius there; `aNormal` which way the surface faces; `aLimb` the foot of the limb it is on (a stem's:
+ * below its foot), and its variant; `aWood` how far along the wood from the ground (m), its order, a number
+ * of its own (its tube's), and how far along the piece of wood between two nodes it is.
  */
 export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Pieces {
-  const b = new Builder({ position: 3, aRadial: 4, aLimb: 4, aWood: 4 });
+  const b = new Builder({ position: 3, aRadial: 4, aNormal: 3, aLimb: 4, aWood: 4 });
   trees.forEach((tree, v) => {
     b.begin();
     const sk = tree.skeleton;
-    if (shape.woodFrom < 1) {
-      const trunk = sk.radius[0] || tree.size.trunkRadius;
-      const from = trunk * shape.woodFrom;
-      // (Which child carries each node on: its thickest. A tube runs on through it without a seam.)
-      const main = new Int32Array(sk.count).fill(-1);
-      for (let i = 1; i < sk.count; i++) {
-        const p = sk.parent[i];
-        if (p >= 0 && (main[p] < 0 || sk.radius[i] > sk.radius[main[p]])) main[p] = i;
-      }
-      const dirIn = (i: number): number[] => {
-        const p = sk.parent[i];
-        if (p < 0) {
-          const c = main[i];
-          return c >= 0 ? norm([sk.x[c] - sk.x[i], sk.y[c] - sk.y[i], sk.z[c] - sk.z[i]]) : [0, 1, 0];
+    const W = woodLines(tree, shape);
+    const trunk = sk.radius[0] || tree.size.trunkRadius;
+    const hf = flareHeight(tree.size);
+    const ownOf = new Float64Array(sk.count).fill(0.5);
+    const stitch = (a: number, na: number, c: number, nc: number) => {
+      let i = 0;
+      let j = 0;
+      while (i < na || j < nc) {
+        if (j >= nc || (i < na && (i + 1) / na <= (j + 1) / nc)) {
+          b.index.push(a + (i % na), c + (j % nc), a + ((i + 1) % na));
+          i++;
+        } else {
+          b.index.push(a + (i % na), c + (j % nc), c + ((j + 1) % nc));
+          j++;
         }
-        return norm([sk.x[i] - sk.x[p], sk.y[i] - sk.y[p], sk.z[i] - sk.z[p]]);
+      }
+    };
+    for (let j = 0; j < sk.count; j++) {
+      const p = sk.parent[j];
+      // A tube starts at a stem's foot, or where a limb leaves its parent.
+      const chain: number[] = [];
+      let at = p < 0 ? W.main[j] : W.line[j] && W.main[p] !== j ? j : -1;
+      while (at >= 0 && W.line[at]) {
+        chain.push(at);
+        at = W.main[at];
+      }
+      if (chain.length === 0) continue;
+      // (Each tube a shade of its own, from its parent's where it leaves it: no seam of colour at a fork.)
+      const own = hash01(chain[0], v * 131 + 5);
+      const ownFrom = p < 0 ? own : ownOf[p];
+      const blend = p < 0 ? 1 : 4 * sk.radius[j] + 0.3;
+      for (const i of chain) ownOf[i] = own;
+      if (p < 0) ownOf[j] = own;
+      const foot = p < 0 ? j : -1;
+      const flared = foot >= 0 && shape.round && sk.radius[foot] > 0.06 && sk.radius[foot] > 1.02 * sk.radius[chain[0]];
+      const lobe = flared ? buttresses(foot * 7 + v * 1013, hf) : null;
+      let u: number[] = [];
+      let last = -1;
+      let lastSides = 0;
+      let lastKey = "";
+      let end = { c: [0, 1, 0], d: [0, 1, 0], r: 0, attrs: { limb: [0, 0, 0], order: 0, along: 0 } };
+      const startAlong = W.line[chain[0]]![8];
+      const ownAt = (along: number) => {
+        const f = Math.min(1, Math.max(0, (along - startAlong) / blend));
+        return ownFrom + (own - ownFrom) * f * f * (3 - 2 * f);
       };
-      const ringDir = (i: number): number[] => {
-        const a = dirIn(i);
-        const c = main[i];
-        if (c < 0) return a;
-        const o = norm([sk.x[c] - sk.x[i], sk.y[c] - sk.y[i], sk.z[c] - sk.z[i]]);
-        return norm([a[0] + o[0], a[1] + o[1], a[2] + o[2]]);
+      // (Where a limb leaves its parent, its surface is lit as its parent's is, easing to its own over its
+      // first radius or so out of it: two tubes meet in a crease, and lit as two they show it as a seam; lit
+      // as one, the eye reads the crotch of a fork, the swell of a collar.)
+      const parentLines = p >= 0 && shape.round ? [W.line[p], W.line[W.main[p]]].filter((l): l is Float64Array => l !== null) : [];
+      const leaving = (x: number[], rLimb: number): { n: number[]; w: number } | null => {
+        let best = Infinity;
+        let n: number[] = [];
+        for (const l of parentLines) {
+          for (let o = 0; o + LINE_STRIDE < l.length; o += LINE_STRIDE) {
+            const a = [l[o], l[o + 1], l[o + 2]];
+            const dd = [l[o + LINE_STRIDE] - a[0], l[o + LINE_STRIDE + 1] - a[1], l[o + LINE_STRIDE + 2] - a[2]];
+            const l2 = dot(dd, dd);
+            const f = l2 > 0 ? Math.min(1, Math.max(0, dot(sub(x, a), dd) / l2)) : 0;
+            const off = sub(x, add(a, scale(dd, f)));
+            const out = Math.hypot(off[0], off[1], off[2]) - (l[o + 6] + (l[o + LINE_STRIDE + 6] - l[o + 6]) * f);
+            if (out < best) {
+              best = out;
+              n = norm(off);
+            }
+          }
+        }
+        if (n.length === 0) return null;
+        const t = Math.min(1, Math.max(0, best / (1.5 * rLimb)));
+        return { n, w: 1 - t * t * (3 - 2 * t) };
       };
-      for (let i = 0; i < sk.count; i++) {
-        const p = sk.parent[i];
-        if (p < 0 || sk.radius[i] < from) continue;
-        const own = hash01(i, v * 131 + 5);
-        const sides = sk.radius[i] > trunk * 0.4 ? shape.sides[0] : shape.sides[1];
-        const isMain = main[p] === i;
-        const r0 = isMain ? sk.radius[p] : sk.radius[i];
-        const d0 = isMain ? ringDir(p) : dirIn(i);
-        const d1 = ringDir(i);
+      const ring = (c: number[], d: number[], r: number, g: number, limb: number[], order: number, along: number, up: number, blend = false): number => {
+        u = u.length ? norm(sub(u, scale(d, dot(u, d)))) : basis(d)[0];
+        if (!Number.isFinite(u[0]) || Math.hypot(u[0], u[1], u[2]) < 0.5) u = basis(d)[0];
+        const w = cross(d, u);
+        const h = foot >= 0 ? c[1] - sk.y[foot] : 0;
+        const swells = lobe !== null && h < 2.5 * hf;
+        const sides = sidesFor(shape, r, trunk) + (swells ? BUTTRESS_SIDES : 0);
+        let first = -1;
+        for (let s = 0; s < sides; s++) {
+          const a = (s / sides) * Math.PI * 2;
+          const cs = Math.cos(a);
+          const sn = Math.sin(a);
+          const e = [u[0] * cs + w[0] * sn, u[1] * cs + w[1] * sn, u[2] * cs + w[2] * sn];
+          const round = [-u[0] * sn + w[0] * cs, -u[1] * sn + w[1] * cs, -u[2] * sn + w[2] * cs];
+          const [m, mA, mH] = swells ? lobe(a, h) : [1, 0, 0];
+          // (The surface's normal: out, tipped back where it swells along the wood and round where it swells round it.)
+          const slopeAlong = g * m + r * mH * d[1];
+          let nrm = norm([e[0] - round[0] * (mA / m) - d[0] * slopeAlong, e[1] - round[1] * (mA / m) - d[1] * slopeAlong, e[2] - round[2] * (mA / m) - d[2] * slopeAlong]);
+          if (blend) {
+            const at = leaving([c[0] + e[0] * r, c[1] + e[1] * r, c[2] + e[2] * r], r);
+            if (at && at.w > 0) nrm = norm(add(scale(nrm, 1 - at.w), scale(at.n, at.w)));
+          }
+          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [along, order, ownAt(along), up] });
+          if (first < 0) first = k;
+        }
+        if (last >= 0) stitch(last, lastSides, first, sides);
+        last = first;
+        lastSides = sides;
+        end = { c, d, r, attrs: { limb, order, along } };
+        return first;
+      };
+      for (let q = 0; q < chain.length; q++) {
+        const i = chain[q];
+        const line = W.line[i]!;
         const limbNode = sk.order[i] === 0 ? -1 : sk.limb[i];
         const limb = limbNode < 0 ? [0, -1, 0] : [sk.x[limbNode], sk.y[limbNode], sk.z[limbNode]];
-        const ring = (at: number, dir: number[], r: number, up: number): number => {
-          const [u, w] = basis(dir);
-          let first = -1;
-          for (let s = 0; s < sides; s++) {
-            const a = (s / sides) * Math.PI * 2;
-            const radial = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
-            const k = b.vertex({ position: [sk.x[at], sk.y[at], sk.z[at]], aRadial: [...radial, r], aLimb: [...limb, v], aWood: [sk.along[at], sk.order[i], own, up] });
-            if (first < 0) first = k;
+        const key = `${limbNode},${sk.order[i]}`;
+        const samples = line.length / LINE_STRIDE;
+        for (let s = 0; s < samples; s++) {
+          const o = s * LINE_STRIDE;
+          const c = [line[o], line[o + 1], line[o + 2]];
+          const d = [line[o + 3], line[o + 4], line[o + 5]];
+          if (s === 0) {
+            // (Where one piece runs on into the next, they share a ring; where a tube runs on into wood of
+            // another limb or order, which the wind moves its own way, a ring of its own starts it again.)
+            if (q > 0 && key === lastKey) continue;
+            if (q > 0) last = -1;
+            if (q === 0 && foot >= 0) {
+              // (A stem's foot goes on a little into the ground, so it stands in it on a slope.)
+              const deep = UNDERGROUND + UNDERGROUND_RADII * line[o + 6];
+              ring([c[0] - d[0] * deep, c[1] - d[1] * deep, c[2] - d[2] * deep], d, line[o + 6] * 1.15, 0, limb, sk.order[i], line[o + 8] - deep, 0);
+            }
           }
-          return first;
-        };
-        const a0 = ring(p, d0, r0, 0);
-        const a1 = ring(i, d1, sk.radius[i], 1);
-        for (let s = 0; s < sides; s++) {
-          const s1 = (s + 1) % sides;
-          b.index.push(a0 + s, a1 + s, a1 + s1, a0 + s, a1 + s1, a0 + s1);
+          ring(c, d, line[o + 6], line[o + 7], limb, sk.order[i], line[o + 8], s / (samples - 1), q === 0 && parentLines.length > 0);
         }
+        lastKey = key;
       }
+      // Its end closed: a rounded cap (a ring part way round and its tip), or on thin wood its tip alone.
+      const { c, d, r, attrs } = end;
+      const w = cross(d, u);
+      let rim = last;
+      let rimSides = lastSides;
+      if (lastSides >= CAP_RING_SIDES) {
+        const cs = Math.cos(CAP_RING);
+        const sn = Math.sin(CAP_RING);
+        let first = -1;
+        for (let s = 0; s < lastSides; s++) {
+          const a = (s / lastSides) * Math.PI * 2;
+          const e = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
+          const dir = [e[0] * cs + d[0] * sn, e[1] * cs + d[1] * sn, e[2] * cs + d[2] * sn];
+          const k = b.vertex({ position: c, aRadial: [...dir, r], aNormal: dir, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1] });
+          if (first < 0) first = k;
+        }
+        stitch(rim, rimSides, first, lastSides);
+        rim = first;
+      }
+      const tip = b.vertex({ position: c, aRadial: [...d, r], aNormal: d, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1] });
+      for (let s = 0; s < rimSides; s++) b.index.push(rim + s, tip, rim + ((s + 1) % rimSides));
     }
     b.end();
   });
   return b.done();
+}
+
+function add(a: number[], b: number[]): number[] {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function sub(a: number[], b: number[]): number[] {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scale(a: number[], k: number): number[] {
+  return [a[0] * k, a[1] * k, a[2] * k];
+}
+
+function dot(a: number[], b: number[]): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function cross(a: number[], b: number[]): number[] {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function norm(a: number[]): number[] {
@@ -366,25 +797,35 @@ export function clumpTwigs(tree: GrownTree): number[][] {
 
 /**
  * The wood leading to a node, back from it along its parents for up to `most` metres (not down onto a stem,
- * unless the node is on one): `at(s)` is the point `s` metres back from the node, and which way the wood
- * runs there (out, towards the node).
+ * unless the node is on one), along its centre line as drawn close to (`lines`): `at(s)` is the point `s`
+ * metres back from the node, and which way the wood runs there (out, towards the node).
  */
-function shootOf(sk: GrownTree["skeleton"], node: number, most: number): { length: number; at(s: number): { p: number[]; d: number[] } } {
+function shootOf(sk: GrownTree["skeleton"], lines: WoodLines, node: number, most: number): { length: number; at(s: number): { p: number[]; d: number[] } } {
   const pts: number[][] = [[sk.x[node], sk.y[node], sk.z[node]]];
   const dirs: number[][] = [];
   const lens: number[] = [];
   let length = 0;
+  const back = (q: number[]) => {
+    const a = pts[pts.length - 1];
+    const seg = [a[0] - q[0], a[1] - q[1], a[2] - q[2]];
+    const l = Math.hypot(seg[0], seg[1], seg[2]);
+    if (l <= 1e-6) return;
+    pts.push(q);
+    dirs.push(seg.map((x) => x / l));
+    lens.push(l);
+    length += l;
+  };
+  // (Down each line from where the wood came onto it: a node's own line from its end, its parent's from
+  // where the node's line left it.)
+  let at = -1;
   for (let i = node; length < most; ) {
     const p = sk.parent[i];
     if (p < 0 || (sk.order[i] === 0 && sk.order[node] > 0)) break;
-    const seg = [sk.x[i] - sk.x[p], sk.y[i] - sk.y[p], sk.z[i] - sk.z[p]];
-    const l = Math.hypot(seg[0], seg[1], seg[2]);
-    if (l > 1e-6) {
-      pts.push([sk.x[p], sk.y[p], sk.z[p]]);
-      dirs.push(seg.map((q) => q / l));
-      lens.push(l);
-      length += l;
-    }
+    const line = lines.line[i];
+    const top = at >= 0 ? at * LINE_STRIDE : line ? line.length - 2 * LINE_STRIDE : 0;
+    if (line) for (let o = top; o >= 0 && length < most; o -= LINE_STRIDE) back([line[o], line[o + 1], line[o + 2]]);
+    else back([sk.x[p], sk.y[p], sk.z[p]]);
+    at = lines.from[i];
     i = p;
   }
   length = Math.min(length, most);
@@ -422,13 +863,14 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
     b.begin();
     const { clumps: cl, skeleton: sk } = tree;
     const twigs = clumpTwigs(tree);
+    const lines = woodLines(tree, TIER_SHAPES[0]);
     for (let c = 0; c < cl.count; c++) {
       const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
       const r = cl.radius[c];
       // (Its twigs in turn, the one it hangs on first. Close to, a card for each at the least: no twig of it
       // is left bare. A few broad cards a clump (mid) cover it whole, and its twigs are under a pixel there.
       // Deep in the crown, fewer: little of it shows.)
-      const shoots = twigs[c].map((t) => shootOf(sk, t, r * SHOOT));
+      const shoots = twigs[c].map((t) => shootOf(sk, lines, t, r * SHOOT));
       const base = cl.depth[c] > 0.65 ? Math.max(1, perClump >> 1) : perClump;
       const count = perClump >= 4 ? Math.max(base, Math.min(shoots.length, 4 * perClump)) : base;
       for (let d = 0; d < count; d++) {

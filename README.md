@@ -186,8 +186,10 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    the main axis than to the lateral (Borchert and Honda's model, its
    leaning from `leader`), a scaffold as much as its trunk; each bud growing
    as many internodes as it is given, turned towards the least shadow it
-   sees and up or down by `bend`, with a lateral bud at every internode by
-   the golden angle at `branchAngle`; and every branch that gathers too
+   sees and up or down by `bend` (a shoot keeps some of its last
+   internode's turn into the next, so it bends over several and does not
+   zigzag), with a lateral bud at every internode by the golden angle at
+   `branchAngle`; and every branch that gathers too
    little light for its wood shed (`shed`). So the crown is a shell of lit
    shoots on bare, branching limbs, its inside shed as it shades.
 4. **Leaves** hang in clumps on the lit shoots near their twigs' ends (the
@@ -195,9 +197,11 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    bigger the more light they have, and never more than a fifth of the
    crown's radius round (a crown grown narrow in a wood is many sprays, not
    a few balls on a stick).
-5. **The wood made good**: smoothed (twice, forks held), bowed by its
-   weight (thin wood more, `bend` down more), and its straight runs joined
-   into single pieces. A tree that weeps then hangs its whips.
+5. **The wood made good**: where an axis's tip died and the shoot below it
+   took the lead, that shoot turned part way back to where the axis ran (a
+   twig of such corners is a zigzag); then smoothed (twice, forks held),
+   bowed by its weight (thin wood more, `bend` down more), and its straight
+   runs joined into single pieces. A tree that weeps then hangs its whips.
 6. **Conifers** grow whorl by whorl instead: a leader to the top and
    `whorl` boughs to each of `whorlsPerMetre` (closer in a narrow crown,
    for its interwhorl branches), each as long as the outline
@@ -254,6 +258,18 @@ upper crowns to Rautiainen's exponents.
   once per variant by an indirect draw for as many trees as are on its
   list: nothing out of view costs a vertex. A tree passing between tiers is
   drawn by both, each in the pixels the other leaves.
+- **The wood is drawn as wood**: a tube along a curve through the nodes
+  (a cubic through each, running the way the wood runs there), its rings
+  at even steps of its turning (9 degrees on limbs, 14 on twigs, close to;
+  18 and 29 mid), as many-sided as it is thick (16 round the trunk, 4
+  round a twig), on through each node into its thickest child, which goes
+  straightest on. A limb starts inside its parent and bends out of it,
+  flaring where it leaves (its collar); a fork starts back along its
+  parent, and the two part as one divides. Where a limb leaves, its
+  surface is lit and furrowed as its parent's is, easing to its own: two
+  tubes meet in a crease, and lit as one they read as one wood. A trunk
+  stands on four to six buttresses, gone by breast height, and every end
+  is closed, rounded on thick wood. (`test/wood.test.ts`.)
 - **The realistic look** draws a near tree's clumps as leaf cards set in
   the crown at angles of their own, each spray growing from a twig (its
   foot on one of the clump's twigs or the last of the wood leading to it),
@@ -276,9 +292,13 @@ On this Mac (Apple, 3200 x 2000, 4x MSAA), 30,000 trees over 2.4 km of 30
 species cost 2.4 to 3.4 ms of the graphics card's time a frame in the painted
 look and 4.5 to 7.2 ms in the realistic one, ground and sky included; the
 cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
-That was before the near tier drew its twigs: a near tree's wood is now
-some 9,600 triangles (1,500 before) and a mid tree's 700 (200), not yet
-measured on the graphics card.
+That was before the near tier drew its twigs, and before its wood was
+curved: a near tree's wood is now some 25,000 triangles and 14,700
+vertices on average over the species (9,700 and 9,700 straight, 1,500
+before the twigs), a mid tree's 1,160 (620). In the lab's grove (400
+trees, 107 near from the clearing) the wood takes some 0.7 ms of a 2.4 ms
+frame in the clearing and 0.55 of 1.8 ms from outside, 0.4 and 0.33 ms of
+2.15 and 1.5 drawn straight.
 
 ## Left out, for now
 
