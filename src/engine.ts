@@ -39,9 +39,9 @@ import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheet
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase } from "./scans.ts";
 import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow } from "./sprays.ts";
 import { growTree } from "./grow.ts";
-import { PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture } from "./palmAtlas.ts";
+import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
 import { palmPieces } from "./palmGeometry.ts";
-import { type Pruning } from "./palm.ts";
+import { PALM_CELL, type Pruning } from "./palm.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
 import { type Stand, standingOf } from "./stand.ts";
 import { type GrownTree, type TreeSize } from "./tree.ts";
@@ -452,6 +452,17 @@ export function createTrees(options: TreesOptions): Trees {
     return { near, far };
   };
 
+  /**
+   * How big a tree is for choosing its tier (m): its height; a palm's, at most twice its crown's size, the
+   * larger of its crown's width and depth. A tall palm's stem is a line, its crown a small part of it: by its
+   * height, a 22 m fan palm drew its near crown from 200 m off.
+   */
+  const tierSize = (r1: Vec4, species: UInt): Float => {
+    const palm = speciesR.element(species.mul(SPECIES_ROWS).add(7)).w;
+    const crown = max(r1.z.mul(2), r1.x.sub(r1.y)).mul(2);
+    return select(palm.greaterThan(0.5), min(r1.x, crown), r1.x);
+  };
+
   const cull = Fn(() => {
     const id = instanceIndex;
     If(id.lessThan(uint(N)), () => {
@@ -471,9 +482,9 @@ export function createTrees(options: TreesOptions): Trees {
       }
       const dist = length(centre.sub(uCam));
       If(seen.greaterThan(0.5).and(dist.lessThan(uDetail.w)), () => {
-        const px = r1.x.mul(uPxPerM).div(max(dist, float(0.1)));
-        const { near, far } = tierShares(px);
         const vrow = variantsR.element(v.mul(2).add(1));
+        const px = tierSize(r1, uint(vrow.z)).mul(uPxPerM).div(max(dist, float(0.1)));
+        const { near, far } = tierShares(px);
         const base = uint(vrow.x);
         const n = uint(vrow.y);
         const put = (t: number) => {
@@ -763,7 +774,7 @@ export function createTrees(options: TreesOptions): Trees {
   const sharesFor = (t: number, T: TreeRows): Vec2 => {
     const centre = vec3(T.r0.x, T.r0.y.add(T.r1.x.mul(0.5)), T.r0.z);
     const dist = length(centre.sub(cameraPosition));
-    const px = T.r1.x.mul(uPxPerM).div(max(dist, float(0.1)));
+    const px = tierSize(T.r1, uint(T.vrow1.z)).mul(uPxPerM).div(max(dist, float(0.1)));
     const { near, far } = tierShares(px);
     // (Thinned out to nothing over the last tenth of the range.)
     const gone = smoothstep(uDetail.w.mul(0.9), uDetail.w, dist);
@@ -1287,7 +1298,12 @@ export function createTrees(options: TreesOptions): Trees {
     // (Its own colour: its species' green (its tree's tint, its own tone) going to straw as it dies, the young
     // ones paler.)
     const green = leaf.xyz.mul(T.r2.xyz).mul(float(1).add(own.sub(0.5).mul(leaf.w).mul(0.5)));
-    let albedo = mix(green, deadCol.mul(float(0.9).add(own.mul(0.2))), aFrond.y).mul(aFrond.z);
+    // (Past 1, dead and weathered: a skirt's old leaves gone from straw to grey-brown.)
+    const deadK = clamp(aFrond.y, 0, 1);
+    const weathered = clamp(aFrond.y.sub(1), 0, 1);
+    const deadHere = deadCol.mul(float(0.9).add(own.mul(0.2)));
+    const greyBrown = vec3(dot(deadHere, vec3(0.2126, 0.7152, 0.0722))).mul(vec3(1.02, 0.93, 0.8)).mul(0.82);
+    let albedo = mix(green, mix(deadHere, greyBrown, weathered), deadK).mul(aFrond.z);
     const grey = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
     albedo = max(mix(vec3(grey), albedo, uStyle5.x), vec3(0));
     const lum = (c: Vec3): Float => dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -1297,15 +1313,17 @@ export function createTrees(options: TreesOptions): Trees {
     const bands = max(uStyle.y, float(1));
     const litK = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
     // (The painterly looks' light warm and shade cool; the realistic look's as the sun and sky give them.)
-    const sky = C.sky.mul(mix(float(1), float(0.8), aFrond.y.oneMinus().mul(0.3)));
-    const shadeCol = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8)).mul(uShadeTint).mul(sky);
-    const litCol = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7)).mul(uSunTint).mul(uStyle5.w);
+    const sky = C.sky.mul(mix(float(1), float(0.8), deadK.oneMinus().mul(0.3)));
+    // (Dead leaves keep their own straw and grey: a painter's warm and cool are for living green.)
+    const living = float(1).sub(deadK.mul(0.85));
+    const shadeCol = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8).mul(living)).mul(uShadeTint).mul(sky);
+    const litCol = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7).mul(living)).mul(uSunTint).mul(uStyle5.w);
     let colour: Vec3 = mix(shadeCol, litCol, litK);
     // (The sun through it, to an eye looking towards it through the leaf, and on its side away from the sun.)
     const thin = crownThin(C, float(0.3), own);
     const behind = max(dot(seen, uSun).negate(), float(0)).mul(C.sunIn);
     const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(uStyle2.y).mul(C.cloud).mul(behind.mul(0.55).add(throughBent(seen, toEye).mul(thin)));
-    colour = colour.add(through.mul(float(1).sub(aFrond.y.mul(0.6))));
+    colour = colour.add(through.mul(float(1).sub(deadK.mul(0.6))));
     m.positionNode = at;
     // (Into the air as a scale and an offset, so the pixel's picture can scale the colour first.)
     const airAdd = intoAir(vec3(0), at);
@@ -1314,15 +1332,35 @@ export function createTrees(options: TreesOptions): Trees {
     const vUv = varying(aUv.xy, "vPalmUv");
     const vCell = varying(aUv.z, "vPalmCell");
     const vShares = varying(sharesFor(t, T), "vPalmShares");
+    // (A near fan small in the picture is drawn as its starburst, as the mid and far tiers draw it: its photograph
+    // mipped down to a few pixels is a disc. The whole fan goes over together, by its own blade's size in the
+    // picture, pixel by pixel through a fixed pattern, so there is no line where it changes.)
+    let vFanFar: Float | null = null;
+    let vFanOff: Vec2 | null = null;
+    if (t === 0) {
+      const cells = PALM_ATLAS.cells;
+      const off = (k: number) => [(cells[PALM_CELL.fanFar].x - cells[k].x) / PALM_ATLAS.width, (cells[PALM_CELL.fanFar].y - cells[k].y) / PALM_ATLAS.height];
+      const [a3, b3] = off(PALM_CELL.fan);
+      const [a4, b4] = off(PALM_CELL.fanB);
+      const isFan = step(float(PALM_CELL.fan - 0.5), aUv.z).mul(step(aUv.z, float(PALM_CELL.fanB + 0.5)));
+      const b = aUv.z.greaterThan(float(PALM_CELL.fanB - 0.5));
+      const footAt = toWorld(T, foot.add(atFoot));
+      const bladePx = L.mul(0.3).mul(uPxPerM).div(max(length(cameraPosition.sub(footAt)), float(0.1)));
+      vFanFar = varying(smoothstep(float(40), float(22), bladePx).mul(isFan), "vPalmFanFar");
+      vFanOff = varying(vec2(select(b, float(a4), float(a3)), select(b, float(b4), float(b3))), "vPalmFanOff");
+    }
     m.colorNode = Fn(() => {
       handOver(vShares);
-      const tex = texture(palmTex!, vUv);
+      const starburst = vFanFar && vFanOff ? step(pixelShare(), vFanFar) : null;
+      const uv = starburst && vFanOff ? vUv.add(vFanOff.mul(starburst)) : vUv;
+      const cellNow = starburst ? mix(vCell, float(PALM_CELL.fanFar), starburst) : vCell;
+      const tex = texture(palmTex!, uv);
       palmNodes.push(tex);
       const a = clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
       Discard(a.lessThan(uAlphaCut));
       // (The picture's colour over its cell's mean: its light and shade, its rachis paler, its tips browner.)
       const lin = pow(max(tex.rgb, vec3(0)), vec3(2.2));
-      const mean = uPalmMeans.element(int(vCell.add(0.5))) as unknown as Vec3;
+      const mean = uPalmMeans.element(int(cellNow.add(0.5))) as unknown as Vec3;
       const ratio = clamp(lin.div(max(mean, vec3(0.004))), vec3(0), vec3(3));
       // (The painted look keeps less of it: its marks are flat.)
       const kept = mix(vec3(1), ratio, mix(float(1), float(0.6), uStyle.x));
@@ -1728,6 +1766,8 @@ export function createTrees(options: TreesOptions): Trees {
             await new Promise((done) => setTimeout(done, 0));
           }
           if (disposed) return false;
+          // (The far fans' starburst, in the colours of the near fan's picture.)
+          means.push(layStarburst(out, PALM_CELL.fanFar, PALM_CELL.fan));
           const tex = atlasTexture(coverageMips(out, PALM_ATLAS_CELL, ALPHA_CUT, 0), 4);
           for (const n of palmNodes) n.value = tex;
           means.forEach((m, k) => (uPalmMeans.array[k] as THREE.Vector3).set(...m));

@@ -18,7 +18,7 @@ import { type LeafSet } from "./scans.ts";
 
 /** The atlas's size (texels) and its cells' rectangles (texels; rows from v = 0). */
 export const PALM_ATLAS = {
-  width: 2048,
+  width: 2560,
   height: 1024,
   cells: [
     { x: 0, y: 0, w: 512, h: 1024 },
@@ -26,6 +26,8 @@ export const PALM_ATLAS = {
     { x: 1024, y: 0, w: 512, h: 1024 },
     { x: 1536, y: 512, w: 512, h: 512 },
     { x: 1536, y: 0, w: 512, h: 512 },
+    // (A fan as its segments' starburst, for the mid and far tiers: `layStarburst`.)
+    { x: 2048, y: 0, w: 512, h: 512 },
   ],
 } as const;
 /** The texels its mips keep coverage over (mips.ts). */
@@ -146,10 +148,68 @@ export function layPicture(out: Pixels, cell: number, sheet: { set: LeafSet; alb
       const o = ((c.y + j) * out.width + c.x + i) * 4;
       const a = acc[3] / 4;
       for (let k = 0; k < 3; k++) out.data[o + k] = acc[3] > 0 ? Math.round(acc[k] / acc[3]) : 0;
+      // (What magenta is left on a leaf's rim (red and blue both over green) taken off: no leaf is pink.)
+      const spill = Math.max(0, Math.min(out.data[o], out.data[o + 2]) - out.data[o + 1]);
+      out.data[o] -= spill;
+      out.data[o + 2] -= spill;
       out.data[o + 3] = Math.round(a);
     }
   bleedCell(out, cell);
   return cellMean(out, cell);
+}
+
+/**
+ * A fan far off, as a starburst of its segments: a small solid hub, then narrow segments radiating over its
+ * spread, opening apart past where they split and each tapering to its own tip, so its outline stays a burst
+ * of points however small it is drawn (a fan's photograph, mipped down, is a disc). Its colour is the fan
+ * picture's in `from` at the same place. Its mean colour (linear).
+ */
+export function layStarburst(px: Pixels, cell: number, from: number): [number, number, number] {
+  const c = PALM_ATLAS.cells[cell];
+  const f = PALM_ATLAS.cells[from];
+  // (Few and broad: a fan a few pixels across is drawn from a small mip of this, where narrow segments and
+  // the gaps between them average into a disc.)
+  const segs = 15;
+  const spread = (150 * Math.PI) / 180;
+  const hash = (n: number) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  for (let j = 0; j < c.h; j++)
+    for (let i = 0; i < c.w; i++) {
+      let acc = 0;
+      // (Supersampled three by three: the segments are a few texels wide at their tips.)
+      for (let sy = 0; sy < 3; sy++)
+        for (let sx = 0; sx < 3; sx++) {
+          const u = (i + (sx + 0.5) / 3) / c.w;
+          const v = (j + (sy + 0.5) / 3) / c.h;
+          const dx = (u - 0.5) / FAN_RADIUS_UV;
+          const dy = (v - FAN_CENTRE_V) / FAN_RADIUS_UV;
+          const r = Math.hypot(dx, dy);
+          const th = Math.atan2(dx, dy);
+          let a = 0;
+          if (r < 0.13) a = 1;
+          else if (Math.abs(th) < spread) {
+            const k = ((th + spread) / (2 * spread)) * segs;
+            const seg = Math.floor(k);
+            const f0 = k - seg - 0.5;
+            const end = 0.78 + 0.22 * hash(seg);
+            // (Joined only near the middle, then apart, each narrowing to its tip: rays more than a disc.)
+            const half = r < 0.22 ? 0.5 : 0.5 - 0.42 * Math.min(1, (r - 0.22) / 0.38);
+            const tip = Math.min(1, Math.max(0, (end - r) / (0.35 * end)));
+            if (r < end && Math.abs(f0) < half * (0.25 + 0.75 * Math.sqrt(tip))) a = 1;
+          }
+          // (Its stalk, below the hub.)
+          if (v < FAN_CENTRE_V && v > FAN_STALK_V && Math.abs(u - 0.5) < 0.02) a = 1;
+          acc += a;
+        }
+      const o = ((c.y + j) * px.width + c.x + i) * 4;
+      const q = ((f.y + Math.round((j / c.h) * (f.h - 1))) * px.width + f.x + Math.round((i / c.w) * (f.w - 1))) * 4;
+      for (let k = 0; k < 3; k++) px.data[o + k] = px.data[q + k];
+      px.data[o + 3] = Math.round((acc / 9) * 255);
+    }
+  bleedCell(px, cell);
+  return cellMean(px, cell);
 }
 
 /** The colour run out past a cell's leaves into its empty texels (so its mips do not darken their edges). */
@@ -262,6 +322,7 @@ export function drawnPalmAtlas(): { px: Pixels; means: [number, number, number][
         set(cell, i, j, rgb, a);
       }
   }
-  for (let k = 0; k < PALM_ATLAS.cells.length; k++) bleedCell(px, k);
+  for (let k = 0; k < 5; k++) bleedCell(px, k);
+  layStarburst(px, 5, 3);
   return { px, means: PALM_ATLAS.cells.map((_, k) => cellMean(px, k)) };
 }

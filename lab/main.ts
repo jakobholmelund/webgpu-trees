@@ -13,6 +13,7 @@
 //   ?eye=standing | tree | overhead | course   where the eye starts
 //   ?at=x,y,z,tx,ty,tz   exactly a view, as "Share view" writes it
 //   ?look=painterly  the look: stylized (painted), painterly, sculpted or real
+//   ?prune=natural | skirt | skinned | pineapple   every palm kept so (else as its species is)
 //   ?tier=0|1|2      draw one tier alone
 //   ?scans=0         the realistic look without its photographs (drawn bark and sprays)
 //   ?fresh           ignore what the lab kept from last time
@@ -27,6 +28,8 @@ import {
   ALL_SPECIES,
   LEAF_KIND_ROWS,
   LOOK_STYLES,
+  PRUNINGS,
+  type Pruning,
   STYLE_RANGES,
   TREE_LOOKS,
   type TreeLook,
@@ -95,6 +98,8 @@ async function start() {
     fill: query.get("fill") === "1",
     envelope: false,
     look: (TREE_LOOKS.find((l) => l === query.get("look")) ?? "stylized") as TreeLook,
+    /** How every palm is kept, or "species": as its species is. */
+    prune: (PRUNINGS.find((p) => p === query.get("prune")) ?? "species") as Pruning | "species",
   };
   Object.assign(style, LOOK_STYLES[state.look]);
 
@@ -162,7 +167,8 @@ async function start() {
     }
   };
   const growNow = () => {
-    const list = treesFor();
+    const asked = treesFor();
+    const list = state.prune === "species" ? asked : asked.map((t) => ({ ...t, pruning: state.prune as Pruning }));
     const t0 = performance.now();
     const made = createTrees({ trees: list, species, variants: { ...variants }, look: state.look, scans: query.get("scans") === "0" ? false : undefined });
     return { made, count: list.length, ms: performance.now() - t0 };
@@ -384,6 +390,11 @@ async function start() {
   // The look: the pieces differ (dabs, leaf clusters, lobes, or leaf cards), so the trees are made again, with
   // the look's own style.
   const refreshLook = segment(el("look"), [["Painted", "stylized"], ["Painterly", "painterly"], ["Sculpted", "sculpted"], ["Real", "real"]] as [string, TreeLook][], () => state.look, (look) => setLook(look));
+  const refreshPrune = segment(el("prune"), [["Palms as kept", "species"], ["Natural", "natural"], ["Skirt", "skirt"], ["Skinned", "skinned"], ["Pineapple", "pineapple"]] as [string, Pruning | "species"][], () => state.prune, (p) => {
+    state.prune = p;
+    refreshPrune();
+    return regrow();
+  });
   const setLook = (look: TreeLook) => {
     state.look = look;
     Object.assign(style, LOOK_STYLES[look]);
@@ -423,6 +434,7 @@ async function start() {
     const q = new URLSearchParams();
     q.set("scene", state.scene);
     if (state.look !== "stylized") q.set("look", state.look);
+    if (state.prune !== "species") q.set("prune", state.prune);
     q.set("species", String(chosen.row));
     if (state.fill) q.set("fill", "1");
     q.set("hour", String(light.hour));
