@@ -1516,7 +1516,9 @@ export function createTrees(options: TreesOptions): Trees {
         const rings = sin(vBark.z.mul(48).add(sin(round.mul(3)).mul(0.6)));
         const latticeK = mix(lattice, stubs, vPalm.y);
         const palmPattern = select(vPalm.x.greaterThan(1.5).and(vPalm.y.lessThan(0.5)), float(0.86).add(smoothstep(float(-0.6), float(0.9), rings).mul(0.16)), float(0.7).add(smoothstep(float(-0.2), float(0.5), latticeK).mul(0.38)));
-        const furrows = select(vPalm.x.greaterThan(0.5), mix(float(1), palmPattern, max(uStyle3.z, float(0.55))), mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z));
+        // (Faded where its period nears a pixel, so it never shimmers far off.)
+        const fine = float(1).sub(smoothstep(float(0.25), float(0.8), fwidth(vBark.z.mul(select(vPalm.x.greaterThan(1.5), float(48 / 6.283), float(15 / 6.283))))));
+        const furrows = select(vPalm.x.greaterThan(0.5), mix(float(1), palmPattern, max(uStyle3.z, float(0.55)).mul(fine)), mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z));
         // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
         // in patches, a cheap wobble of the furrows' own coordinates.)
         const patch = sin(round.mul(7).add(vBark.z.mul(4.3))).mul(sin(round.mul(4).sub(vBark.z.mul(6.1)))).mul(0.22).add(sin(vBark.z.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(vBark.z.mul(27.1)))).mul(0.16)).add(0.5);
