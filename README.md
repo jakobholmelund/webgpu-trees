@@ -8,13 +8,15 @@ began as the trees of Couch Golf Club, a browser golf game.
 It is early. It has four looks from the same grown trees: `stylized`,
 crowns laid in dabs of paint, as the game draws them; `painterly`, crowns of
 small crisp leaves lit as a few big soft masses; `sculpted`, crowns of soft
-clay lobes; and `real`, crowns of leaf cards, each a spray of the species'
-leaves, with furrowed bark (see *Styles*).
+clay lobes; and `real`, crowns of leaf cards made of the species' own
+scanned leaves, with scanned bark (see *Photographs*).
 WebGPU only (three.js r187, `three/webgpu`).
 
 ```
-src/   the package: imports three and nothing else
-lab/   the lab: ground, sky, and the package's trees on it; and its gallery
+src/      the package: imports three and nothing else
+assets/   the realistic look's photographs: scanned bark and leaves (CC0, SOURCES.md)
+tools/    scans/ makes assets/ from the downloaded scans
+lab/      the lab: ground, sky, and the package's trees on it; and its gallery
 ```
 
 `pnpm test` holds the walls: the package imports only three, the lab
@@ -68,6 +70,14 @@ trees.update(renderer, camera, timeSeconds);
   see "Light from the crown's own leaves"), and
   `trees.sunAt(xz)` hands it to a host's ground or grass as a TSL node (the
   grass library takes it as `world.sun`).
+- **Photographs** (the realistic look's scanned bark and leaves, in
+  `assets/`) are fetched once a page and put in as they come; until then,
+  and with `scans: false`, the bark and the sprays are drawn by arithmetic.
+  `trees.ready` settles when they are in. A bundler must copy the package's
+  `assets/` with it: Vite does, for `new URL(..., import.meta.url)`, unless
+  it pre-bundles the package (then exclude it from `optimizeDeps`, or copy
+  `assets/` somewhere served and pass `scans: { base: "/where/" }`). Hosts
+  may give species photographs of their own (`scans.looks`).
 - **Light and wind** (`trees.environment`) are the host's to set, as the
   grass takes them: the sun's direction, the colour of sunlight and of
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
@@ -681,7 +691,65 @@ side's, inside it is lifted and keeps its top, and wherever it stands it
 keeps to its box and to its outline or its ellipsoid; an edge tree faces
 and leans its own way.
 
+## Photographs
+
+The realistic look wears photographs: scanned bark and scanned leaves, CC0
+from [ambientCG](https://ambientcg.com) and [Poly Haven](https://polyhaven.com),
+and, where no scan exists, a few AI-generated pictures (a silver birch's bark,
+a Canary palm's trunk and frond, a blue gum's sickle leaves), all credited in
+`assets/SOURCES.md` (the generated ones marked so: they are not CC0).
+`tools/scans/fetch.mjs` downloads the sources, `tools/scans/build.mjs` makes
+`assets/` from them (`tools/scans/recipe.mjs` lists both, and how each is cut).
+8.3 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
+spoil).
+
+- **Bark** is a set a species wears (`scans.ts` `SCAN_LOOKS`): a tile of
+  1024 texels of bark, its colour (roughness in alpha) and its relief (normal
+  and height), with the photograph's long-range light evened out so a repeat
+  is not marked. It is wrapped round the wood at its real size (the scan's
+  measured size, or one estimated from its pattern against
+  `docs/MORPHOLOGY.md`, times the species' `barkScale`): seen from two sides
+  square to the wood, each laid up the wood as the bark runs, the two blended
+  by which way the surface faces and by their relief, so there is no seam
+  round a stem and the furrows run up a limb however it leans. Its colour is
+  the scan's, scaled from the set's mean to the species' bark colour (paler up
+  the trunk where the species' is); its relief lights each ridge's sunny side,
+  and the sky's light is less deep in its furrows, where moss gathers first.
+  A species may give way to a second set up its stem, raggedly, in tongues up
+  the furrows: a Scots pine's plates to its orange flakes, a birch's black
+  foot to its white. Twigs stay a twig's dark grey-brown. Only the near tier's
+  wood wears them; further off the bark is drawn as before.
+- **Leaves** are a sheet of single leaves a species wears, cut from a scan
+  and stood upright, laid on the species' own twigs at their real size
+  (`sprays.ts`): a row of cards for each species in the trees: three near
+  cards (a twig's end of a few shoots, 0.4 to 0.9 m across) and one big card
+  (a branch's end, a clump wide, for the mid tier, a conifer's sheets and the
+  far dabs). An oak's leaves one to a node with a cluster at the tip, a
+  maple's in pairs, a blue gum's few long sickles hanging from the twig's end
+  (its cards hang too), a willow's and a birch's along hanging whips; a fir's
+  and a cedar's whole scanned sprays, a pine's whole shoots fanning from a bare
+  stem; a Canary palm's card a two-metre stretch of its frond, a fan palm's
+  its whole fan. The near cards are many small ones (as many to a clump as
+  cover it, at most 36), spread through the clump about its shoots, over two
+  big cards a clump set into it, its mass. The card keeps the drawn sprays' channels (a grey tone
+  from the scan's lightness, lit a little by its own relief; each leaf's own
+  thinness, from the scan's translucency; coverage), so the shaders read
+  either alike and the species' colour still tints them.
+- **Cost**: in the lab's grove, 1552 x 1868, the frame took 1.80 to 1.92 ms
+  in the clearing and 2.45 from outside, against 1.35 to 1.58 and 1.75 to
+  1.83 without the photographs (`scans: false`): the near cards about twice
+  as many (four light steps each instead of six), the near wood's bark
+  sampled four times a pixel. On the graphics card: the bark set's layers
+  (1024 square, mipmapped, two textures) about 11 MB each, and the cards 4
+  MB a species row (512 texels a card for up to six species, 256 beyond).
+
 ## Left out, for now
+
+- The photographs: a birch's dark diamonds and a Canary palm's pineapple
+  knob are not drawn; the leaves' own colour is used only as lightness (the
+  species gives the hue); the cards are composed on the page's thread, a row
+  of cards a task (a worker would keep a busy page smoother); a set's tile
+  repeats along a tall straight stem.
 
 - Pines grown as broadleaves (Scots, Monterey, Torrey, Aleppo, stone) keep
   their clusters and cards: their tufts want sheets of their own, pads

@@ -265,6 +265,8 @@ async function start() {
     camera.lookAt(...shot.target);
     camera.updateProjectionMatrix();
     const t = stand.trees;
+    // (The realistic look's photographs first, so a cell never shows the trees without them.)
+    await t.ready;
     scene.add(t.object);
     ground.mesh.material = stand.groundMat;
     // The light, as the lab sets it.

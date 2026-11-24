@@ -1,6 +1,7 @@
 // The package's walls (README.md):
 //
-//   src imports three and its own files, and nothing else;
+//   src imports three and its own files, and nothing else (but the list of
+//   its photographs, assets/scans.json: data, in the package);
 //   lab imports three and the package's public face (src/index.ts) and its
 //   own files, so the lab can do only what a stranger's project could.
 //
@@ -15,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
 const LAB = join(ROOT, "lab");
+const ASSETS = join(ROOT, "assets");
 
 /** Every module a file imports or re-exports from. */
 function imports(file) {
@@ -38,6 +40,7 @@ test("the package imports only three and itself", () => {
       if (isThree(spec)) continue;
       assert.ok(spec.startsWith("."), `${relative(ROOT, file)} imports ${spec}`);
       const to = resolve(dirname(file), spec);
+      if (to === join(ASSETS, "scans.json")) continue;
       assert.ok(to.startsWith(SRC + "/"), `${relative(ROOT, file)} imports ${spec}, outside src`);
     }
   }
