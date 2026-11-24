@@ -106,8 +106,18 @@ const PINE_SHORT = 0.15;
 /** How many near cards to a pine's clump, as `FixedCards.fill`: this, and this much more for a dense one (openness 0). */
 const PINE_FILL = 0.45;
 const PINE_FILL_DENSE = 1.2;
-const PINE_BIG_FILL = 0.3;
+const PINE_BIG_FILL = 0.05;
+/** How far a pine's mid cards turn up along their twigs (`cardPieces`' `rises`). */
+const PINE_MID_RISE = 1;
+/** A pine more closed than this has a cushion card under its near tufts. */
+const PINE_CUSHION_OPEN = 0.45;
 const PINE_RIM = 1.5;
+/** How dark a pine's needles are at the foot of their clump, beside its top's (`cardPieces`' height in the clump). */
+const PINE_CLUMP_LOW = 0.18;
+/** How much of its leaf area a pine's crown shades with, for its needles' clumping into shoots and cushions. */
+const PINE_CLUMPING = 0.55;
+/** ... and how much lighter, and yellower, its top. */
+const PINE_CLUMP_TOP = 1.75;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -310,7 +320,13 @@ export function createTrees(options: TreesOptions): Trees {
   const lobeShape = LOOK_LOBES[look];
   const lobes = lobed ? grown.map((g) => crownLobes(g, Math.min(MAX_LOBES, lobeCount(g, lobeShape.share, lobeShape.least, lobeShape.most)))) : [];
   // (Each variant's box of light: its own leaves and wood, and the sky they leave it. light.ts.)
-  const volumes: LightVolume[] = grown.map((g, i) => bakeLight(g, { lai: leafAreaIndex(species[plan.variants[i].species].openness) }));
+  // (A pine's needles are clumped into shoots and its shoots into cushions, with gaps between: light gets
+  // through as through a canopy of so much less leaf (the clumping index, Chen and Black 1992: 0.5 to 0.7
+  // for pines). Spread evenly through each clump's ball, its leaf area shaded even the cushions' sunlit tops.)
+  const volumes: LightVolume[] = grown.map((g, i) => {
+    const sp = species[plan.variants[i].species];
+    return bakeLight(g, { lai: leafAreaIndex(sp.openness) * (sp.leafKind === "pine" ? PINE_CLUMPING : 1) });
+  });
   const detail: TreeDetail = { ...DEFAULT_DETAIL };
   const show = { near: true, mid: true, far: true, wood: true, leaves: true };
 
@@ -435,7 +451,9 @@ export function createTrees(options: TreesOptions): Trees {
     return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "tufts"
         ? // (A pine's shoots, each a few tufts with air between: as many to a clump as it is dense, and no big
           // card under them, whose picture a clump wide, close to, was a lump, a broad leaf's.)
-          { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 36, big: 0, bigSize: 1, hang: 0, rise: 0.8 }
+          // (A dense pine's clump is a cushion, nearly opaque: under its tufts one big card a clump wide, its
+          // branch's tufts at their size (`pineBranch`), the mass the near ones lay their spikes over.)
+          { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 36, big: species[v.species].openness < PINE_CUSHION_OPEN ? 1 : 0, bigSize: 1, hang: 0, rise: 0.8 }
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
@@ -445,7 +463,9 @@ export function createTrees(options: TreesOptions): Trees {
   // (A palm's leaves are its fronds, drawn as they are: `frondSets`. Its clumps are only for its light.)
   const isPalm = grown.map((g) => !!g.palm);
   const noDabs = sheeted.map((k, v) => k || isPalm[v]);
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
+  // (A pine's mid cards stand up, its big card's cushion of tufts flat beneath and domed above.)
+  const midRises = plan.variants.map((v) => (looks[v.species].spray === "tufts" ? PINE_MID_RISE : 0));
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs, undefined, midRises) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
   const frondSets: Pieces[] = TIER_SHAPES.map((_, t) => palmPieces(grown, t));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
   // from boughs to blots, pixel by pixel, a speckle over the whole hand-over.)
@@ -1081,6 +1101,15 @@ export function createTrees(options: TreesOptions): Trees {
       const leaf = T.srow(0);
       const tone = float(1).add(jit.mul(leaf.w).mul(0.6));
       let albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
+      if (pineCard) {
+        // (A pine's clump is a dense cushion of needles: those low in it are in its own shade, a light box
+        // a clump to its cell cannot hold. Each clump lit on top and dark beneath, as a pine's are seen.)
+        const inClump = attribute<"vec4">("aTangent", "vec4").w;
+        // (Its top's needle tips catch the sun, yellower: the young shoots' paler needles.)
+        const up = smoothstep(float(-1), float(0.8), inClump);
+        const cushion = mix(vec3(PINE_CLUMP_LOW), vec3(PINE_CLUMP_TOP * 1.08, PINE_CLUMP_TOP, PINE_CLUMP_TOP * 0.78), up.mul(up));
+        albedo = albedo.mul(mix(vec3(1), cushion, pineCard));
+      }
       // (Deep in the crown the leaves see little sky as well as little sun: the crown's own shade.)
       // (Less so where the crown's own leaves say how much sky it sees: `structure`.)
       const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w.mul(float(1).sub(uLight.x.mul(0.7)))));

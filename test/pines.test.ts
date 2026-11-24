@@ -12,7 +12,7 @@ import { LINE_STRIDE, TIER_SHAPES, flareBark, woodPieces } from "../src/geometry
 import { ALPHA_CUT, alphaOf, coverage, coverageMips } from "../src/mips.ts";
 import { leafSet, scanLookOf } from "../src/scans.ts";
 import { ALL_SPECIES } from "../src/species.ts";
-import { needleOf, pineShoots } from "../src/sprays.ts";
+import { drawSprayRow, needleOf, pineShoots } from "../src/sprays.ts";
 import { hash01 } from "../src/variants.ts";
 
 const species = (name: string) => ALL_SPECIES.find((s) => s.name === name)!;
@@ -159,4 +159,97 @@ test("a blue gum's leaves are as narrow as its adult leaves (12–30 by 1.7–3 
   // (A sprite's box holds its sickle's curve too, so its width over its length is over the leaf's own.)
   const ratio = mean(set.sprites.map((s) => s.w / Math.hypot(s.tip[0] - s.base[0], s.tip[1] - s.base[1]))) * (look.leafWidth ?? 1);
   assert.ok(ratio <= 0.2, `${ratio.toFixed(3)}`);
+});
+
+// ---- The pines' crowns against their photographs (the owner's stone pine references: an umbrella 2.5 to 3
+// times as wide as deep, flat on top, on a stem that forks a third to half of the way up). ----
+
+/** A grown tree's crown, from its clumps: its width (seen side-on, the most of eight sides), its depth, and how high its top is at each ring out from its stem. */
+function crownOf(tree: ReturnType<typeof growTree>) {
+  const c = tree.clumps;
+  let lo = Infinity;
+  let hi = -Infinity;
+  let reach = 0;
+  for (let i = 0; i < c.count; i++) {
+    lo = Math.min(lo, c.y[i] - c.radius[i]);
+    hi = Math.max(hi, c.y[i] + c.radius[i]);
+    reach = Math.max(reach, Math.hypot(c.x[i], c.z[i]) + c.radius[i]);
+  }
+  let width = 0;
+  for (let v = 0; v < 8; v++) {
+    const a = (v / 8) * Math.PI;
+    let l = 0;
+    let r = 0;
+    for (let i = 0; i < c.count; i++) {
+      const across = c.x[i] * Math.cos(a) + c.z[i] * Math.sin(a);
+      l = Math.min(l, across - c.radius[i]);
+      r = Math.max(r, across + c.radius[i]);
+    }
+    width = Math.max(width, r - l);
+  }
+  const rings = new Array(5).fill(-Infinity);
+  for (let i = 0; i < c.count; i++) {
+    const k = Math.min(4, Math.floor((Math.hypot(c.x[i], c.z[i]) / reach) * 5));
+    rings[k] = Math.max(rings[k], c.y[i] + c.radius[i]);
+  }
+  return { width, depth: hi - lo, top: hi, rings };
+}
+
+test("a stone pine is an umbrella: two and a half to four times as wide as deep, its top flat", () => {
+  const sp = species("Stone pine");
+  for (const seed of SEEDS) {
+    const tree = growTree(sp, { height: sp.height, crownRadius: sp.crownRadius, crownBase: sp.crownBase, trunkRadius: sp.trunkRadius }, seed);
+    const { width, depth, top, rings } = crownOf(tree);
+    const ratio = width / depth;
+    console.log(`stone pine seed ${seed}: ${width.toFixed(1)} m wide, ${depth.toFixed(1)} m deep (${ratio.toFixed(2)}), top by ring ${rings.map((r) => r.toFixed(1)).join(" ")}`);
+    assert.ok(ratio >= 2.5 && ratio <= 4, `seed ${seed}: ${ratio.toFixed(2)} times as wide as deep`);
+    // (Flat: its top over the inner four fifths of its reach within a fourteenth of its height of the highest; a
+    // dome as deep falls a third of its depth, some 2.5 m, by four fifths of the way out.)
+    for (const r of rings.slice(0, 4)) assert.ok(top - r <= 0.07 * sp.height, `seed ${seed}: a ring's top ${(top - r).toFixed(2)} m under the crown's`);
+  }
+});
+
+test("a stone pine's stem forks below its umbrella into a few great limbs rising bare to it", () => {
+  const sp = species("Stone pine");
+  for (const seed of SEEDS) {
+    const tree = growTree(sp, { height: sp.height, crownRadius: sp.crownRadius, crownBase: sp.crownBase, trunkRadius: sp.trunkRadius }, seed);
+    const k = tree.skeleton;
+    // (Its limbs' feet: the first node of each limb off the stem.)
+    const feet: number[] = [];
+    for (let i = 0; i < k.count; i++) if (k.order[i] === 1 && k.parent[i] >= 0 && k.order[k.parent[i]] === 0) feet.push(k.y[i]);
+    const low = feet.filter((y) => y < 0.9 * sp.crownBase);
+    assert.ok(low.length >= 3, `seed ${seed}: ${low.length} limbs leave the stem below its umbrella`);
+    assert.ok(Math.min(...feet) >= 0.25 * sp.height && Math.min(...feet) <= 0.5 * sp.height, `seed ${seed}: it forks at ${Math.min(...feet).toFixed(1)} m of ${sp.height}`);
+  }
+});
+
+test("a pine's big card is a cushion of tufts, wider than high, and its near card stands on its twig's foot", () => {
+  for (const name of ["Stone pine", "Scots pine", "Monterey pine"]) {
+    const sp = species(name);
+    const look = scanLookOf(sp);
+    const n = 128;
+    const sheet = { set: { sprites: [{ size: 1 }] }, albedo: { width: 1, height: 1, data: new Uint8Array(4) }, normal: { width: 1, height: 1, data: new Uint8Array(4) } };
+    const out = { width: 4 * n, height: n, data: new Uint8Array(4 * n * 4 * n) };
+    drawSprayRow(out, 0, n, sheet as never, look, 1.45 * sp.clumpSize, 7, 1 - sp.openness);
+    const box = (col: number) => {
+      let x0 = n, x1 = 0, y0 = n, y1 = 0, rows = 0, sum = 0;
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          if (out.data[(y * out.width + col * n + x) * 4 + 3] < 128) continue;
+          x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+          rows += y; sum++;
+        }
+      return { w: x1 - x0, h: y1 - y0, meanRow: rows / Math.max(1, sum), cover: sum / (n * n) };
+    };
+    const big = box(3);
+    assert.ok(big.w > 1.3 * big.h, `${name}: its cushion ${big.w} texels wide and ${big.h} high`);
+    assert.ok(big.cover > 0.12, `${name}: its cushion covers ${(big.cover * 100).toFixed(0)}% of its card`);
+    // (Its cards are drawn upside down on their twigs, the picture's first row at the twig's far end (seen in
+    // the lab); a pine's are written so, its foot in its last rows and its tufts above it.)
+    for (const col of [0, 1, 2]) {
+      const near = box(col);
+      assert.ok(near.meanRow < 0.75 * n, `${name}: a near card's needles over its foot (their mean row ${near.meanRow.toFixed(0)} of ${n})`);
+      assert.ok(out.data[((n - 1 - Math.round(0.1 * n)) * out.width + col * n + n / 2) * 4 + 3] > 0, `${name}: its twig comes in at its foot`);
+    }
+  }
 });

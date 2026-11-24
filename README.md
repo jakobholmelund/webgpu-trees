@@ -303,10 +303,10 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Douglas fir | *Pseudotsuga menziesii* | a tall, somewhat open cone | pacific-northwest, denmark | 30 | 5 | 3 |
 | Western red cedar | *Thuja plicata* | a cone of drooping sprays, red bark | pacific-northwest | 20 | 4.5 | 1 |
 | Monterey cypress | *Hesperocyparis macrocarpa* | a wind-shaped flat top on a few great limbs | california | 18 | 7 | 3 |
-| Monterey pine | *Pinus radiata* | an irregular rounded crown, grass-green | california | 20 | 6.5 | 5 |
+| Monterey pine | *Pinus radiata* | a heavy, lumpy rounded crown going flat, dark green | california | 20 | 7.5 | 4 |
 | Torrey pine | *Pinus torreyana* | an open crooked crown, long grey-green needles | california | 15 | 5.5 | 4 |
 | Aleppo pine | *Pinus halepensis* | an irregular open crown, grey-green | california, france | 15 | 6.5 | 3 |
-| Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 10.5 | 5 |
+| Stone pine | *Pinus pinea* | a flat umbrella of dense cushions on a stem forked into rising limbs | california, france | 15 | 11.5 | 8 |
 | Canary date palm | *Phoenix canariensis* | a big round head of arching fronds on a thick trunk | california | 15 | 5 | 7 |
 | Mexican fan palm | *Washingtonia robusta* | a tall thin pole flared at its foot, a small tight head of fan leaves | california | 22 | 2.2 | 18 |
 | California fan palm | *Washingtonia filifera* | a stout grey column, a head of grey-green fans; in the wild a skirt of dead leaves to the ground | california | 12 | 3 | 7.5 |
@@ -323,7 +323,11 @@ pine's proportions (crown reach and base for height) and outlines are
 measured from photographs of open-grown trees (`test/outlines.json`; each
 grows within 12% of its photograph's outline, `test/outline.test.ts`). An
 old pine has given up its leader: the Scots, Torrey, Aleppo, Monterey and
-stone pines are grown as broadleaves, with needles.
+stone pines are grown as broadleaves, with needles. A stone pine's stem forks a
+third of the way up (`fork`, a share of its crown's base: its limbs leave together, in
+a vase, and rise bare to the umbrella), its crown some three times as wide as deep and
+flat on top (`test/pines.test.ts`); its outline test still reads the Roquebrune
+photograph, whose low left is another tree behind it.
 
 A crown's outline is its `shape`'s, made round (`CROWN_OUTLINES`): widest
 some way up, upright there, curving in above and below. `crownPeak` (0..1)
@@ -943,6 +947,30 @@ spoil).
   outside before, 1.25 to 1.28 and 1.70 to 1.72 after (two runs each,
   interleaved; this Mac is shared): fewer near cards on a pine and on a blue
   gum's bunches pay for the rest.
+- **Pines as cushions** (the owner's stone pine references: dense cushions, lit on top
+  and dark beneath, on a flat-topped layer). A pine's tuft is a brush along its
+  shoot's last years (`ScanLook.brush`, in needle lengths: a stone pine's 2, a Monterey
+  pine's 1.8, a Scots pine's 1.6, an Aleppo pine's 1.2), its needles behind the tip's
+  starburst standing forward as a bottle brush's, in a dozen or more bundles (a few big
+  spokes were a palmate leaf a few dozen metres off). Its big card is a branch seen
+  side-on, its shoots rising off it (`pineBranch`): a cushion flat beneath and domed
+  above, wider than high, its wood half a near card's; a pine's mid cards stand up on
+  their twigs (`cardPieces`' `rises`) so the cushions stay cushions, and a dense pine
+  (`openness` under 0.45) has one under its near tufts. Its cards are lit by how high
+  each corner is in its clump (`aTangent.w`): dark at the clump's foot, lighter and
+  yellower at its top. Its light box holds its leaf area times a clumping index of
+  0.55 (Chen and Black 1992): spread evenly through each clump's ball, it shaded the
+  cushions' sunlit tops. Its near cards spread above their shoots, not under them.
+- **The cards stand upside down on their twigs.** Seen in the lab (a card of a triangle
+  whose point is its last row, on cards turned up their twigs: the points were down),
+  a card's first row is at its twig's far end, not at its foot, for every species; a
+  pine's cards are written bottom row first (`drawSprayCard`), so its tufts are held up
+  and its big card's cushion sits on its branch. The other species' cards are as
+  they were: to be looked at with the looks they were tuned under.
+- **Cost** of the pines as cushions: in the lab's grove, 3456 x 2006, the frame took
+  3.81 to 3.89 ms in the clearing and 3.39 to 3.50 from outside before, 4.05 to 5.63
+  and 3.68 to 5.14 after (runs interleaved on a shared, busy Mac): more near cards to a
+  dense pine's clump, and a cushion card under them.
 - **Cost** of the pines' shoots, the hand-over piece by piece and the bark
   over the flare: in the lab's grove, 1104 x 1868, the frame took 1.29 to
   1.34 ms in the clearing and 1.70 to 1.80 from outside before, 1.21 to 1.45
