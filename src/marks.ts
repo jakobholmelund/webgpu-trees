@@ -464,8 +464,8 @@ export function sheetAtlasPixels(): { data: Uint8Array; width: number; height: n
     for (const leaf of needles) drawLeaf(top, leaf);
     put(data, width, col, 0, top);
     const under = layer(SHEET_CELL);
-    for (const leaf of needles) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.74 });
-    for (const leaf of body) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.78 });
+    for (const leaf of needles) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.8 });
+    for (const leaf of body) drawLeaf(under, { ...leaf, tone: leaf.tone * 0.84 });
     put(data, width, col, 1, under);
   }
   return { data, width, height };

@@ -81,9 +81,9 @@ replaces them.
 | Look | Its crowns | Its light |
 | --- | --- | --- |
 | `stylized` (painted) | brush marks, a few dabs to a clump | the crown's form and each clump's, in flat bands |
-| `painterly` | lumpy clusters of small crisp leaves of the species' kind (`marks.ts`), never longer than `leafSize` metres however big the crown: ovate leaves for broadleaves, round leaves for small-leaved trees, level boughs with hanging needles for conifers, curved leaflets for palms | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
+| `painterly` | lumpy clusters of small crisp leaves of the species' kind (`marks.ts`), never longer than `leafSize` metres however big the crown: ovate leaves for broadleaves, round leaves for small-leaved trees, curved leaflets for palms; a conifer's boughs as sheets of needles (*Boughs*) | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
 | `sculpted` | soft lumpy clay discs, and sprigs of two or three leaves on the tops of its lobes | the lobes as clay balls, each dab a small ball on its lobe |
-| `real` | leaf cards set in the crown, each a spray of the species' leaves | as the sun gives it, with light through the leaves |
+| `real` | leaf cards set in the crown, each a spray of the species' leaves; a conifer's boughs as sheets carrying its sprays | as the sun gives it, with light through the leaves |
 
 **Lobes.** The painterly and sculpted looks light a crown as a painter does,
 as a handful of masses before any leaf. Each crown's clumps are gathered
@@ -119,8 +119,71 @@ tips all round and no ring of tips pointing out like a star.
 an outline about its midrib, folded (one half a little darker), lighter
 to its tip, its own tone, casting a thin shadow on what it lies over;
 green carries a number of each leaf's own, so leaves in the light vary one
-by one. Close to, where a texel covers more than a pixel, a mark's edge is
-sharpened over one pixel, so leaves stay crisp at any distance.
+by one. A mark's edge is sharpened over one pixel, so leaves stay crisp
+close to, where a texel covers more than a pixel, and keep their coverage
+far off (see *Far leaves*).
+
+**Boughs.** A conifer grown whorl by whorl (spruces, firs, cedars) lays
+its boughs, near and mid, as sheets lying along them, in the painterly and
+the realistic looks (`sheetPieces`). Dabs facing the eye made a fir a stack
+of blocks, and a bough is not a ball of leaves: it is a flat, drooping
+spray, lit on its top and dark beneath. Koerye's foliage-mass study tried
+three ways and found the same: loose leaves gave spiky balls, dense
+clusters looked fragmented and closed blocks cushions, while curved sheets
+held their volume from every side and read as tiered boughs. So each bough
+is a run of overlapping strips on its own wood, from its first clump to
+past its tip, each as wide as the bough's side shoots reach, lifted at its
+foot and drooping to its tip, its edges falling away either side of its
+middle and a little twisted: from the tee a bough hangs its fringe, from
+under it is a bough's shade, and from above its top. A sheet has two
+sides, its top light (needles over a darker body) and its underside dark
+(the body over the needles), the same outline cell for cell; which shows
+is the pixel's to say, and the side lit as itself over its lobe, so
+neighbouring boughs shade as one mass. The sun on a bough's top comes
+through to its underside. Twelve triangles a sheet close to, about 4,300
+a spruce (its dabs were 1,360, its realistic cards 5,450); mid, the same
+boughs in fewer, longer sheets of four, about 480 a spruce. The mid tier
+had been dabs, and a tree passing between the two changed from boughs to
+blots pixel by pixel, a speckle over the whole hand-over. An old pine
+grown as a broadleaf has no whorled boughs, its needles tufts at its
+twigs' ends, and sheets made its crown a palm's fronds: it keeps its
+clusters.
+
+**Light through the leaves.** A thin leaf passes on about as much light as
+it sends back. To an eye looking towards the sun through it, the light is
+bent a little by how the leaf faces and gathers about the sun
+(Barré-Brisebois, GDC 2011: `throughWarp`, `throughPower`), as much as
+`through` says. SeedThree's lesson is that the model alone makes every
+backlit leaf the same lime green: it knows only where the eye, the sun
+and the leaf face, and a crown is not one thickness. So the leaves are as
+thin as the crown lets the sun reach them (Monsi and Saeki, the share of
+sun at the leaf), thicker deep in the crown, and each leaf its own (the
+marks' green is each leaf's number; the realistic sprays carry one too),
+as far as `throughVary` says: the crown's edge glows where little lies
+between, and its heart stays dark. Close to it is worked out pixel by
+pixel, the leaf's facing its lobe's (painterly) or its own (cards); far
+off, once a dab.
+
+**Moss.** The wood takes moss where it holds the wet: on what faces up (a
+limb's top), low on the trunk, in the grooves between its buttresses
+(where the surface swells less than round), more on its side away from
+the sun, and never on twigs; `moss` says how much, and a species' bark
+how much it takes (none on a palm, less on pale peeling bark). Painted, it
+is a flat soft green; on furrowed bark, darker and in patches, in the
+furrows first. A few operations a pixel.
+
+**Far leaves.** Drawn with alpha to coverage, a far crown thinned away to a
+lace. Each smaller picture (mip) of an atlas, averaged from the one before,
+keeps the alpha's mean but not how much of a mark is over its cut: a
+thin leaf averaged down is a pixel mostly not there, and two overlapping
+leaves of the same soft alpha get the same samples, so a far crown of them
+shows the sky through. The atlases' mips are made here (`mips.ts`), each
+cell's alpha scaled so as much of it lies at or over the cut as at full
+size (Castaño 2010), and the shader sharpens every mark at the cut over a
+pixel: a far leaf covers its pixels as a near one does, and overlapping
+leaves add up. A painterly bough's mips go further, closing towards its
+outline with distance (a needled bough far off is a bough's shape, as a
+painter's far masses are, not a lace of needles).
 
 **Cost**, the grove (400 trees) on this Mac at 2800 x 1800, 4x MSAA, the
 least of four runs, graphics card's time for the whole frame: painted 1.8
@@ -128,7 +191,20 @@ ms in the clearing and 1.3 ms from outside, painterly 3.4 and 2.1,
 sculpted 3.5 and 2.1, real 3.0 and 2.3. The same pieces in every look but
 the realistic one; the painterly and sculpted looks' dabs are larger
 (`dabScale` 1.4 and 1.5), which is most of their cost, and their lobe is
-found by a search over the crown's lobes in the vertex shader.
+found by a search over the crown's lobes in the vertex shader. A sheet is
+lit by its own lobe, with no search: it faces as its bough does, and the
+search for each of a sheet's twelve vertices was most of what a conifer
+cost.
+
+Boughs as sheets, the light through and the far leaves, measured against
+the drawing before them at 1780 x 1868 (the least of two runs each,
+interleaved; this Mac is shared): the grove of 400 spruces, painterly,
+1.54 to 1.76 ms in the clearing and 2.18 to 2.55 from outside; realistic,
+where sheets replace cards, 1.67 to 1.32 and 2.46 to 1.97. The course's
+30,000 trees of 30 species, painterly, 0.1 to 0.25 ms more of 3 to 5;
+realistic, 0.1 to 0.5 ms less. Anisotropic filtering is the painterly
+sheets' alone: on the realistic atlas, which every card samples, it cost
+0.25 ms of the grove for little to see.
 
 ## Species
 
@@ -319,7 +395,8 @@ upper crowns to Rautiainen's exponents.
   near (all its wood, down to the twigs, and three dabs to a clump of
   leaves, one more over any of its twigs they leave out), mid (its limbs
   and branches, its clumps gathered into at most 56 broad dabs), far (16
-  dabs and a stroke for its trunk). Each tier is one mesh holding every variant, drawn
+  dabs and a stroke for its trunk). A conifer's boughs, near and mid, are
+  sheets (see *Boughs*). Each tier is one mesh holding every variant, drawn
   once per variant by an indirect draw for as many trees as are on its
   list: nothing out of view costs a vertex. A tree passing between tiers is
   drawn by both, each in the pixels the other leaves.
@@ -366,6 +443,11 @@ frame in the clearing and 0.55 of 1.8 ms from outside, 0.4 and 0.33 ms of
 2.15 and 1.5 drawn straight.
 
 ## Left out, for now
+
+- Pines grown as broadleaves (Scots, Monterey, Torrey, Aleppo, stone) keep
+  their clusters and cards: their tufts want sheets of their own, pads
+  along the twigs. A species' kind of sheet is chosen when the trees are
+  made: changing its leaves in the lab needs it grown again.
 
 - Trees' shadows on each other and on what stands under them (the ground's
   shade is baked; see above).

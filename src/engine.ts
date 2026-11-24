@@ -141,7 +141,7 @@ function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = false;
   // (Sheets and cards are seen aslant, from under a bough: sampled along the slant, they keep their needles.)
-  tex.anisotropy = which === "sheets" || which === "leaves" ? 4 : 1;
+  tex.anisotropy = which === "sheets" ? 4 : 1;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
@@ -860,7 +860,10 @@ export function createTrees(options: TreesOptions): Trees {
           const edge = pow(float(1).sub(max(dot(n, eye), float(0))), float(2));
           let col = mix(vShade.xyz, vLit.xyz, lit).add(vRim.mul(edge));
           // (The sun through the leaves, each leaf as thin as its own number makes it.)
-          if (vThru) col = col.add(vThru.xyz.mul(vThru.w).mul(throughView(n, eye, leafy ? mark.g.mul(0.7).add(0.15) : float(0.5))));
+          const ownThin = leafy ? mark.g.mul(0.7).add(0.15) : float(0.5);
+          if (vThru) col = col.add(vThru.xyz.mul(vThru.w).mul(throughView(n, eye, ownThin)));
+          // (A bough's underside, under a sunlit top: the sun through its needles, as a card's back has it.)
+          if (vThru && vSheetN) col = col.add(vThru.xyz.mul(vThru.w).mul(under.mul(max(dot(normalize(vSheetN), uSun), float(0))).mul(0.6).mul(leafThin(ownThin))));
           // (A sprig is a little lighter than the clay it stands on.)
           col = col.mul(float(1).add(mark.b.mul(0.45)));
           return vec4(col.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
@@ -941,7 +944,7 @@ export function createTrees(options: TreesOptions): Trees {
     // side away from the sun. None on twigs. As much as the style and the species' bark take.)
     const facesUp = smoothstep(float(0.3), float(0.85), nWorld.y);
     const away = smoothstep(float(0.2), float(-0.6), dot(normalize(vec2(nWorld.x, nWorld.z).add(vec2(1e-4, 0))), normalize(vec2(uSun.x, uSun.z).add(vec2(1e-4, 0)))));
-    const low = float(1).sub(smoothstep(float(0.15), float(2.4), surface.y));
+    const low = float(1).sub(smoothstep(float(0.1), float(1.6), surface.y));
     const groove = smoothstep(float(0.99), float(0.91), length(aRadial.xyz)).mul(low);
     const mossAmount = clamp(facesUp.mul(mix(float(0.45), float(1), away)).add(low.mul(mix(float(0.3), float(1), away)).mul(0.75)).add(groove.mul(0.8)), 0, 1)
       .mul(smoothstep(float(0.025), float(0.07), thick))
@@ -966,7 +969,7 @@ export function createTrees(options: TreesOptions): Trees {
       const inFurrow = float(1).sub(smoothstep(float(-0.4), float(0.7), ridge));
       const where = patch.mul(0.6).add(inFurrow.mul(0.4));
       const real = smoothstep(float(1).sub(vMoss.w), float(1.18).sub(vMoss.w), where);
-      const cover = mix(smoothstep(float(0.2), float(0.5), vMoss.w), real, uStyle3.z);
+      const cover = mix(smoothstep(float(0.3), float(0.6), vMoss.w), real, uStyle3.z);
       const moss = vMoss.xyz.mul(mix(float(1), patch.mul(0.5).add(0.75), uStyle3.z));
       return vec4(mix(vCol.mul(furrows), moss, cover), 1);
     })();
