@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { breastHeight, growTree } from "../src/grow.ts";
+import { breastHeight, forkHeight, formOf, growTree } from "../src/grow.ts";
 import { ALL_SPECIES, type TreeSpecies } from "../src/species.ts";
 import { type GrownTree, type TreeSize } from "../src/tree.ts";
 
@@ -94,7 +94,8 @@ for (const sp of trees) {
       test(`${name}: its bole under the crown is no thread`, () => {
         // (Under its fork, where a stem forks below its crown (`fork`, a stone pine's): above it, the stem
         // followed is one of its limbs.)
-        const under = Math.min(size.crownBase, (sp.fork ?? 1) * size.crownBase);
+        const form = formOf(sp, seed);
+        const under = Math.min(size.crownBase, form.stems > 1 ? forkHeight(sp, size, form) : size.crownBase);
         const share = radiusAt(tree, stem, 0.97 * under) / radiusAt(tree, stem, bh);
         assert.ok(share >= 0.35, `its radius under the crown is ${(share * 100).toFixed(0)}% of its radius at breast height`);
       });

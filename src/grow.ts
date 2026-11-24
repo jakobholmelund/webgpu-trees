@@ -59,7 +59,7 @@ import { growPalm } from "./palm.ts";
 import { type TreeSpecies } from "./species.ts";
 import { type Stand, standShare } from "./stand.ts";
 import { crownProfile, type Clumps, type GrownTree, type Skeleton, type TreeSize } from "./tree.ts";
-import { Random } from "./random.ts";
+import { Random, hashSeed } from "./random.ts";
 
 const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -148,6 +148,33 @@ const FORK_SWING = 0.5;
 const FORK_WANDER = 0.16;
 /** How far apart up the stem a third or fourth stem leaves it (m). */
 const FORK_APART = 0.3;
+/**
+ * A forked trunk's or a clump's stems (trunks of their own): how far out from the axis the middle of each one's
+ * share of the crown is, as a share of its radius, by how many share it; how far a stem may lean where it
+ * leaves (rad) at leader 1 and at leader 0; the most its lean eases as it rises (the power p of 1 - (1 - t)^p:
+ * 1 straight, more leaning out at first and then turning up); how far round from its way out its great limbs
+ * leave it, at the most, over all its stems (a share of a full turn); and how far into another's share a
+ * stem's wood may grow, a share of the crown's radius.
+ */
+const TRUNK_SHARE = [0, 0, 0.42, 0.5, 0.55];
+const TRUNK_TILT: [number, number] = [12 * DEG, 38 * DEG];
+const TRUNK_CURVE = 2.4;
+const TRUNK_COVER = 1.3;
+const SHARE_OVERLAP = 0.08;
+/**
+ * The first piece of such a stem, from where it leaves (m); and how far up it eases into its lean and steps
+ * aside to its own side of the trunk, in trunk radii, and at the least (m).
+ */
+const STEM_FIRST = 0.2;
+/** ... and at least this many of the trunk's radii: it narrows from the trunk to itself over that, a crotch's shoulder. */
+const STEM_FIRST_RADII = 1.4;
+const STEM_EASE = 1.6;
+/** How much thicker such a stem is where it leaves the trunk, fused into it, and over how much of its first piece that falls by e. */
+const STEM_JOIN = 0.25;
+const STEM_JOIN_FALL = 0.5;
+const STEM_EASE_LEAST = 0.45;
+/** A trunk is not forked this close under breast height or over it (m): measured, it is one trunk or its stems. */
+const FORK_CLEAR_BH = 0.3;
 /** How far a forked stem sways, at crooked 1, as a share of its height to the fork: a sinuous or leaning stem. */
 const STEM_SWAY = 0.2;
 /** How much wider than the species' angle the lowest scaffold leaves (and narrower the highest). */
@@ -391,6 +418,135 @@ export function breastHeight(size: TreeSize): number {
   return Math.min(BREAST_HEIGHT, 0.1 * size.height);
 }
 
+// ---------------------------------------------------------------------------
+// A tree's own form: whether its trunk forks, or it grows as a clump of stems.
+
+/**
+ * How one tree of its kind is built at the foot, from its own seed (`formOf`): one stem, a trunk that forks
+ * (`forkShare`), or a clump of stems from one root plate (`stemShare`).
+ */
+export interface TreeForm {
+  /** How many stems: 1, or a fork's or a clump's 2 to 4. */
+  stems: number;
+  /** Where a forked trunk divides, as a share of its crown base's height (1 for one stem). */
+  fork: number;
+  /** Whether its stems rise from one root plate (a clump), not from a trunk that forks. */
+  clump: boolean;
+  /** A clump's stems part this many flare heights (`flareHeight`) up, over the root plate. */
+  join: number;
+}
+
+/** The seed's own stream for its form, apart from the one it grows by. */
+const FORM_SALT = 0x2f6b1c3d;
+/** In a closed wood (enclosure 1): this share fewer of its trees fork, or grow as clumps ... */
+const WOOD_FEWER_FORKS = 0.6;
+const WOOD_FEWER_CLUMPS = 0.35;
+/** ... and those that fork do so this share of the way higher, towards the crown's base. */
+const WOOD_HIGHER = 0.5;
+/** Where a clump's stems part from their root plate, in flare heights. */
+const CLUMP_JOIN: [number, number] = [1.4, 2.2];
+/** A fork is never lower than this many flare heights (or half its crown's base): its root plate, under it. */
+const ROOT_PLATE = 1.2;
+
+/** A number 0..1 from a seed alone, which decides its form: below a species' shares, it forks or is a clump. */
+export function formDraw(seed: number): number {
+  return new Random(hashSeed(seed) ^ FORM_SALT).next();
+}
+
+/** The share of a species' trees whose trunk forks. */
+export function forkShareOf(sp: TreeSpecies): number {
+  if (sp.architecture !== "broadleaf") return 0;
+  return Math.min(1, Math.max(0, sp.forkShare ?? (sp.fork !== undefined && sp.forkStems !== undefined ? 1 : 0)));
+}
+
+/** The share of a species' trees that grow as a clump of stems from one root plate. */
+export function stemShareOf(sp: TreeSpecies): number {
+  if (sp.architecture !== "broadleaf") return 0;
+  return Math.min(1, Math.max(0, sp.stemShare ?? 0));
+}
+
+/** Whether a species' trees differ in their form at the foot, one from the next. */
+export function formsVary(sp: TreeSpecies): boolean {
+  const f = forkShareOf(sp);
+  return stemShareOf(sp) > 0 || (f > 0 && (f < 1 || (sp.forkSpread ?? 0) > 0 || (sp.forkStemsMost ?? 0) > (sp.forkStems ?? 0)));
+}
+
+/**
+ * A tree's form, from its own seed (and where it stands: in a closed wood fewer trees fork or grow as
+ * clumps, and those that fork do so higher). The same seed always gives the same form; over many seeds, a
+ * species' shares.
+ */
+export function formOf(sp: TreeSpecies, seed: number, stand?: Stand): TreeForm {
+  const rng = new Random(hashSeed(seed) ^ FORM_SALT);
+  const u = rng.next();
+  const v = rng.next();
+  const w = rng.next();
+  const shut = Math.min(1, Math.max(0, stand?.enclosure ?? 0));
+  const clump = stemShareOf(sp) * (1 - WOOD_FEWER_CLUMPS * shut);
+  const forks = forkShareOf(sp) * (1 - WOOD_FEWER_FORKS * shut);
+  // (Fewer stems are likelier than more.)
+  const count = (lo: number, hi: number) => Math.min(hi, lo + Math.floor(v ** 1.3 * (hi - lo + 1)));
+  if (u < clump) {
+    const [lo, hi] = sp.stemRange ?? [2, 3];
+    return { stems: count(Math.max(2, lo), Math.min(4, hi)), fork: 0, clump: true, join: CLUMP_JOIN[0] + (CLUMP_JOIN[1] - CLUMP_JOIN[0]) * w };
+  }
+  if (u < clump + forks) {
+    const lo = Math.max(2, Math.min(4, Math.round(sp.forkStems ?? 2)));
+    const hi = Math.max(lo, Math.min(4, Math.round(sp.forkStemsMost ?? lo)));
+    let at = Math.min(1, Math.max(0, sp.fork ?? 0.6)) + (sp.forkSpread ?? 0) * (2 * w - 1);
+    at += shut * WOOD_HIGHER * (1 - at);
+    return { stems: count(lo, hi), fork: Math.min(1, Math.max(0.02, at)), clump: false, join: 0 };
+  }
+  return { stems: 1, fork: 1, clump: false, join: 0 };
+}
+
+/**
+ * Where a tree's stems part (m): a clump's a little over its root plate, a forked trunk's where its form says
+ * (but over its root plate: the stems of a trunk forked near the ground still rise from one), a stone pine's
+ * (V-forks) where its form says.
+ */
+export function forkHeight(sp: TreeSpecies, size: TreeSize, form: TreeForm): number {
+  if (form.stems <= 1) return size.crownBase;
+  const hf = flareHeight(size, sp.buttress ?? 0);
+  const bh = breastHeight(size);
+  // (A stem's first piece, from the trunk's thickness to its own, ends under breast height or well over it.)
+  const under = Math.max(FORK_CLEAR_BH, stemFirst(size));
+  if (form.clump) return Math.max(0.1, Math.min(hf * form.join, 0.6 * bh, bh - under, 0.6 * size.crownBase));
+  if (sp.forkSplits !== undefined) return form.fork * size.crownBase;
+  const y = Math.max(form.fork * size.crownBase, Math.min(ROOT_PLATE * hf, 0.5 * size.crownBase));
+  // (Not at breast height, where its trunk is measured: over it if the crown leaves room, else under it.)
+  if (y > bh - under && y < bh + FORK_CLEAR_BH) return bh + FORK_CLEAR_BH <= 0.9 * size.crownBase ? bh + FORK_CLEAR_BH : Math.max(0.1, Math.min(y, bh - under));
+  return y;
+}
+
+/**
+ * The wood a grown tree has at a height (m): where each piece of it crosses that height (x, z from its foot)
+ * and how thick it is there, the thickest first, leaving out wood thinner than `least` of its trunk's
+ * radius. At 1 m, a forked or clumped tree's stems: what a ball meets of it low down (one circle for a tree
+ * of one stem).
+ */
+export function stemsAt(tree: GrownTree, y: number, least = 0.15): { x: number; z: number; r: number }[] {
+  const k = tree.skeleton;
+  const out: { x: number; z: number; r: number }[] = [];
+  for (let i = 0; i < k.count; i++) {
+    const p = k.parent[i];
+    if (p < 0 || k.y[p] > y || k.y[i] <= y) continue;
+    const f = (y - k.y[p]) / Math.max(1e-9, k.y[i] - k.y[p]);
+    const r = k.radius[p] + (k.radius[i] - k.radius[p]) * f;
+    if (r < least * tree.size.trunkRadius) continue;
+    out.push({ x: k.x[p] + (k.x[i] - k.x[p]) * f, z: k.z[p] + (k.z[i] - k.z[p]) * f, r });
+  }
+  return out.sort((a, b) => b.r - a.r);
+}
+
+/** How long the first piece of a forked trunk's or a clump's stem is (m). */
+function stemFirst(size: TreeSize): number {
+  // (No longer than leaves room for a fork just over the root plate to end under breast height: a short
+  // tree's stems may still part low.)
+  const room = breastHeight(size) - ROOT_PLATE * flareHeight(size) - 0.05;
+  return Math.max(STEM_FIRST, Math.min(STEM_FIRST_RADII * size.trunkRadius, room));
+}
+
 /** A branch's angle from its parent (radians): the species', varied by its spread, within two spreads. */
 function branchAngle(sp: TreeSpecies, rng: Random): number {
   const g = Math.max(-2, Math.min(2, rng.gauss()));
@@ -414,6 +570,8 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
   // grown narrow in a wood is still a crown of many sprays, not two or three balls on a stick.
   const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height);
   const clumpR = species.architecture === "palm" ? own : Math.min(own, CLUMP_OF_CROWN * sz.crownRadius);
+  // (Its form at the foot, from its own seed: one stem, a forked trunk, or a clump of stems.)
+  const form = species.architecture === "broadleaf" ? formOf(species, seed, st) : { stems: 1, fork: 1, clump: false, join: 0 };
   let hung: Hung;
   switch (species.architecture) {
     case "conifer":
@@ -421,13 +579,18 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
       break;
     case "broadleaf":
     case "shrub":
-      hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift);
+      hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift, form);
       break;
     case "palm":
       // (A palm is grown as a palm: palm.ts.)
       return growPalm(species, sz, seed);
   }
-  const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined), rng.fork(), st);
+  // (A stone pine's V-forks below its crown keep their limbs from there; a forked trunk's or a clump's
+  // stems are kept as trunks.)
+  const vForkY = form.stems > 1 && species.forkSplits !== undefined ? forkHeight(species, sz, form) : undefined;
+  // (A forked trunk's or a clump's: where its stems part and their first pieces are kept as grown by the fit.)
+  const keepBelow = form.stems > 1 && species.forkSplits === undefined ? forkHeight(species, sz, form) + stemFirst(sz) + 0.05 : 0;
+  const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st);
   const habit = { sprayHang: species.sprayHang, pads: species.pads, clusters: species.clusters };
   const said = Object.values(habit).some((v) => v !== undefined && v > 0);
   return species.buttress || said ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}) } : tree;
@@ -788,7 +951,7 @@ class Lobes {
  * or down by the species' bend, with a lateral bud at every one (by the golden angle); and a branch that
  * gathers too little light for its wood is shed (Takenaka). Nothing grows out of the crown's outline.
  */
-function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, liftTo = size.crownBase): Hung {
+function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, liftTo = size.crownBase, form: TreeForm = { stems: 1, fork: 1, clump: false, join: 0 }): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
   const crown = Math.cbrt(R * R * depth);
@@ -1001,6 +1164,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   /** A V-fork (`forkStems`): its two arms share what it is given by the light each gathers, neither favoured. */
   const even = new Uint8Array(cap);
   const az = new Float64Array(cap);
+  /** Which of a forked trunk's or a clump's stems a node is on (-1: the trunk under them, or a tree of one stem). */
+  const owner = new Int8Array(cap).fill(-1);
   /** How many nodes along its axis a node is: which of its axis's buds it bears, for opposite or two-ranked buds. */
   const rank = new Int32Array(cap);
   const phyllo = sp.phyllotaxis ?? "spiral";
@@ -1025,6 +1190,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     dy[i] = d[1];
     dz[i] = d[2];
     par[i] = parent;
+    owner[i] = parent >= 0 ? owner[parent] : -1;
     main[i] = -1;
     lat[i] = -1;
     kind[i] = k;
@@ -1055,7 +1221,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
    * turns as `way(s)` says (s, metres along it), an internode at a time, until it leaves the crown (once it
    * has been in it) or has gone `most` metres. Returns its nodes' places.
    */
-  const spine = (from: number, way: (s: number) => V3, most: number): number[] => {
+  const spine = (from: number, way: (s: number) => V3, most: number, keep?: (x: number, z: number) => boolean): number[] => {
     const pts: number[] = [];
     let x = px[from];
     let y = py[from];
@@ -1066,7 +1232,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const nx2 = x + d[0] * L;
       const ny2 = y + d[1] * L;
       const nz2 = z + d[2] * L;
-      if (inCrown(nx2, ny2, nz2)) entered = true;
+      if (inCrown(nx2, ny2, nz2) && (!keep || keep(nx2, nz2))) entered = true;
       // (In a stand, a spine that has found no live crown by the crown's edge never will.)
       else if (entered || ny2 < 0 || (liveAt && nx2 * nx2 + nz2 * nz2 > R * R)) break;
       x = nx2;
@@ -1093,6 +1259,22 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   // crown, leaning out from it.
   const stems = Math.max(1, Math.round(sp.stems));
   const scaffolds = scaffoldCount(sp);
+  // (A forked trunk's or a clump's stems share the crown: each the part of it nearer the middle of its own
+  // share than of another's, by a little. Their middles, out from the axis, are laid with the stems.)
+  const shareX: number[] = [];
+  const shareZ: number[] = [];
+  const overlap = SHARE_OVERLAP * R;
+  const owns = (k: number, x: number, z: number): boolean => {
+    for (let j = 0; j < shareX.length; j++) {
+      if (j === k) continue;
+      const ux = shareX[k] - shareX[j];
+      const uz = shareZ[k] - shareZ[j];
+      const l = Math.hypot(ux, uz);
+      if (l < 1e-6) continue;
+      if (((x - 0.5 * (shareX[k] + shareX[j])) * ux + (z - 0.5 * (shareZ[k] + shareZ[j])) * uz) / l < -overlap) return false;
+    }
+    return true;
+  };
   const turn = rng.range(0, 2 * Math.PI);
   for (let s = 0; s < stems; s++) {
     const azs = turn + s * GOLDEN_ANGLE + rng.range(-0.3, 0.3);
@@ -1113,13 +1295,15 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       continue;
     }
     /** The scaffolds to lay: where each leaves, and (a forked stem's) which way and at what angle from upright. */
-    const holds: { node: number; scaffold: number; az?: number; angle?: number }[] = [];
+    const holds: { node: number; scaffold: number; az?: number; angle?: number; pos?: number; own?: number }[] = [];
+    // (A stone pine's stem divides in V-forks; a forked trunk's or a clump's stems are trunks of their own.)
+    const vFork = form.stems > 1 && sp.forkSplits !== undefined;
     // (Not a crown grown narrow, in a wood: its stem's limbs leave it one by one, rising steeply, as any tree's.)
-    if (sp.forkStems !== undefined && sp.fork !== undefined && !liveAt && R / depth >= NARROW) {
+    if (vFork && !liveAt && R / depth >= NARROW) {
       // A stem that divides at its fork into a few stems, each dividing again in V-forks, rising and then
       // spreading, their last arms the limbs that reach out under the crown (a stone pine's): its fork a share
       // of the way to its crown's base, its stem sinuous or leaning a little on the way, as crooked as it is.
-      const yF = Math.min(1, Math.max(0, sp.fork)) * base;
+      const yF = forkHeight(sp, size, form);
       const lean = rng.range(0, 2 * Math.PI);
       const sway = STEM_SWAY * sp.crooked * yF * rng.range(0.6, 1);
       const wave = rng.range(0.7, 1.1);
@@ -1132,7 +1316,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       };
       // (Its stems leave it a little apart up it: a node has one stem to go on and one to put out, so a third
       // or fourth leaves a little below the others.)
-      const n = Math.max(1, Math.round(sp.forkStems));
+      const n = form.stems;
       const below: number[] = [];
       for (let k = 1; k <= steps; k++) {
         const y = (yF * k) / steps;
@@ -1193,15 +1377,141 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
         const more = splits - (k > 0 && rng.chance(0.3) ? 1 : 0);
         arm(nodes[k], k === 0, a, tilt, first * rng.range(0.85, 1.15), more);
       }
+    } else if (form.stems > 1) {
+      // A trunk that forks into a few stems (`forkShare`; near the ground, its stems rising from one root
+      // plate and leaning apart from it), or a clump of stems from one root plate (`stemShare`): each a tree's
+      // stem of its own, leaning out from where they part and turning up, its leader in the middle of its own
+      // share of the crown, its great limbs round it and out over its share (crowns that touch, not one
+      // blob: Leonardo's tree is one crown however many its stems).
+      const n = form.stems;
+      const yF = forkHeight(sp, size, form);
+      // (Its stems part a little apart: under breast height downwards from the fork, over it upwards, so a
+      // trunk is measured there as one trunk or as its stems.)
+      const apart = Math.min(FORK_APART, 0.12 * yF);
+      const yLow = yF >= breastHeight(size) ? yF : yF - apart * (n - 2);
+      let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
+      lBud[at] = 0;
+      const steps = Math.max(1, Math.ceil(yLow / TRUNK_STEP));
+      for (let k = 1; k <= steps; k++) {
+        at = add(0, (yLow * k) / steps, 0, at, true, 0, [0, 1, 0]);
+        lBud[at] = 0;
+      }
+      const below: number[] = [];
+      for (let k = 2; k < n; k++) {
+        below.push(at);
+        at = add(0, py[at] + apart, 0, at, true, 0, [0, 1, 0]);
+        lBud[at] = 0;
+      }
+      even[at] = 1;
+      for (const b of below) even[b] = 1;
+      const from = [at, at, ...below];
+      const az0 = rng.range(0, 2 * Math.PI);
+      // (Its share's middle: out from the axis, the further the more stems share the crown.)
+      const out = TRUNK_SHARE[Math.min(4, n)] * R;
+      const azOf: number[] = [];
+      for (let k = 0; k < n; k++) {
+        const a = az0 + (k * 2 * Math.PI) / n + rng.range(-0.25, 0.25);
+        const d = out * rng.range(0.85, 1.15);
+        azOf.push(a);
+        shareX.push(d * Math.cos(a));
+        shareZ.push(d * Math.sin(a));
+      }
+      // (How far a stem may lean where it leaves: an excurrent tree's stems rise nearly upright, a decurrent
+      // one's lean out.)
+      const tiltMost = TRUNK_TILT[0] + (TRUNK_TILT[1] - TRUNK_TILT[0]) * (1 - sp.leader);
+      const span = Math.min(0.8, SCAFFOLD_SPAN + SCAFFOLD_SPAN_LEADER * sp.leader);
+      const each = Math.max(2, Math.round(scaffolds / Math.sqrt(n)));
+      const cover = Math.min(1, TRUNK_COVER / n);
+      for (let k = 0; k < n; k++) {
+        const a = azOf[k];
+        const d = Math.hypot(shareX[k], shareZ[k]);
+        const yLo = Math.max(base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0, yF + L);
+        const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : Math.max(yLo + L, base + span * depth);
+        const top = Math.max(yHi + L, yHi + Math.min(1, LEADER_REACH + (1 - LEADER_REACH) * sp.leader) * (hi - L - yHi));
+        // Its way out: from where it leaves, out to its share's middle by its leader's top, leaning out most
+        // at first and turning up (1 - (1 - t)^p), no more than it may lean where it leaves.
+        const rise = Math.max(L, top - yF);
+        const p = Math.min(TRUNK_CURVE, Math.max(1, (Math.tan(tiltMost) * rise) / Math.max(1e-3, d)));
+        // (Eased in over its first few trunk radii, as are its stepping aside to its own side of the trunk and
+        // the wandering it starts with: a trunk bent harder than its thickness folds over on itself.)
+        const ramp = Math.max(STEM_EASE_LEAST, STEM_EASE * size.trunkRadius);
+        // (Its step aside: out to where its outer side is the trunk's where they part (the trunk there its
+        // stems' areas together, a stem its share), taken over its first piece.)
+        const first0 = stemFirst(size);
+        const trunkAt = (size.trunkRadius * boleShape(size, yF, sp.buttress ?? 0)) / boleShape(size, breastHeight(size), sp.buttress ?? 0);
+        const aside = Math.max(0, trunkAt * (1 - 1 / Math.sqrt(n)));
+        const slope = (y: number): number => {
+          const t = Math.min(1, Math.max(0, (y - yF) / rise));
+          const u = Math.min(1, Math.max(0, (y - yF) / ramp));
+          return ((d * p * (1 - t) ** (p - 1)) / rise) * u * u * (3 - 2 * u) + (y - yF < first0 ? aside / first0 : 0);
+        };
+        const marks: number[] = [];
+        for (let j = 0; j < each; j++) marks.push(yLo + ((j + rng.range(0.15, 0.85)) / each) * (yHi - yLo));
+        const levels: { y: number; scaffold: number }[] = [];
+        // (A short first piece, a stem leaving the fork as itself and not as a cone from the trunk's thickness;
+        // then pieces close enough to draw its easing out as a curve.)
+        for (const y of [first0, ...[0.4, 0.7, 1].map((f) => f * ramp).filter((y) => y > first0 + 0.1)]) if (yF + y < yLo - 0.1) levels.push({ y: yF + y, scaffold: -1 });
+        const from0 = levels.length > 0 ? levels[levels.length - 1].y : yF;
+        const rest = Math.max(1, Math.ceil((yLo - from0) / TRUNK_STEP));
+        for (let j = 1; j < rest; j++) levels.push({ y: from0 + ((yLo - from0) * j) / rest, scaffold: -1 });
+        const section: { y: number; scaffold: number }[] = marks.map((y, j) => ({ y, scaffold: j }));
+        for (let y = yLo; y <= yHi + 1e-9; y += L) if (marks.every((m) => Math.abs(m - y) > 0.4 * L)) section.push({ y, scaffold: -1 });
+        section.sort((u, v) => u.y - v.y);
+        levels.push(...section);
+        let node = from[k];
+        let wx = 0;
+        let wz = 0;
+        let first = true;
+        const phase = rng.range(0, 2 * Math.PI);
+        for (const lv of levels) {
+          const j = rng.onSphere();
+          // (Its stems stand side by side in the trunk where they part, each stepping out from its middle to its
+          // own side: so a stem's outer side runs on from the trunk's, and they part in a crotch between them.)
+          const calm = Math.min(1, Math.max(0, (lv.y - yF) / ramp));
+          wx = 0.6 * wx + 0.08 * sp.crooked * j[0] * calm;
+          wz = 0.6 * wz + 0.08 * sp.crooked * j[2] * calm;
+          const sl = slope(0.5 * (py[node] + lv.y));
+          const dir = norm([wx + sl * Math.cos(a), 1, wz + sl * Math.sin(a)]);
+          const len = (lv.y - py[node]) / dir[1];
+          node = add(px[node] + dir[0] * len, lv.y, pz[node] + dir[2] * len, node, first ? k === 0 : true, 0, dir);
+          if (first) owner[node] = k;
+          first = false;
+          if (lv.scaffold >= 0) {
+            lBud[node] = 0;
+            // (Its great limbs round it and out over its share, few towards the others'.)
+            const off = (((lv.scaffold * GOLDEN_ANGLE + phase) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+            holds.push({ node, scaffold: lv.scaffold, pos: each > 1 ? lv.scaffold / (each - 1) : 0.5, az: a + cover * (off - Math.PI) + rng.range(-0.2, 0.2), own: k });
+          } else if (lv.y < yLo) lBud[node] = 0;
+        }
+        // Its leader, on up to its top.
+        let lx = 0;
+        let lz = 0;
+        const y0 = py[node];
+        const pts = spine(
+          node,
+          (u) => {
+            const j = rng.onSphere();
+            lx = 0.7 * lx + 0.06 * sp.crooked * j[0] + (stand ? STAND_LEADER * stand.lopsided : 0);
+            lz = 0.7 * lz + 0.06 * sp.crooked * j[2];
+            const sl = slope(y0 + u);
+            return norm([lx + sl * Math.cos(a), 1, lz + sl * Math.sin(a)]);
+          },
+          Math.max(0, top - y0),
+          (x, z) => owns(k, x, z),
+        );
+        node = lay(node, pts, pts.length / 3, 0, true);
+        tBud[node] = 1;
+      }
     } else {
     // A tree's trunk: bare to its crown's base, then through the scaffolds' span, one of them at each of
     // their heights (one in each of as many slots up it), its own lateral buds between.
     // (In a stand, from where its live crown starts, its wood's shade having lifted it.)
     // (Or lower, where the species' stem forks (`fork`): its limbs rise bare to its crown.)
-    const yLo = Math.max(sp.fork !== undefined ? Math.min(1, Math.max(0, sp.fork)) * base : base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0);
+    const vase = vFork ? forkHeight(sp, size, form) : undefined;
+    const yLo = Math.max(vase !== undefined ? vase : base + SCAFFOLD_FROM * depth, liveAt ? liveLow : 0);
     const span = Math.min(0.8, SCAFFOLD_SPAN + SCAFFOLD_SPAN_LEADER * sp.leader);
     // (A forked stem's limbs leave it close together, in a vase: its V-forks.)
-    const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : sp.fork !== undefined ? Math.max(yLo + L, yLo + FORK_SPAN * (base - yLo)) : Math.max(yLo + L, base + span * depth);
+    const yHi = liveAt ? Math.max(yLo + L, yLo + span * (H - yLo)) : vase !== undefined ? Math.max(yLo + L, yLo + FORK_SPAN * (base - yLo)) : Math.max(yLo + L, base + span * depth);
     const levels: { y: number; scaffold: number }[] = [];
     const below = Math.max(1, Math.ceil(yLo / TRUNK_STEP));
     for (let k = 1; k < below; k++) levels.push({ y: (yLo * k) / below, scaffold: -1 });
@@ -1255,7 +1565,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     };
     for (const h of holds) {
       const { node, scaffold: k } = h;
-      const pos = scaffolds > 1 ? k / (scaffolds - 1) : 0.5;
+      const pos = h.pos ?? (scaffolds > 1 ? k / (scaffolds - 1) : 0.5);
       const g = Math.max(-2, Math.min(2, rng.gauss()));
       // (No wider than the crown has room for: in a crown narrow for its depth (a tree grown in a wood, a
       // column), the limbs rise steeply, or they would reach its side at once and curl over into hooks.)
@@ -1295,7 +1605,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
         const e = Math.max(-80 * DEG, Math.min(0.5 * Math.PI, e0 + limbTurn(f) + we));
         const a = a0 + sway * Math.sin(Math.PI * f + phase) + wa;
         return [Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a)];
-      }, R + depth);
+      }, R + depth, h.own !== undefined ? (x, z) => owns(h.own as number, x, z) : undefined);
       const n = pts.length / 3;
       lay(node, pts, Math.max(Math.min(2, n), Math.round(n * rng.range(0.82, 1))), 1, false);
     }
@@ -1345,7 +1655,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     let any = false;
     for (let i = 0; i < count; i++) {
       const c = lat[i];
-      if (!alive[i] || c < 0 || !alive[c] || kind[c] === 1 || internodes[c] < 3) continue;
+      if (!alive[i] || c < 0 || !alive[c] || kind[c] <= 1 || internodes[c] < 3) continue;
       if (gathered[c] / internodes[c] >= shedThreshold) continue;
       shedPipes[i] += pipes[c];
       cut(c);
@@ -1398,7 +1708,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       const x = px[at] + d[0] * L;
       const y = py[at] + d[1] * L;
       const z = pz[at] + d[2] * L;
-      if (!inCrown(x, y, z)) {
+      if (!inCrown(x, y, z) || (owner[at] >= 0 && !owns(owner[at], x, z))) {
         if (at !== from || onAxis) tBud[at] = 0;
         return;
       }
@@ -1467,6 +1777,15 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     shed.push(shedPipes[i]);
   }
   w.shed = shed;
+  // (A forked trunk's or a clump's stems are stems of their own, each with its own bole: `pipeRadii`.)
+  const feet = w.stems;
+  let lastOwner = -1;
+  for (let i = 0; i < count; i++) {
+    if (!alive[i] || owner[i] < 0) continue;
+    w.stem[index[i]] = feet + owner[i];
+    lastOwner = Math.max(lastOwner, owner[i]);
+  }
+  w.stems = feet + lastOwner + 1;
 
   // Leaves: on the lit shoots near their twigs' ends (further back the deeper the species keeps its leaves),
   // the lighter the bigger; each at its node, a little on along its twig and out of the crown.
@@ -1809,7 +2128,8 @@ function simplifyOnce(w: Wood, h: Hung, angle: number, longest: number): boolean
   let dropped = 0;
   for (let i = 0; i < n; i++) {
     const p = parent[i];
-    if (p < 0 || kids[i].length !== 1) continue;
+    // (A stem leaving a forked trunk keeps its first node: its first piece is where it narrows to itself.)
+    if (p < 0 || kids[i].length !== 1 || w.stem[i] !== w.stem[p]) continue;
     const c = kids[i][0];
     if (!cont[c]) continue;
     const ax = w.x[i] - w.x[p];
@@ -2263,7 +2583,7 @@ function hangNeedles(h: Hung, w: Wood, node: number, sp: TreeSpecies, size: Tree
 // ---------------------------------------------------------------------------
 // For every tree: thin the clumps, fit to size, the radii, and the arrays.
 
-function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: number): GrownTree {
+function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: number, forkY?: number, keepBelow = 0): GrownTree {
   const lifted = lift !== undefined;
   const env = new Envelope(sp, size, 0, 0, 0, lift);
   liftCanopy(sp, size, hung);
@@ -2272,7 +2592,7 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
   // lies along its bough, and a twig off it, inside a clump's ball but not under the sheet, pokes out bare.)
   if (sp.architecture !== "palm") keep = shedBare(w, hung, keep, sp.architecture === "conifer" && !tufted(sp) ? IN_SHEET : IN_SPRAY);
   if (clothed(sp)) keep = clotheTop(size, w, hung, keep);
-  fit(size, w, hung, keep, lifted);
+  fit(size, w, hung, keep, lifted, keepBelow);
   if (sp.architecture !== "palm") keepToOutline(env, w, hung);
   // (And again where drawing the crown in to its outline took its clothing off its wood.)
   if (clothed(sp)) keep = clotheTop(size, w, hung, keep);
@@ -2356,7 +2676,11 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
     clumps.ty[k] = t[1];
     clumps.tz[k] = t[2];
   }
-  return sp.architecture === "palm" ? { size, skeleton, clumps } : shedStrays(size, skeleton, clumps, sp.fork !== undefined ? sp.fork * size.crownBase : undefined);
+  if (sp.architecture === "palm") return { size, skeleton, clumps };
+  // (A trunk's stems, a forked one's or a clump's, are not strays however low they leave it.)
+  const trunks = new Uint8Array(n);
+  for (const start of stemStarts(w)) for (const i of trunkBole(w, start)) trunks[i] = 1;
+  return shedStrays(size, skeleton, clumps, forkY, trunks);
 }
 
 /** Whether a species' crown is a weeping one whose top is clothed in leaves (`clotheTop`): its sprays are hung over its wood there. */
@@ -2531,7 +2855,7 @@ function shedBare(w: Wood, h: Hung, keep: number[], inSpray = IN_SPRAY): number[
  * hanging from it), as a tree drops a limb it cannot hold up or light. Stems stay; a clump on shed wood
  * goes with it, and wood it leaves bare goes after it.
  */
-function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps, forkY?: number): GrownTree {
+function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps, forkY?: number, trunks?: Uint8Array): GrownTree {
   const depth = Math.max(0.01, size.height - size.crownBase);
   // (A stem that forks below its crown (`fork`) keeps its limbs from there.)
   const low = Math.min(size.crownBase - STRAY_BELOW * depth, forkY !== undefined ? forkY - 0.5 : Infinity);
@@ -2539,7 +2863,7 @@ function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps, forkY?: number): G
   const keep = new Uint8Array(sk.count);
   for (let i = 0; i < sk.count; i++) {
     const p = sk.parent[i];
-    const out = sk.order[i] > 0 && (sk.y[i] < low || Math.hypot(sk.x[i], sk.z[i]) > far);
+    const out = sk.order[i] > 0 && !trunks?.[i] && (sk.y[i] < low || Math.hypot(sk.x[i], sk.z[i]) > far);
     keep[i] = (p < 0 || keep[p]) && !out ? 1 : 0;
   }
   // (What is left bare by that goes too: a twig whose leaves were all on the wood shed past it is dead.)
@@ -2827,7 +3151,7 @@ function keepToOutline(env: Envelope, w: Wood, h: Hung): void {
  * little) its lowest at its crown's base, stretching the crown and the trunk under it apart. The growing
  * aims at all three already; this takes up what it misses by.
  */
-function fit(size: TreeSize, w: Wood, h: Hung, keep: number[], lifted = false): void {
+function fit(size: TreeSize, w: Wood, h: Hung, keep: number[], lifted = false, below = 0): void {
   let reach = 0;
   let topY = 0;
   let lowY = Infinity;
@@ -2850,7 +3174,10 @@ function fit(size: TreeSize, w: Wood, h: Hung, keep: number[], lifted = false): 
     to = size.crownBase + 0.5 * FIT_LOW * depth;
   }
   const upward = topY > from ? (FIT_TOP * size.height - to) / (topY - from) : 1;
-  const stretch = (y: number) => (y > from ? to + (y - from) * upward : from > 0 ? (y * to) / from : y);
+  // (A trunk that forks or a clump's root plate keeps where its stems part, and their first pieces, as grown:
+  // what is stretched is the trunk over them. So a fork kept clear of breast height stays clear of it.)
+  const b = Math.max(0, Math.min(below, 0.8 * to, 0.8 * from));
+  const stretch = (y: number) => (y > from ? to + (y - from) * upward : from <= 0 ? y : y <= b ? y : b + ((y - b) * (to - b)) / (from - b));
   for (let i = 0; i < w.x.length; i++) {
     w.x[i] *= across;
     w.z[i] *= across;
@@ -2892,19 +3219,39 @@ function unitOf(size: TreeSize): number {
 }
 
 /**
- * A stem's bole: its nodes from its foot up its own axis to the first that bears a branch (the lowest live
- * limb, where the crown starts), that node last.
+ * A stem's bole: its nodes from its start (its foot, or where it leaves a trunk that forks) up its own axis
+ * to the first that bears a branch of its own (the lowest live limb, where the crown starts), that node last.
+ * A trunk that forks into stems (each a stem of its own: `Wood.stem`) runs on through the nodes they leave,
+ * to the last of them.
  */
-function boleOf(w: Wood, foot: number): number[] {
-  const out = [foot];
-  let at = foot;
+function trunkBole(w: Wood, start: number): number[] {
+  const out = [start];
+  const s = w.stem[start];
+  let at = start;
   for (;;) {
     const kids = w.kids[at];
-    const next = kids.find((c) => w.cont[c]);
-    if (next === undefined || kids.length > 1) return out;
+    const next = kids.find((c) => w.cont[c] && w.stem[c] === s);
+    if (next === undefined || kids.some((c) => c !== next && w.stem[c] === s)) return out;
     at = next;
     out.push(at);
   }
+}
+
+/** Where each stem starts: its foot, or where it leaves the trunk it forks from. Parents first. */
+function stemStarts(w: Wood): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < w.x.length; i++) {
+    const p = w.parent[i];
+    if (p < 0 || w.stem[p] !== w.stem[i]) out.push(i);
+  }
+  return out;
+}
+
+/** The stems that leave a bole (a trunk forking, or a clump's root plate): their starts. */
+function stemsOff(w: Wood, bole: readonly number[]): number[] {
+  const out: number[] = [];
+  for (const b of bole) for (const c of w.kids[b]) if (w.stem[c] !== w.stem[b]) out.push(c);
+  return out;
 }
 
 /** How far up a stem its root flare reaches (m): its e-folding height, more for a thicker trunk, under breast height. */
@@ -2935,16 +3282,19 @@ function refineBoles(size: TreeSize, w: Wood, h: Hung, buttress = 0): void {
   const hf = flareHeight(size, buttress);
   /** For each node, the heights at which to cut the piece under it. */
   const cuts = new Map<number, number[]>();
-  for (let i = 0; i < n; i++) {
-    if (w.parent[i] >= 0) continue;
-    const bole = boleOf(w, i);
-    if (w.y[bole[bole.length - 1]] <= bh) continue;
-    for (let k = 1; k < bole.length; k++) {
+  for (const start of stemStarts(w)) {
+    const bole = trunkBole(w, start);
+    // (A stem's under breast height is a shrub's, of the pipe model: but not a root plate that stems leave.)
+    if (w.y[bole[bole.length - 1]] <= bh && stemsOff(w, bole).length === 0) continue;
+    // (A stem off a forked trunk from the piece under its start.)
+    for (let k = w.parent[start] >= 0 ? 0 : 1; k < bole.length; k++) {
       const c = bole[k];
-      const y0 = w.y[bole[k - 1]];
+      const y0 = w.y[w.parent[c]];
       const y1 = w.y[c];
       const ys: number[] = [];
-      for (const f of FLARE_CUTS) if (f * hf > y0 + 0.05 && f * hf < y1 - 0.05) ys.push(f * hf);
+      // (Not the first piece of a stem leaving a forked trunk: it narrows from the trunk to itself along it,
+      // and cut, it would narrow at the cut, a ledge.)
+      if (k > 0 || w.parent[start] < 0) for (const f of FLARE_CUTS) if (f * hf > y0 + 0.05 && f * hf < y1 - 0.05) ys.push(f * hf);
       const from = ys.length > 0 ? ys[ys.length - 1] : y0;
       const pieces = Math.ceil((y1 - from) / BOLE_PIECE - 1e-9);
       for (let m = 1; m < pieces; m++) ys.push(from + ((y1 - from) * m) / pieces);
@@ -2959,15 +3309,18 @@ function refineBoles(size: TreeSize, w: Wood, h: Hung, buttress = 0): void {
     const p = w.parent[i];
     let parent = p < 0 ? -1 : remap[p];
     const ys = cuts.get(i);
+    // (The first piece cut keeps the node's place on its parent: a stem leaving a fork leaves it as it did.)
+    let cont = w.cont[i];
     if (ys && p >= 0) {
       for (const y of ys) {
         const f = (y - w.y[p]) / Math.max(1e-9, w.y[i] - w.y[p]);
-        parent = addNode(out, w.x[p] + (w.x[i] - w.x[p]) * f, y, w.z[p] + (w.z[i] - w.z[p]) * f, parent, true);
+        parent = addNode(out, w.x[p] + (w.x[i] - w.x[p]) * f, y, w.z[p] + (w.z[i] - w.z[p]) * f, parent, cont);
         out.stem[parent] = w.stem[i];
         shed.push(0);
+        cont = true;
       }
     }
-    remap[i] = addNode(out, w.x[i], w.y[i], w.z[i], parent, w.cont[i]);
+    remap[i] = addNode(out, w.x[i], w.y[i], w.z[i], parent, cont);
     out.stem[remap[i]] = w.stem[i];
     shed.push(w.shed ? w.shed[i] : 0);
   }
@@ -2997,14 +3350,49 @@ function pipeRadii(size: TreeSize, w: Wood, buttress = 0): Float64Array {
   const bh = breastHeight(size);
   const scale = new Float64Array(w.stems).fill(1);
   const boleR = new Float64Array(n).fill(-1);
+  const shape = (y: number) => boleShape(size, y, buttress);
+  /** A stem's bole tapered as a bole does, from a radius at a height; its crown scaled to meet it where it starts. */
+  const taper = (bole: readonly number[], r0: number, y0: number, swell: (y: number) => number = () => 1) => {
+    for (const b of bole) boleR[b] = (r0 * shape(w.y[b]) * swell(w.y[b])) / (shape(y0) * swell(y0));
+    const top = bole[bole.length - 1];
+    scale[w.stem[top]] = boleR[top] / r[top];
+  };
   for (let i = 0; i < n; i++) {
     if (w.parent[i] >= 0) continue;
-    const bole = boleOf(w, i);
+    const bole = trunkBole(w, i);
     const top = bole[bole.length - 1];
+    const stems = stemsOff(w, bole);
+    if (stems.length > 0) {
+      // A trunk that forks into stems, or a clump's root plate: its stems share its wood by their area (the
+      // pipe model with Leonardo's 2), each tapering as a bole does to its own crown. Forked under breast
+      // height, their areas there together are the trunk's (what a survey measures of a clump is its stems'
+      // basal area); above it, the trunk is measured there, as one stem is.
+      const boles = stems.map((c) => trunkBole(w, c));
+      let total = 0;
+      for (const c of stems) total += r[c] * r[c];
+      const share = stems.map((c) => (r[c] * r[c]) / Math.max(1e-12, total));
+      const yTop = w.y[top];
+      // (Each stem swells a little into the trunk where it leaves it, as a limb's collar does: fused there.)
+      const join = (y: number) => 1 + STEM_JOIN * Math.exp(-Math.max(0, y - yTop) / (STEM_JOIN_FALL * stemFirst(size)));
+      if (yTop >= bh) {
+        taper(bole, size.trunkRadius, bh);
+        stems.forEach((c, k) => {
+          const yP = w.y[w.parent[c]];
+          taper(boles[k], boleR[w.parent[c]] * Math.sqrt(share[k]) * (shape(w.y[c]) / shape(yP)), w.y[c], join);
+        });
+      } else {
+        let area = 0;
+        stems.forEach((_, k) => {
+          const rs = size.trunkRadius * Math.sqrt(share[k]);
+          taper(boles[k], rs, bh, join);
+          area += ((rs * shape(yTop)) / shape(bh)) ** 2;
+        });
+        taper(bole, Math.sqrt(area), yTop);
+      }
+      continue;
+    }
     if (w.y[top] > bh) {
-      const at = (y: number) => (size.trunkRadius * boleShape(size, y, buttress)) / boleShape(size, bh, buttress);
-      for (const b of bole) boleR[b] = at(w.y[b]);
-      scale[w.stem[i]] = boleR[top] / r[top];
+      taper(bole, size.trunkRadius, bh);
       continue;
     }
     // Each stem's radius at breast height, along its axis from its foot.

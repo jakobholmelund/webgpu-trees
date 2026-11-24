@@ -17,15 +17,18 @@
 //   ?cell=400                 a cell's width in pixels (its height is 1.25 times it)
 //   ?screen=1080              the lines of the screen a cell is a piece of: the trees choose their tier as on it
 //   ?thumbs=0                 no reference photographs' thumbnails (the links stay)
+//   ?seed=7 | 3:7,Oak:2       another set of trees (`VariantOptions.seed`), for every species or by species:
+//                             a forked trunk or a clump instead of one stem, where its species has them
 //   ?photos=<address>         also a photograph of your own per species, <address><name>.jpg, from a
 //                             folder outside the repository that you serve yourself
 //
 // For scripts: `await __gallery.render({ look, views, species })` gives every cell as a PNG data URL;
-// `await __gallery.sheet({...})` the contact sheet; `await __gallery.save({...})` writes the sheet to the
+// `await __gallery.sheet({...})` the contact sheet; `await __gallery.saveCells({...}, prefix)` writes each cell to
+// the GALLERY_OUT folder; `await __gallery.save({...})` writes the sheet to the
 // folder the dev server was started with (GALLERY_OUT=<folder> pnpm dev).
 
 import * as THREE from "three/webgpu";
-import { ALL_SPECIES, type Architecture, DEFAULT_DETAIL, LOOK_STYLES, REGION_ROWS, type Region, TREE_LOOKS, type TreeInstance, type TreeLook, type TreeSpecies, type TreeStyle, type Trees, cloneSpecies, createTrees } from "../src/index";
+import { ALL_SPECIES, type Architecture, DEFAULT_DETAIL, DEFAULT_VARIANT_OPTIONS, LOOK_STYLES, REGION_ROWS, type Region, TREE_LOOKS, type TreeInstance, type TreeLook, type TreeSpecies, type TreeStyle, type Trees, cloneSpecies, createTrees } from "../src/index";
 import referenceText from "./REFERENCE.md?raw";
 import { type Reference, readReferences } from "./references";
 import { SKY, makeGround, makeSky, sunAt, tintsFor } from "./stage";
@@ -103,6 +106,16 @@ const cellW = Math.max(120, Math.min(1200, Number(query.get("cell")) || 400));
 const cellH = Math.round(cellW * 1.25);
 const screen: Screen = { lines: Math.max(200, Number(query.get("screen")) || REFERENCE_SCREEN.lines), fov: REFERENCE_SCREEN.fov };
 const photosAt = query.get("photos");
+/** Another set of trees (`?seed`), for every species or by species: its seed for a row. */
+const seedFor = (row: number): number => {
+  let all = 0;
+  for (const part of (query.get("seed") ?? "").split(",").filter(Boolean)) {
+    const [a, b] = part.split(":");
+    if (b === undefined) all = Number(a) || 0;
+    else if (rowOf(a) === row) return Number(b) || 0;
+  }
+  return all;
+};
 
 function el<T extends HTMLElement = HTMLElement>(id: string) {
   return document.getElementById(id) as T;
@@ -230,7 +243,7 @@ async function start() {
     const sp = species[row];
     const step = groupSpacing(sp.crownRadius);
     const list: TreeInstance[] = group ? GROUP.map(([x, z], k) => measured(sp, row, x * step, z * step, k + 1)) : [{ x: 0, y: 0, z: 0, species: row }];
-    const trees = createTrees({ trees: list, species, look });
+    const trees = createTrees({ trees: list, species, look, variants: { ...DEFAULT_VARIANT_OPTIONS, seed: seedFor(row) } });
     Object.assign(trees.style, LOOK_STYLES[look], over);
     const standing = trees.plan.placements.map((p) => ({ x: p.x, z: p.z, ...p.size }));
     // (Where the trunk first forks: the lowest limb of a fair size leaving the stem, in the tree as grown, at
@@ -448,7 +461,7 @@ async function start() {
     if (settings.views.length < VIEW_NAMES.length) q.set("views", settings.views.join(","));
     if (settings.hour !== 9) q.set("hour", String(settings.hour));
     if (settings.wind !== 4) q.set("wind", String(settings.wind));
-    for (const key of ["cell", "screen", "photos", "thumbs"]) if (query.has(key)) q.set(key, query.get(key)!);
+    for (const key of ["cell", "screen", "photos", "thumbs", "seed"]) if (query.has(key)) q.set(key, query.get(key)!);
     const text = q.toString();
     history.replaceState(null, "", text ? `${location.pathname}?${text}` : location.pathname);
   };
@@ -800,6 +813,18 @@ async function start() {
       const text = await r.text();
       if (!r.ok) throw new Error(text);
       return text;
+    },
+    /** Every cell asked for, each written by the dev server into its GALLERY_OUT folder as <prefix>-<species>-<look>-<view>.png: their names. */
+    async saveCells(ask?: RenderAsk, prefix = "cell") {
+      const list = await renderSet(askToSettings(ask), () => undefined);
+      const out: string[] = [];
+      for (const c of list) {
+        const name = `${prefix}-${species[c.row].name.replace(/\W+/g, "_")}-${c.look}-${c.view}.png`;
+        const r = await fetch(`/__gallery/save?name=${encodeURIComponent(name)}`, { method: "POST", body: c.blob });
+        if (!r.ok) throw new Error(await r.text());
+        out.push(name);
+      }
+      return out;
     },
     /** Forget every drawn cell (to draw again after the code changed under a running page). */
     forget() {
