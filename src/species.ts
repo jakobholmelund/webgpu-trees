@@ -179,6 +179,12 @@ export interface TreeSpecies {
    */
   canopyLift?: number;
   /**
+   * How far its trunk leans from upright, at most (degrees): each tree of it leans between half that and all
+   * of it, its own way, from its foot, and its crown, grown upright, stands out over its lean (a wild Torrey
+   * pine's on a bluff). Left out: 0, upright.
+   */
+  lean?: number;
+  /**
    * Where a broadleaf's trunk divides into its great limbs, as a share of its crown's base's height (a stone
    * pine's stem forks a third to half of the way up its height, its limbs rising bare in V-forks to the
    * umbrella, the ribs under it): left out, at its crown's base.
@@ -324,6 +330,7 @@ export const OPTIONAL_SPECIES_FIELDS = {
   phyllotaxis: ["spiral", "opposite", "distichous"],
   sprayHang: "number",
   canopyLift: "number",
+  lean: "number",
   fork: "number",
   forkStems: "number",
   forkSplits: "number",
@@ -534,7 +541,10 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     stiffness: 0.85,
   },
   // Set against the owner's reference pictures: its crown more open, its clumps apart with sky between (open
-  // 0.5; its outline stays the photographed tree's, test/outlines.json), grey-green rather than teal.
+  // 0.5; its outline stays the photographed tree's, test/outlines.json), grey-green rather than teal, olive where
+  // lit. Most old ones fork into two or three sub-leaders at the crown's base (MORPHOLOGY.md 5: "old trees often
+  // fork into 2–4 sub-leaders"), the heavy orange limbs the references show; a stem straight to there, and
+  // thicker (a mature tree's).
   {
     name: "Scots pine",
     latin: "Pinus sylvestris",
@@ -543,7 +553,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     height: 19,
     crownRadius: 8,
     crownBase: 9,
-    trunkRadius: 0.35,
+    trunkRadius: 0.42,
     shape: "hemispherical",
     crownPeak: 0.4,
     crownRound: 2.4,
@@ -554,7 +564,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     branchAngle: 65,
     branchAngleSpread: 20,
     bend: -0.1,
-    crooked: 0.7,
+    crooked: 0.3,
     leader: 0.2,
     whorl: 0,
     whorlsPerMetre: 0,
@@ -564,11 +574,16 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     limbCurve: -5,
     limbCurveBack: 35,
     zigzag: 10,
+    fork: 1,
+    forkStems: 2,
+    forkStemsMost: 3,
+    forkSplits: 1,
+    forkShare: 0.7,
     pads: 0.85,
     leafKind: "pine",
     clumpSize: 2.0,
     clumpSpread: 0.4,
-    leafColor: "#5a6e56",
+    leafColor: "#748060",
     leafVariation: 0.25,
     treeVariation: 0.2,
     throughTint: [0.8, 0.95, 0.5],
@@ -1154,7 +1169,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // California Native Plant Society, San Diego (Pinus torreyana): 40–70 ft tall, 35 ft spread, an open
   // picturesque form. Few crooked limbs, long grey-green needles in tufts, so grown as a broadleaf, with
-  // needles. Wild ones lean; the grower stands every tree upright (a host leans it at most 3 degrees). Set
+  // needles. Coastal ones lean, wind-sculpted on the bluffs (MORPHOLOGY.md 19, the owner's reference): each
+  // grown leaning 8 to 16 degrees its own way, its crown back over its foot (`lean`); its limbs less looped
+  // and its brushes smaller and more of them (0.9 m clumps, branchier), so its crown is layered tufts on crooked
+  // limbs and not a broad leaf's lobes. Set
   // against the owner's reference pictures (lab/references): a crown wider than it is tall (r/H 0.67, the top
   // of docs/MORPHOLOGY.md's 0.40–0.70), from low limbs that run out level and turn up at their ends, open,
   // the sky between its brushes, which are grey-green.
@@ -1177,19 +1195,20 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     branchAngle: 55,
     branchAngleSpread: 20,
     bend: -0.2,
-    crooked: 0.7,
+    crooked: 0.45,
+    lean: 16,
     leader: 0.05,
     whorl: 0,
     whorlsPerMetre: 0,
-    branchiness: 0.5,
+    branchiness: 0.8,
     scaffolds: 5,
     limbAngle: [75, 105],
     limbCurve: -10,
-    limbCurveBack: 35,
-    zigzag: 10,
+    limbCurveBack: 20,
+    zigzag: 6,
     pads: 0.85,
     leafKind: "pine",
-    clumpSize: 1.2,
+    clumpSize: 0.9,
     clumpSpread: 0.45,
     leafColor: "#728262",
     leafVariation: 0.25,
@@ -1247,7 +1266,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // third of the way up into a few crooked limbs rising in V-forks and spreading under a flat wide crown of
   // dense cushions, some three times as wide as deep, its underside flat and bare; so grown as a broadleaf,
   // with needles; orange-brown plated bark. Its reach as old trees photographed open-grown have it
-  // (test/outlines.json, and the owner's references: wider than UF's landscape trees).
+  // (test/outlines.json, and the owner's references: wider than UF's landscape trees). As the references and
+  // the owner's photographs: a thick short stem forking into three thick sinuous limbs, a shallow smooth
+  // canopy of many smaller cushions.
   stonePine: {
     name: "Stone pine",
     latin: "Pinus pinea",
@@ -1256,11 +1277,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     height: 15,
     crownRadius: 11.5,
     crownBase: 8,
-    trunkRadius: 0.62,
+    trunkRadius: 0.7,
     shape: "hemispherical",
     crownPeak: 0.45,
     crownRound: 4,
-    foliageDepth: 0.3,
+    foliageDepth: 0.2,
     openness: 0.25,
     stems: 1,
     branchAngle: 45,
@@ -1277,9 +1298,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbCurveBack: -10,
     zigzag: 5,
     canopyLift: 0.6,
-    fork: 0.72,
+    fork: 0.66,
     forkSpread: 0.08,
-    forkStems: 2,
+    forkStems: 3,
     forkStemsMost: 3,
     forkSplits: 2,
     leafKind: "pine",
@@ -1764,6 +1785,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.limbAngle !== undefined && !(s.limbAngle.length === 2 && s.limbAngle.every((a) => a >= 0 && a <= 175))) out.push("limbAngle must be [top, base], each 0..175 degrees");
   for (const k of ["limbCurve", "limbCurveBack"] as const) if (s[k] !== undefined && !(Math.abs(s[k] as number) <= 180)) out.push(`${k} must be -180..180 degrees`);
   if (s.zigzag !== undefined && !(s.zigzag >= 0 && s.zigzag <= 60)) out.push("zigzag must be 0..60 degrees");
+  if (s.lean !== undefined && !(s.lean >= 0 && s.lean <= 30)) out.push("lean must be 0..30 degrees");
   if (s.zigzagRun !== undefined && !(s.zigzagRun >= 0 && s.zigzagRun <= 5)) out.push("zigzagRun must be 0..5 m");
   if (s.phyllotaxis !== undefined && !["spiral", "opposite", "distichous"].includes(s.phyllotaxis)) out.push("phyllotaxis must be spiral, opposite or distichous");
   for (const k of ["sprayHang", "canopyLift", "pads", "clusters", "buttress", "fork", "forkShare", "stemShare"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);

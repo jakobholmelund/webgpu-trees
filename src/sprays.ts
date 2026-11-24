@@ -65,6 +65,22 @@ const TUFT_BUNDLES_LEAST = 12;
 const TUFT_BUNDLE_SPREAD = 0.1;
 /** The share of a tuft's needles that stand loose between its bundles. */
 const TUFT_LOOSE = 0.45;
+/** How much lighter a tuft's needles pointing up are than those lying level, and darker those hanging; how dark a needle's inner half is beside its outer's. */
+const TUFT_UP_LIGHT = 0.3;
+const TUFT_HEART = 0.5;
+/**
+ * A needle drawn for a smaller mip (`Layer.far`): its half width, in that mip's texels, at its foot, and at its tip
+ * a share of that; and how many more of them are kept than would cover what the full-size needles do.
+ */
+const FAR_NEEDLE = 0.75;
+const FAR_TIP = 0.7;
+const FAR_KEEP = 1;
+/**
+ * From this mip (`Layer.far`, a texel this many of the full-size picture's) a pine whose tufts are pictures of its
+ * shoots fanned (`ScanLook.tuftFan`) has its drawn needles alone, this many times as many.
+ */
+const FAR_BARE = 4;
+const FAR_BARE_MORE = 1.5;
 /** A pine's shoot picture laid at a tuft (`ScanLook.tuftPicture`): how long, in its needles' lengths (a white pine's 30 cm shoot, its needles 8–12 cm). */
 const TUFT_SHOOT = 3;
 /** How far apart the pictures of a fan of shoot pictures laid at one tuft are turned (rad; `ScanLook.tuftFan`). */
@@ -110,6 +126,11 @@ interface Layer {
   warm?: Float32Array;
   /** How far each texel is a flower (its look's `flowers`: a gorse sprig's yellow pea flowers), 0..1, where it keeps them. */
   flower?: Float32Array;
+  /**
+   * Drawn for a mip this many times smaller (`pineMip`): a pine's needles each as wide as that mip's
+   * texel and as many fewer as they are wider, so its tufts keep their spikes there.
+   */
+  far?: number;
 }
 
 /** How far a photograph's texel (sRGB, 0..1) is a yellow or orange flower: red and green both well over blue, red not under green. */
@@ -198,7 +219,7 @@ function stroke(L: Layer, ax: number, ay: number, bx: number, by: number, ra: nu
  * bundles behind the shoot are drawn first and darker, those in front last and lighter, each needle lighter to
  * its tip.
  */
-function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rnd: () => number, tone: number, own: number, brush = TUFT_STRETCH): void {
+function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rnd: () => number, tone: number, own: number, brush = TUFT_STRETCH, thicker = 1): void {
   // (A longer brush, as many more needles and bundles as it is longer: as thick all along it.)
   const more = Math.max(1, brush / TUFT_STRETCH);
   const n = Math.round(Math.min(TUFT_MOST * more, Math.max(TUFT_LEAST, len * TUFT_NEEDLES * more)));
@@ -246,14 +267,31 @@ function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rn
     needles.push({ bx: x - ca * at, by: y - sa * at, dx: (ca * u - sa * v) * nl, dy: (sa * u + ca * v) * nl, front: Math.sin(th) * Math.sin(ph), t: LEAF * tone * (0.75 + 0.35 * rnd()) });
   }
   needles.sort((p, q) => p.front - q.front);
-  for (const nd of needles) {
-    // (Behind the shoot, in the tuft's own shade; in front, in the light.)
-    const lit = 0.7 + 0.45 * (nd.front * 0.5 + 0.5);
+  // (Drawn for a smaller mip (`Layer.far`): each needle as wide as that mip's texel and kept by chance as
+  // often as it is narrower than that, so the tuft covers about what its needles do, but in spokes a texel
+  // wide with sky between, which the mip keeps; its needles' own light and shade are kept too. Averaged down
+  // from the full-size picture, a needle a quarter of a texel wide was a quarter of an alpha, under the cut,
+  // and only the tuft's dense heart was left: a disc, a broad leaf's blot (Cook et al. 2007, *Stochastic
+  // simplification of aggregate detail*: fewer elements, each bigger, the same cover).)
+  const far = L.far ?? 1;
+  const wide0 = far > 1 ? Math.max(w, FAR_NEEDLE * far) : w;
+  const share = far > 1 ? (w / wide0) * FAR_KEEP * thicker : 1;
+  // (All of them, and wider, where as many again are asked for as there are: `thicker`.)
+  const wide = wide0 * Math.max(1, share);
+  const keep = Math.min(1, share);
+  const salt = Math.round(x * 13 + y * 7919);
+  needles.forEach((nd, i) => {
+    if (keep < 1 && hash01(i, salt) >= keep) return;
+    // (Behind the shoot, in the tuft's own shade; in front, in the light. And lit as a brush is from above: its
+    // needles pointing up catch the sky and the sun, those hanging down are in the brush's own shade, so a tuft
+    // is a ball of needles, its heart dark, and not a flat leaf of one tone.)
+    const up = nd.dy / Math.max(1e-6, Math.hypot(nd.dx, nd.dy));
+    const lit = (0.7 + 0.45 * (nd.front * 0.5 + 0.5)) * (1 + TUFT_UP_LIGHT * up);
     const mx = nd.bx + nd.dx * 0.45;
     const my = nd.by + nd.dy * 0.45;
-    stroke(L, nd.bx, nd.by, mx, my, w, w * 0.9, nd.t * lit * 0.62, own);
-    stroke(L, mx, my, nd.bx + nd.dx, nd.by + nd.dy, w * 0.9, w * 0.45, nd.t * lit * 1.3, own);
-  }
+    stroke(L, nd.bx, nd.by, mx, my, wide, wide * 0.9, nd.t * lit * TUFT_HEART, own);
+    stroke(L, mx, my, nd.bx + nd.dx, nd.by + nd.dy, wide * 0.9, far > 1 ? wide * FAR_TIP : w * 0.45, nd.t * lit * 1.3, own);
+  });
 }
 
 /** A pine's needle, metres: its look's, or a share of its brush. */
@@ -705,7 +743,7 @@ function frond(look: ScanLook, rnd: () => number): { twigs: Twig[]; leaves: Leaf
  * (ox, oy): a near card (`big` false, `extent` its width in metres, its twig coming in near its first row),
  * or its big card. `seed` makes each card its own.
  */
-export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sheet: Sheet, look: ScanLook, extent: number, big: boolean, seed: number, density = 0): void {
+export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sheet: Sheet, look: ScanLook, extent: number, big: boolean, seed: number, density = 0, far = 1): void {
   const rnd = rng(seed);
   const whole = look.spray === "whole";
   const palm = look.spray === "pinnate" || look.spray === "fan" || whole;
@@ -722,7 +760,7 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     const more = bigSpray(look, extent, 2 * nearCardHalf(look), rnd, density);
     for (const l of more.leaves) if (rnd() < thick) under.push(l);
   }
-  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n), ...(look.flowers ? { flower: new Float32Array(n * n) } : {}) };
+  const L: Layer = { n, far, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n), ...(look.flowers ? { flower: new Float32Array(n * n) } : {}) };
   // (Metres to texels: a near card at its real size, its foot near its first row; a big card or a palm's
   // leaf fitted inside its cell.)
   let k = n / extent;
@@ -833,6 +871,9 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     // (A fan's middle picture last, over its sides; each a little longer or shorter than the next, and the pine's own
     // needles drawn under them, longer, so the brush's edge is needle tips at their own lengths and not one smooth arc,
     // which a few dozen metres off was a broad leaf's outline.)
+    // (Drawn for a far mip (`FAR_BARE`), its needles alone, as many more as its pictures covered: the pictures
+    // fanned about the brush's foot were its few big lobes there, a palmate leaf from the tee.)
+    else if (fan > 1 && (L.far ?? 1) >= FAR_BARE) needleTuft(L, x0 + Math.cos(lay.ang) * tipBack, y0 + Math.sin(lay.ang) * tipBack, lay.ang, needle * (lay.len / len0), rnd, lay.tone, lay.own, l.brush, FAR_BARE_MORE);
     else if (fan > 1) {
       needleTuft(L, x0 + Math.cos(lay.ang) * tipBack, y0 + Math.sin(lay.ang) * tipBack, lay.ang, needle * (lay.len / len0), rnd, lay.tone, lay.own, l.brush);
       for (const c of Array.from({ length: fan }, (_, c) => c).sort((a, b) => Math.abs(b - (fan - 1) / 2) - Math.abs(a - (fan - 1) / 2))) leaf(L, sheet, { ...fanned(c), len: lay.len * (TUFT_FAN_LEN + 0.1 * ((c * 7) % 3)) }, shadow);
@@ -927,9 +968,9 @@ const WARMTH = 4;
  * underside near black, darker still in the creases where two lumps meet, a few twigs under its flat base.
  * So a far cushion is a cushion's shape and light, and a near one its needles.
  */
-export function drawnCushionCard(out: Pixels, ox: number, oy: number, n: number, look: ScanLook, extent: number, seed: number, density: number): void {
+export function drawnCushionCard(out: Pixels, ox: number, oy: number, n: number, look: ScanLook, extent: number, seed: number, density: number, far = 1): void {
   const rnd = rng(seed);
-  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
+  const L: Layer = { n, far, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
   const k = n / extent;
   const N = Math.max(6, Math.min(n * 0.09, needleOf(look) * k));
   const d = clamp01(density);
@@ -1061,15 +1102,15 @@ function write(out: Pixels, ox: number, oy: number, n: number, L: Layer, mean: n
  * to a card, or its cushions drawn (`"drawn"`); with pictures of its canopy (`far`, `ScanLook.cushionFar`) those
  * on its far cards. Else its far cards are its big cards again.
  */
-export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet, far?: Sheet): void {
+export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet, far?: Sheet, mip = 1): void {
   // (A palm's near cards are the drawn ones' size: a clump's radius and a little less (geometry.ts `cardPieces`),
   // a big card's 0.8 / 1.45 of it.)
   const near = 2 * nearCardHalf(look) || bigExtent * (0.8 / 1.45);
   for (let c = 0; c < FAR_CARD; c++) {
     const big = c >= BIG_CARD;
     if (big && look.cushion && cushions && cushions.set.sprites.length > 0) drawCushionCard(out, c * n, row * n, n, cushions, c - BIG_CARD, look.padThick);
-    else if (big && look.cushion) drawnCushionCard(out, c * n, row * n, n, look, bigExtent, seed * 31 + c * 7 + 3, density);
-    else drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
+    else if (big && look.cushion) drawnCushionCard(out, c * n, row * n, n, look, bigExtent, seed * 31 + c * 7 + 3, density, mip);
+    else drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density, mip);
   }
   for (let c = FAR_CARD; c < FAR_CARD + FAR_CARDS; c++) {
     if (far && far.set.sprites.length > 0) {
@@ -1080,4 +1121,63 @@ export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, 
     const from = BIG_CARD + ((c - FAR_CARD) % BIG_CARDS);
     for (let j = 0; j < n; j++) out.data.copyWithin(((row * n + j) * out.width + c * n) * 4, ((row * n + j) * out.width + from * n) * 4, ((row * n + j) * out.width + from * n + n) * 4);
   }
+}
+
+/** How many of a pine's mips below its full-size picture are drawn for themselves (`pineMips`): down to a card of 32 texels from 512. */
+export const PINE_MIPS = 4;
+
+/**
+ * Which of a species' row's cards are a pine's needles drawn tuft by tuft (`needleTuft`), whose mips are drawn
+ * for themselves (`pineMip`): a pine's near cards, and its big and far cards unless they are photographs.
+ */
+export function needledCards(look: ScanLook, cushions?: Sheet, far?: Sheet): boolean[] {
+  // (A pine whose tufts are each one picture of its shoot (`tuftPicture`, no fan) has no needles drawn: its mips are its pictures'.)
+  if (look.spray !== "tufts" || (look.tuftPicture && (look.tuftFan ?? 1) <= 1)) return Array.from({ length: SPRAY_COLS }, () => false);
+  const bigPhoto = !!look.cushion && !!cushions && cushions.set.sprites.length > 0;
+  const farPhoto = !!far && far.set.sprites.length > 0;
+  return Array.from({ length: SPRAY_COLS }, (_, c) => (c < BIG_CARD ? true : c < FAR_CARD ? !bigPhoto : !farPhoto && !bigPhoto));
+}
+
+/**
+ * A pine's row drawn again for its mip `level` (`Layer.far`): drawn at full size with its needles each as wide
+ * as that mip's texel and as many fewer, then averaged down to the mip's size, `n >> level` texels a card. Its
+ * first row is the row's.
+ */
+export function pineMip(level: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet, far?: Sheet): Pixels {
+  const full: Pixels = { data: new Uint8Array(SPRAY_COLS * n * n * 4), width: SPRAY_COLS * n, height: n };
+  drawSprayRow(full, 0, n, sheet, look, bigExtent, seed, density, cushions, far, 1 << level);
+  return boxDown(full, level);
+}
+
+/** ... for each of its first `levels` mips. */
+export function pineMips(n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet, far?: Sheet, levels = PINE_MIPS): Pixels[] {
+  const out: Pixels[] = [];
+  for (let l = 1; l <= levels && n >> l >= 1; l++) out.push(pineMip(l, n, sheet, look, bigExtent, seed, density, cushions, far));
+  return out;
+}
+
+/** A picture averaged down `level` times, 2^level texels square to one: colour weighted by coverage where there is any. */
+function boxDown(px: Pixels, level: number): Pixels {
+  const f = 1 << level;
+  const w = px.width >> level;
+  const h = px.height >> level;
+  const data = new Uint8Array(w * h * 4);
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      let a = 0;
+      const c = [0, 0, 0];
+      for (let y = 0; y < f; y++) {
+        const row = ((j * f + y) * px.width + i * f) * 4;
+        for (let x = 0; x < f; x++) {
+          const p = row + x * 4;
+          a += px.data[p + 3];
+          for (let k = 0; k < 3; k++) c[k] += px.data[p + k];
+        }
+      }
+      const o = (j * w + i) * 4;
+      for (let k = 0; k < 3; k++) data[o + k] = Math.round(c[k] / (f * f));
+      data[o + 3] = Math.round(a / (f * f));
+    }
+  }
+  return { data, width: w, height: h };
 }

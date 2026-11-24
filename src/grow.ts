@@ -590,10 +590,90 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
   const vForkY = form.stems > 1 && species.forkSplits !== undefined ? forkHeight(species, sz, form) : undefined;
   // (A forked trunk's or a clump's: where its stems part and their first pieces are kept as grown by the fit.)
   const keepBelow = form.stems > 1 && species.forkSplits === undefined ? forkHeight(species, sz, form) + stemFirst(sz) + 0.05 : 0;
-  const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st);
+  const tree = leant(species, boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st), seed);
   const habit = { sprayHang: species.sprayHang, pads: species.pads, clusters: species.clusters };
   const said = Object.values(habit).some((v) => v !== undefined && v > 0);
   return species.buttress || said ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}) } : tree;
+}
+
+/**
+ * How far up a leaning trunk (`TreeSpecies.lean`) leans at its full angle, past its crown's base (a share of the
+ * crown's depth), and over how much more of the crown it turns back up over its foot.
+ */
+const LEAN_FULL = 0.1;
+const LEAN_EASE = 0.5;
+
+/**
+ * A tree leant as its species leans (`lean`): between half its lean and all of it, its own way by its seed,
+ * from its foot, at its full angle to a little past its crown's base, and then turning back up, so its crown
+ * stands over its foot as a leaning tree's grows to (and its crown keeps to its box, which a ball meets). A
+ * shear, height kept, everything on the trunk carried with it.
+ */
+function leant(sp: TreeSpecies, tree: GrownTree, seed: number): GrownTree {
+  if (!sp.lean) return tree;
+  const rnd = new Random(hashSeed(seed) ^ 0x6c65616e);
+  const angle = (sp.lean * (0.5 + 0.5 * rnd.next()) * Math.PI) / 180;
+  const way = rnd.next() * 2 * Math.PI;
+  const sx = Math.tan(angle) * Math.cos(way);
+  const sz = Math.tan(angle) * Math.sin(way);
+  const { crownBase, height } = tree.size;
+  const y0 = crownBase + LEAN_FULL * (height - crownBase);
+  const ease = Math.max(0.01, LEAN_EASE * (height - crownBase));
+  // (How far over it is at a height, for each of its lean: as high as it is, then back to none over `ease`, a
+  // cubic leaving at the lean's slope and arriving upright.)
+  const back = -y0 / ease;
+  const over = (y: number): number => {
+    if (y <= y0) return Math.max(0, y);
+    const u = Math.min(1, (y - y0) / ease);
+    return y0 + ease * (u - 2 * u * u + u * u * u + back * (3 * u * u - 2 * u * u * u));
+  };
+  const sk = tree.skeleton;
+  const cl = tree.clumps;
+  const reach = () => {
+    let r = 0;
+    for (let c = 0; c < cl.count; c++) r = Math.max(r, Math.hypot(cl.x[c], cl.z[c]) + cl.radius[c]);
+    return r;
+  };
+  const was = reach();
+  for (let n = 0; n < sk.count; n++) {
+    const o = over(sk.y[n]);
+    sk.x[n] += sx * o;
+    sk.z[n] += sz * o;
+  }
+  // (A clump carried with the wood it hangs on.)
+  for (let c = 0; c < cl.count; c++) {
+    const o = over(sk.y[cl.node[c]]);
+    cl.x[c] += sx * o;
+    cl.z[c] += sz * o;
+  }
+  // (Its crown kept to its reach: drawn in a little where its lean carried it out past it.)
+  const k = Math.min(1, was / Math.max(1e-6, reach()));
+  for (let n = 0; n < sk.count; n++) {
+    sk.x[n] *= k;
+    sk.z[n] *= k;
+  }
+  for (let c = 0; c < cl.count; c++) {
+    cl.x[c] *= k;
+    cl.z[c] *= k;
+  }
+  // (Its wood's length from the ground, and each clump's twig's way, as they now run.)
+  for (let n = 0; n < sk.count; n++) {
+    const p = sk.parent[n];
+    if (p >= 0) sk.along[n] = sk.along[p] + Math.hypot(sk.x[n] - sk.x[p], sk.y[n] - sk.y[p], sk.z[n] - sk.z[p]);
+  }
+  for (let c = 0; c < cl.count; c++) {
+    const n = cl.node[c];
+    const p = sk.parent[n];
+    if (p < 0) continue;
+    const tx = sk.x[n] - sk.x[p];
+    const ty = sk.y[n] - sk.y[p];
+    const tz = sk.z[n] - sk.z[p];
+    const l = Math.hypot(tx, ty, tz) || 1;
+    cl.tx[c] = tx / l;
+    cl.ty[c] = ty / l;
+    cl.tz[c] = tz / l;
+  }
+  return tree;
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */

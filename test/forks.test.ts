@@ -21,7 +21,7 @@ const own = (sp: TreeSpecies): TreeSize => ({ height: sp.height, crownRadius: sp
 
 /** The species that fork or grow as clumps, and those that keep one stem (conifers with a leader among them). */
 const VARIED = ALL_SPECIES.filter(formsVary);
-const KEEP_ONE = ["Spruce", "Sitka spruce", "Douglas fir", "White spruce", "Corsican pine", "Monterey pine", "Eastern white pine", "Scots pine", "Lombardy poplar"];
+const KEEP_ONE = ["Spruce", "Sitka spruce", "Douglas fir", "White spruce", "Corsican pine", "Monterey pine", "Eastern white pine", "Lombardy poplar"];
 
 /** The first seeds from 1 whose form `want` says yes to. */
 function seedsWhere(sp: TreeSpecies, want: (f: TreeForm) => boolean, count: number): number[] {
@@ -57,7 +57,7 @@ function forkOf(t: GrownTree): { at: number; kids: number[] } | null {
 
 test("the species that fork or grow as clumps are the ones the notes give, and the leaders keep one stem", () => {
   const names = VARIED.map((s) => s.name).sort();
-  for (const n of ["Oak", "Beech", "Silver birch", "Black alder", "Weeping willow", "Eucalyptus", "Monterey cypress", "Stone pine", "Coast live oak", "California sycamore"]) assert.ok(names.includes(n), `${n} forks or grows as clumps`);
+  for (const n of ["Oak", "Beech", "Silver birch", "Black alder", "Weeping willow", "Eucalyptus", "Monterey cypress", "Stone pine", "Scots pine", "Coast live oak", "California sycamore"]) assert.ok(names.includes(n), `${n} forks or grows as clumps`);
   for (const n of KEEP_ONE) {
     const sp = species(n);
     for (let s = 1; s <= 200; s++) assert.equal(formOf(sp, s).stems, 1, `${n}, seed ${s}`);
