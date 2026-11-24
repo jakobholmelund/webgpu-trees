@@ -127,6 +127,14 @@ the size of a tray beside a golfer. The atlas holds each kind's clusters
 at three densities (`PAINTERLY_DENSITIES`, the leaves smaller and more at
 each), and each dab takes the coarsest whose leaves stay under `leafSize`
 (0.22 m for a broad leaf; a palm's fronds are allowed five times that).
+Nor finer than leaves four pixels across: further off, a leaf's size in
+metres is not seen, and finer leaves were a shimmer of specks over a birch
+or a willow at the fairway; and leaves seven pixels across or fewer are
+drawn softly, their own tone and number eased towards the mean (to a third
+at two pixels), so a far crown is soft painted masses with crisp edges. A
+painterly tree passing between tiers hands its dabs and sheets over piece by
+piece (`pieceShare`), as the realistic look does: handed over pixel by pixel,
+a crown at 60 m was a speckle of sky inside it and lone leaves round it.
 A cluster is a lumpy mass of a few round lobes, darker under its leaves,
 the leaves pointing out from their lobe, so its outline is ragged leaf
 tips all round and no ring of tips pointing out like a star.
@@ -194,6 +202,19 @@ blots pixel by pixel, a speckle over the whole hand-over. An old pine
 grown as a broadleaf has no whorled boughs, its needles tufts at its
 twigs' ends, and sheets made its crown a palm's fronds: it keeps its
 clusters.
+
+A painterly sheet seen aslant had its picture squeezed across its sprays
+into streaks along its bough, and under a cedar the near ones were big
+smeared sheets. So, near, each is turned about its middle line (`aSpine`)
+towards the eye until it faces it at least 0.25 (the cosine), and 0.6
+within three of its half lengths, never more than 63 degrees: a bough seen
+from the tee lies as it lies, its tiers so, and one overhead is never a
+streak. What is still edge-on (under 0.2, or 0.42 close to) goes spray by
+spray, by each painted spray's own number, as its mips thin to their
+hearts; and from five of its half lengths in to one and a half, half its
+sprays go, so close to it breaks into sprays with air between, the rest by
+six tenths of one (a sheet at the eye was a smear). Mid sheets are as they
+were: turned or thinned, a far spruce was a row of spikes.
 
 **Light through the leaves.** A thin leaf passes on about as much light as
 it sends back. To an eye looking towards the sun through it, the light is
@@ -323,7 +344,12 @@ as low as the crown's base, leaved all along and over its arch (the willow's
 curtain, the birch's tresses). Past the crown's outline a whip goes no
 further out and turns down the sooner; drawn back in to it, a whip arching
 out of the crown's narrow top turned back on itself, a loop of wire over the
-crown.
+crown. A crown that weeps half or more (a willow's) has its top clothed: once
+it is thinned and fitted, every piece of wood in its upper half that no
+clump's core lies over gets a whip's spray over it, the highest first, so no
+bare limb stands over its dome of leaves in any variant a course grows
+(`test/weep.test.ts`); the realistic look's sprays there spring from as high
+as their clump is hung (`FixedCards.lift`), not from the wood under it.
 
 What the grower cannot do yet, so those rows come as close as their data
 allows: a lean (Torrey, Aleppo, California sycamore; a host leans a tree at
@@ -437,6 +463,12 @@ grows as it did):
   a side bud took the lead (sympodial growth: a plane's, a sycamore's
   twigs, 25 degrees), or none (a maple's, whose terminal bud goes on). Grown
   into the wood after it is smoothed, which would iron a zigzag flat.
+- **`zigzagRun`**: how far a crooked tree's wood runs straight between elbows
+  (m): a California sycamore's limbs and branches turn, wander and seek the
+  light all at once at each elbow, rather than a little at every internode,
+  which drawn as a curve through its nodes was a wavy line hanging in the
+  gaps between its pads (`test/crooked.test.ts`: it turns back a fiftieth as
+  often a metre, its limbs as crooked).
 - **`phyllotaxis`**: how its side buds are set round a shoot, by the golden
   angle (most trees), opposite and crossed (a maple's: one of each pair
   grown), or in two ranks in the shoot's plane (a beech's flat fans).

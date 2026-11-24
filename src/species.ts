@@ -153,6 +153,13 @@ export interface TreeSpecies {
    */
   zigzag?: number;
   /**
+   * How far its wood runs straight between elbows (m): a crooked tree whose limbs and branches zigzag at
+   * angular elbows (a California sycamore's), all their wandering and turning to the light at once at each,
+   * rather than a little at every internode, which drawn through its nodes is a wavy line. Left out: they
+   * wander as they grow, and `zigzag` sets their twigs aside internode by internode.
+   */
+  zigzagRun?: number;
+  /**
    * How its side buds are set round a shoot: one at a node turning by the golden angle (`spiral`, most
    * trees), opposite in pairs crossed at right angles (`opposite`: maple, ash; one of each pair is grown, so
    * its shoots alternate side to side and cross), or in two ranks in the shoot's plane (`distichous`: beech,
@@ -272,6 +279,7 @@ export const OPTIONAL_SPECIES_FIELDS = {
   limbCurve: "number",
   limbCurveBack: "number",
   zigzag: "number",
+  zigzagRun: "number",
   phyllotaxis: ["spiral", "opposite", "distichous"],
   sprayHang: "number",
   canopyLift: "number",
@@ -1325,6 +1333,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     limbCurve: 0,
     limbCurveBack: 5,
     zigzag: 25,
+    zigzagRun: 1.1,
     pads: 0.4,
     leafKind: "broad",
     clumpSize: 1.9,
@@ -1612,6 +1621,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.limbAngle !== undefined && !(s.limbAngle.length === 2 && s.limbAngle.every((a) => a >= 0 && a <= 175))) out.push("limbAngle must be [top, base], each 0..175 degrees");
   for (const k of ["limbCurve", "limbCurveBack"] as const) if (s[k] !== undefined && !(Math.abs(s[k] as number) <= 180)) out.push(`${k} must be -180..180 degrees`);
   if (s.zigzag !== undefined && !(s.zigzag >= 0 && s.zigzag <= 60)) out.push("zigzag must be 0..60 degrees");
+  if (s.zigzagRun !== undefined && !(s.zigzagRun >= 0 && s.zigzagRun <= 5)) out.push("zigzagRun must be 0..5 m");
   if (s.phyllotaxis !== undefined && !["spiral", "opposite", "distichous"].includes(s.phyllotaxis)) out.push("phyllotaxis must be spiral, opposite or distichous");
   for (const k of ["sprayHang", "canopyLift", "pads", "clusters", "buttress"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
   if (!(s.clumpSize > 0)) out.push("clumpSize must be above 0");

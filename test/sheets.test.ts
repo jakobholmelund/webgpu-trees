@@ -186,3 +186,30 @@ test("a painterly sheet's far mips close up towards its outline, never thinner t
     });
   }
 });
+
+test("each sheet's vertices say where its middle line is (`aSpine`): across it, square to the way it runs, and nothing on the line", () => {
+  // (The painterly look turns a sheet about that line to the eye, so it is never seen edge-on.)
+  for (const sp of CONIFERS) {
+    const tree = grow(sp);
+    const P = sheetPieces([tree], [kindOf(sp.leafKind)]);
+    const pos = P.attributes.position.array;
+    const dab = P.attributes.aDab.array;
+    const spine = P.attributes.aSpine.array;
+    const per = SHEET_ACROSS * SHEET_ALONG;
+    let worst = 0;
+    for (let v0 = 0; v0 + per <= pos.length / 3; v0 += per) {
+      for (let v = v0; v < v0 + per; v++) {
+        const s = dab[4 * v];
+        const reach = Math.hypot(spine[3 * v], spine[3 * v + 1], spine[3 * v + 2]);
+        if (Math.abs(s) < 1e-6) assert.ok(reach < 1e-5, `${sp.name}: a middle vertex is on its line`);
+        // (Its partner across the sheet, the other way along the same row, has its middle line at the same point.)
+        const row = Math.floor((v - v0) / SHEET_ACROSS);
+        const mirror = v0 + row * SHEET_ACROSS + (SHEET_ACROSS - 1 - ((v - v0) % SHEET_ACROSS));
+        const a = [pos[3 * v] + spine[3 * v], pos[3 * v + 1] + spine[3 * v + 1], pos[3 * v + 2] + spine[3 * v + 2]];
+        const b = [pos[3 * mirror] + spine[3 * mirror], pos[3 * mirror + 1] + spine[3 * mirror + 1], pos[3 * mirror + 2] + spine[3 * mirror + 2]];
+        worst = Math.max(worst, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]));
+      }
+    }
+    assert.ok(worst < 1e-4, `${sp.name}: a row's vertices share their middle point (${worst})`);
+  }
+});

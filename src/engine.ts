@@ -19,7 +19,7 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, Loop, abs, atan, fwidth, int, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, texture3D, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, Loop, abs, acos, atan, fwidth, int, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sign, sin, smoothstep, sqrt, step, storage, texture, texture3D, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
 
 /** The painted look's brush marks' texels (dabs.ts makes them as a texture). */
@@ -39,7 +39,7 @@ import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheet
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
-import { growTree } from "./grow.ts";
+import { clothed, growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
 import { palmPieces } from "./palmGeometry.ts";
 import { PALM_CELL, type Pruning } from "./palm.ts";
@@ -67,6 +67,32 @@ const BIG_CARD_FULL = 5;
 const BIG_CARD_GONE = 2.5;
 /** How far a pine's cards are turned about their shoots to the eye: its tufts are brushes, alike all round. */
 const PINE_FACE_EYE = 0.85;
+/** A painterly dab's leaves are no smaller than this in the picture (px): it takes a coarser density of them. */
+const LEAF_PX_LEAST = 4;
+/** Painterly leaves this many pixels across and fewer are drawn softly (their tone and own number towards their mean), and as themselves from the second. */
+const LEAF_PX_SOFT: [number, number] = [2, 7];
+/** How much of a leaf's own tone and number a far painterly leaf keeps, at the least. */
+const LEAF_SOFT_LEAST = 0.35;
+/**
+ * A painterly sheet is turned about its middle line towards the eye until it faces it at least this much
+ * (the cosine), far and close to (from the first of its half lengths off to the second), and no further than
+ * SHEET_TURN_MOST (rad).
+ */
+const SHEET_FACE_LEAST: [number, number] = [0.25, 0.6];
+const SHEET_FACE_NEAR: [number, number] = [12, 3];
+const SHEET_TURN_MOST = 1.1;
+/** A painterly sheet facing the eye less than the first (|cos|) is drawn only where its picture is as dense as SHEET_EDGE_CUT; past the second, whole. */
+const SHEET_EDGE: [number, number] = [0.05, 0.2];
+/** ... the second, close to (from SHEET_FACE_NEAR[0] of its half lengths off to SHEET_FACE_NEAR[1]). */
+const SHEET_EDGE_NEAR = 0.42;
+const SHEET_EDGE_CUT = 1.02;
+/** A painterly sheet nearer the eye than the first of its half lengths starts to break into its sprays, the most at the second, when this share of them is gone. */
+const SHEET_NEAR: [number, number] = [5, 1.5];
+const SHEET_NEAR_GONE = 0.5;
+/** ... and nearer than the first, the rest go, all by the second: a sheet at the eye, its picture magnified, was a smear. */
+const SHEET_GONE: [number, number] = [1.6, 0.6];
+/** A painted mark's mean tone (tools/marks/build.mjs brings every cell to it). */
+const MARK_TONE_MEAN = 0.82;
 /** How much of a tier's hand-over each realistic piece of leaves takes to grow in or shrink away (`pieceShare`). */
 const PIECE_BAND = 0.3;
 /** How much less a weeping tree's sprays hang over its crown's top (`FixedCards.hangTop`). */
@@ -414,7 +440,7 @@ export function createTrees(options: TreesOptions): Trees {
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : // (A weeping tree's sprays hang less over its crown's top, over the arches of its limbs.)
-          { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0 };
+          { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0, lift: clothed(species[v.species]) };
   });
   // (A palm's leaves are its fronds, drawn as they are: `frondSets`. Its clumps are only for its light.)
   const isPalm = grown.map((g) => !!g.palm);
@@ -1143,17 +1169,42 @@ export function createTrees(options: TreesOptions): Trees {
       // small sprays over it: drawn in to nothing from BIG_CARD_GONE of its half widths off to BIG_CARD_FULL.)
       const half = aDab.z.mul(fit.size);
       const bigNear = mix(float(1), smoothstep(half.mul(BIG_CARD_GONE), half.mul(BIG_CARD_FULL), length(cameraPosition.sub(at))), big);
-      // (Realistic: a tree passing between tiers hands its leaves over piece by piece, each card or dab
-      // growing in or shrinking away by a share of its own, a sheet coming or going whole: `pieceShare`.)
-      const handPiece = real ? pieceShare(sharesFor(t, T), own) : float(1);
+      // (Realistic and painterly: a tree passing between tiers hands its leaves over piece by piece, each card
+      // or dab growing in or shrinking away by a share of its own, a sheet coming or going whole: `pieceShare`.
+      // Handed over pixel by pixel, a painterly crown at the fairway was a speckle of sky and lone leaves.)
+      const pieceWise = real || look === "painterly";
+      const handPiece = pieceWise ? pieceShare(sharesFor(t, T), own) : float(1);
       // (Painterly: each cluster a size of its own, give or take an eighth, so the same picture does not repeat at one size.)
       const ownSize = look === "painterly" && !sheet ? own.mul(5.13).fract().mul(0.26).add(0.87) : float(1);
       const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece).mul(ownSize);
       if (sheet) {
-        // (A sheet's point is where it is: nothing turns it to the eye. One handed over is drawn to its tree's
-        // foot, its triangles to nothing.)
-        position = real ? select(handPiece.lessThan(0.5), toWorld(T, vec3(0)), at) : at;
+        // (A sheet's point is where it is (realistic), or turned a little about its middle line to the eye
+        // (painterly). One handed over is drawn to its tree's foot, its triangles to nothing.)
+        let turnedAt = at;
         sheetFace = sheetN;
+        if (look === "painterly" && t === 0) {
+          // (Painterly: turned about its middle line towards the eye, as a card is turned to it, so it is never
+          // seen edge-on: a sheet aslant, its picture squeezed across its sprays, was streaks along its bough,
+          // and from under a crown a smear of them.)
+          const aSpine = attribute<"vec3">("aSpine", "vec3");
+          const mid = toWorld(T, fit.point(positionGeometry.add(aSpine)).add(blown));
+          const across = at.sub(mid);
+          const reach = length(across);
+          const axis = normalize(cross(across, sheetN).add(vec3(1e-6, 0, 0)));
+          const eyeIn = normalize(toEye.sub(axis.mul(dot(toEye, axis))).add(vec3(0, 1e-6, 0)));
+          const towards = eyeIn.mul(select(dot(sheetN, eyeIn).lessThan(0), float(-1), float(1)));
+          const off = atan(dot(cross(sheetN, towards), axis), dot(sheetN, towards));
+          // (Only as far as it faces the eye less than SHEET_FACE_LEAST says, more close to: a bough seen from the
+          // tee keeps lying as it lies, its tiers so, and one overhead is never a streak.)
+          const halves = length(cameraPosition.sub(at)).div(max(aDab.z.mul(fit.size), float(0.05)));
+          const least = mix(float(SHEET_FACE_LEAST[0]), float(SHEET_FACE_LEAST[1]), smoothstep(float(SHEET_FACE_NEAR[0]), float(SHEET_FACE_NEAR[1]), halves));
+          const over = max(abs(off).sub(acos(least)), float(0));
+          const angle = sign(off).mul(min(over, float(SHEET_TURN_MOST))).mul(step(float(1e-4), reach));
+          const turn = (v: Vec3): Vec3 => v.mul(cos(angle)).add(cross(axis, v).mul(sin(angle))).add(axis.mul(dot(axis, v)).mul(float(1).sub(cos(angle))));
+          turnedAt = mid.add(turn(across));
+          sheetFace = turn(sheetN);
+        }
+        position = pieceWise ? select(handPiece.lessThan(0.5), toWorld(T, vec3(0)), turnedAt) : turnedAt;
         if (lobeLight && frontAt && frontR) {
           const d = position.sub(frontAt);
           lobeLight.q = d.sub(toEye.mul(dot(d, toEye))).div(frontR);
@@ -1215,7 +1266,18 @@ export function createTrees(options: TreesOptions): Trees {
       const want = uLeafSize.mul(allowed).div(max(markSize.mul(share), float(1e-4)));
       let density: Float = float(PAINTERLY_DENSITIES.length - 1);
       for (let d = PAINTERLY_DENSITIES.length - 2; d >= 0; d--) density = select(want.greaterThanEqual(float(PAINTERLY_DENSITIES[d])), float(d), density);
+      // (And no finer than leaves of LEAF_PX_LEAST pixels: further off, a leaf's size in metres is not seen, and
+      // finer leaves were a shimmer of specks over the crown at the fairway.)
+      const leafPx = markSize.mul(share).mul(uPxPerM).div(max(length(cameraPosition.sub(position)), float(0.1)));
+      let byPx: Float = float(0);
+      for (let d = 1; d < PAINTERLY_DENSITIES.length; d++) byPx = select(leafPx.mul(PAINTERLY_DENSITIES[d]).greaterThanEqual(float(LEAF_PX_LEAST)), float(d), byPx);
+      if (look === "painterly") density = min(density, byPx);
       if (t > 0) density = max(density, uMidDensity);
+      // (How far its leaves are drawn each as itself, by how big they are in the picture: a far crown's leaves
+      // a few pixels across are its masses' texture, softly, and not specks each its own tone.)
+      let leafDensity: Float = float(PAINTERLY_DENSITIES[0]);
+      for (let d = 1; d < PAINTERLY_DENSITIES.length; d++) leafDensity = select(density.equal(float(d)), float(PAINTERLY_DENSITIES[d]), leafDensity);
+      const leafSharp = smoothstep(float(LEAF_PX_SOFT[0]), float(LEAF_PX_SOFT[1]), leafPx.mul(leafDensity));
       const painterlyCell = vec2(floor(own.mul(PAINTERLY_VARIANTS - 0.001)).add(density.mul(PAINTERLY_VARIANTS)), kind);
       const disc = floor(own.mul(7.31).fract().mul(2.999));
       const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
@@ -1233,6 +1295,21 @@ export function createTrees(options: TreesOptions): Trees {
         // its overlapping leaves add up as near ones do: alpha to coverage gives two leaves of the same soft
         // alpha the same samples, and a crown of soft far leaves showed the sky through.)
         return clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
+      };
+      /**
+       * A painterly sheet's alpha. As it turns edge-on to the eye (`facing`, 0 edge-on) its sprays go one by
+       * one, by their own numbers (green), and the soft far ones thin to their hearts (its cut raised); and close
+       * to (`near.x`, 0..1) a share of its sprays go, so it breaks into them, with air between (`near.y`, how
+       * close it is for its facing).
+       */
+      const sprays = (tex: Vec4, facing: Float, near: Vec2): Float => {
+        // (Edge-on is wider close to, where a sheet is its picture's full width and a streak shows.)
+        const edge = float(1).sub(smoothstep(float(SHEET_EDGE[0]), mix(float(SHEET_EDGE[1]), float(SHEET_EDGE_NEAR), near.y), facing));
+        const cut = mix(float(0.5), float(SHEET_EDGE_CUT), edge);
+        const gone = max(edge, near.x);
+        // (A spray's own number, sure only where the picture is sharp: far off, its mip's mean is a half.)
+        const kept = step(gone, tex.g.mul(0.98).add(0.01));
+        return clamp(tex.a.sub(cut).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1).mul(kept);
       };
       // (Which side of a sheet the eye sees: its top or its underside, pixel by pixel.)
       const vSheetN = sheetFace ? varying(sheetFace, "vTreeSheet") : null;
@@ -1252,15 +1329,25 @@ export function createTrees(options: TreesOptions): Trees {
         const vForm = varying(L.form, "vTreeForm");
         const vCorner = varying(L.corner, "vTreeCorner");
         const vThru = t < 2 ? varying(L.through, "vTreeThrough") : null;
+        const vSharp = look === "painterly" && !sheet ? varying(leafSharp, "vTreeLeafSharp") : null;
+        // (How many of a painterly sheet's sprays go for its being close, by how many of its half lengths off it
+        // is: SHEET_NEAR_GONE of them from SHEET_NEAR[0] to SHEET_NEAR[1], the rest by SHEET_GONE[1]: `sprays`.)
+        const sheetOff = length(cameraPosition.sub(position)).div(max(aDab.z.mul(fit.size), float(0.05)));
+        const vNear = look === "painterly" && sheet && t === 0 ? varying(vec2(smoothstep(float(SHEET_NEAR[0]), float(SHEET_NEAR[1]), sheetOff).mul(SHEET_NEAR_GONE).add(smoothstep(float(SHEET_GONE[0]), float(SHEET_GONE[1]), sheetOff).mul(1 - SHEET_NEAR_GONE)), smoothstep(float(SHEET_FACE_NEAR[0]), float(SHEET_FACE_NEAR[1]), sheetOff)), "vTreeSheetNear") : null;
         // (Whether its marks are leaves, whose own number lights each leaf its own way.)
         const leafy = look === "painterly" || look === "sculpted" ? 1 : 0;
         m.colorNode = Fn(() => {
-          handOver(vShares);
+          // (Painterly leaves are handed over piece by piece, in the vertex shader: `pieceShare`.)
+          if (look !== "painterly") handOver(vShares);
           const eye = normalize(vEye);
           const under = underOf(eye);
           const uv = sheetUv(vUv, under);
           const tex = markTex(marks, uv);
-          const mark = vec4(tex.rgb, crisp(tex));
+          // (A far crown's leaves, a few pixels each, softened towards their tone's mean and one number: its masses.)
+          const rg = vSharp ? mix(vec2(MARK_TONE_MEAN, 0.5), tex.rg, mix(float(LEAF_SOFT_LEAST), float(1), vSharp)) : tex.rg;
+          // (A sheet seen edge-on thins away to its densest sprays, and then to nothing: drawn so, its picture
+          // squeezed across its width was a streak, many of them a smear.)
+          const mark = vec4(rg, tex.b, vSheetN && vNear ? sprays(tex, abs(dot(normalize(vSheetN), eye)), vNear) : crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
           // (A point on a ball seen from the eye, from where it is across the ball's disc in its radii; held
           // just inside the disc's edge, where a dab reaches past its lobe's outline.)
@@ -1301,8 +1388,8 @@ export function createTrees(options: TreesOptions): Trees {
         // (The painted look's marks have no leaves of their own: each mark one thickness.)
         const ownLeaf = look === "stylized" ? 0 : 1;
         m.colorNode = Fn(() => {
-          // (Realistic leaves are handed over piece by piece, in the vertex shader: `pieceShare`.)
-          if (!real) handOver(vShares);
+          // (Realistic and painterly leaves are handed over piece by piece, in the vertex shader: `pieceShare`.)
+          if (!real && look !== "painterly") handOver(vShares);
           const eye = vEye ? normalize(vEye) : vec3(0, 1, 0);
           const under = underOf(eye);
           const uv = sheetUv(vUv, under);

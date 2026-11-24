@@ -978,10 +978,10 @@ const BOUGH_STEP = 0.62;
  * it is (its variant's frame); `aDab` where it is on the sheet's picture (x across, y along its length, each
  * -1..1), half the sheet's length (m), and a number of the sheet's own; `aNormal` its clump's outward normal
  * and depth; `aOffset` the sheet's own normal there (its top's side) and its kind; `aLimb` the foot of its
- * limb and its variant.
+ * limb and its variant; `aSpine` from it to the sheet's middle line, across.
  */
 export function sheetPieces(trees: readonly GrownTree[], kinds: readonly number[], coarse = false): Pieces {
-  const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aLimb: 4 });
+  const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aLimb: 4, aSpine: 3 });
   trees.forEach((tree, v) => {
     b.begin();
     const kind = kinds[v] ?? -1;
@@ -1324,7 +1324,9 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
       const ds = sub(point(u, Math.min(1, s + e)), point(u, Math.max(-1, s - e)));
       let nrm = norm(cross(du, ds));
       if (dot(nrm, top) < 0) nrm = scale(nrm, -1);
-      const k = b.vertex({ position: p, aDab: [s, u * 2 - 1, length / 2, own], aNormal: [...n, depth], aOffset: [...nrm, kind], aLimb: [...limb, v] });
+      // (And where its middle line is, from it: a sheet may be turned about it, as the painterly look does.)
+      const mid = point(u, 0);
+      const k = b.vertex({ position: p, aDab: [s, u * 2 - 1, length / 2, own], aNormal: [...n, depth], aOffset: [...nrm, kind], aLimb: [...limb, v], aSpine: sub(mid, p) });
       if (first < 0) first = k;
     }
   }
@@ -1375,6 +1377,8 @@ export interface FixedCards {
    * hung all below their twigs there, they left the wood over them a bare wire along the crown's top).
    */
   hangTop?: number;
+  /** Whether its sprays spring from as high as their clump is hung over its wood (a weeping crown's clothed top: `clothed`). */
+  lift?: boolean;
   /** How far its sprays turn up along their twigs, 0..1 (a pine's shoots turn up to the light, their tufts like brushes held up). */
   rise?: number;
 }
@@ -1430,7 +1434,10 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // (In a tree whose leaves lie in pads, `habit.pads`, flattened into a shelf: wider, and thin.)
         const spread = fix && !filler ? r * 0.55 * Math.sqrt(hash01(k, 26)) : 0;
         const wide = 1 + PAD_WIDE * pads;
-        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + off[1] * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : at0;
+        // (A weeping tree's sprays, `lift`, spring from as high as their clump is hung over its wood: a
+        // whip's arch, its crown's clothed top. Hung from the wood, they left it bare over them.)
+        const lift = fix?.lift ? Math.max(0, cl.y[c] - at0.p[1]) : 0;
+        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread * wide, at0.p[1] + lift + off[1] * spread * (1 - PAD_FLAT * pads), at0.p[2] + off[2] * spread * wide], d: at0.d } : lift > 0 ? { p: [at0.p[0], at0.p[1] + lift, at0.p[2]], d: at0.d } : at0;
         // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's;
         // its big cards too, the clump's hanging mass.)
         // (Less on a clump facing the sky, as far as its kind says: `hangTop`.)

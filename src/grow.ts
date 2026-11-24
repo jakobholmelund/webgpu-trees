@@ -143,6 +143,8 @@ const STRAY_BEYOND = 1.15;
 /** How far a scaffold's way wanders each internode at crooked 1 (radians, a deviate's spread), and how much of its wander it keeps from the last. */
 const LIMB_WANDER = 0.09;
 const LIMB_KEEP = 0.85;
+/** How much a crooked tree's wood that runs straight between elbows (`zigzagRun`) turns at each, for each internode of its run, beside what it wanders an internode. */
+const ELBOW = 0.8;
 /** How far a scaffold sways side to side over its length, at crooked 1. */
 const SCAFFOLD_SWAY = 28 * DEG;
 /** How far a trunk goes on up its crown, from its scaffolds to the top, at leader 0 (and all the way at leader 1). */
@@ -255,6 +257,12 @@ const WHIP_STAGGER = 0.45;
 const WHIP_ARCH_FROM = 0.5;
 /** How far over a whip's arch its clumps are hung there, in their radii. */
 const WHIP_ARCH_LIFT = 0.35;
+/** A weeping crown's wood above this share of its depth has leaves over it (`clotheTop`): over this share of a clump's radius above it, a spray hung this share of one over it where not. */
+const CLOTHE_FROM = 0.45;
+const CLOTHE_COVER = 0.6;
+const CLOTHE_LIFT = 0.45;
+/** ... in a tree that weeps at least this much: a curtain of whips is its crown (a willow's; a birch's few whips hang from an open crown, its twigs seen through it). */
+const CLOTHE_WEEP = 0.5;
 
 // Clumps.
 /** How far from a clump's centre (in its radii) the twigs it covers are: they bear its leaves, and are not shed as bare. */
@@ -768,6 +776,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const under = (l: number) => Math.max(0, Math.floor(base / l) - 4);
   const voxels = (l: number) => (Math.ceil((2 * R) / l) + 7) ** 2 * (Math.ceil(H / l) + 6 - under(l));
   while (voxels(L) > MAX_VOXELS) L *= 1.08;
+  /** How many internodes a run of a crooked tree's wood is between its elbows (`zigzagRun`), or 1. */
+  const elbows = sp.zigzagRun ? Math.max(1, Math.round(sp.zigzagRun / L)) : 1;
   const weep = weepOf(sp);
   const target = Math.round(FINE_NODES * (1 - WHIP_NODES * weep));
   const cap = 2 * target + 600;
@@ -1165,8 +1175,14 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
         // (Its arch over the crown, reckoned over the crown's reach: the larger of its radius and most of its
         // depth, so a long limb in a narrow crown rises rather than arching back down.)
         const f = u / (R / depth < NARROW ? Math.max(R, 0.6 * depth) : R);
-        we = LIMB_KEEP * we + LIMB_WANDER * sp.crooked * rng.gauss();
-        wa = LIMB_KEEP * wa + LIMB_WANDER * sp.crooked * rng.gauss();
+        // (A tree whose wood runs straight between elbows, `zigzagRun`, turns only at them, by as much at once.)
+        const kick = elbows > 1 ? ((Math.round(u / L) + 1) % elbows === 0 ? ELBOW * elbows : 0) : 1;
+        const ge = rng.gauss();
+        const ga = rng.gauss();
+        if (kick > 0) {
+          we = LIMB_KEEP ** elbows * we + kick * LIMB_WANDER * sp.crooked * ge;
+          wa = LIMB_KEEP ** elbows * wa + kick * LIMB_WANDER * sp.crooked * ga;
+        }
         const e = Math.max(-80 * DEG, Math.min(0.5 * Math.PI, e0 + limbTurn(f) + we));
         const a = a0 + sway * Math.sin(Math.PI * f + phase) + wa;
         return [Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a)];
@@ -1251,13 +1267,18 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     for (let m = 0; m < n && count < cap; m++) {
       const j = rng.onSphere();
       const up = lift + (k === 0 ? LEADER_UP * sp.leader : 0);
-      let wx = WANDER * sp.crooked * j[0];
-      let wy = WANDER * sp.crooked * j[1];
-      let wz = WANDER * sp.crooked * j[2];
-      if (lookForLight(px[at], py[at], pz[at], d)) {
-        wx += TO_LIGHT * toLight[0];
-        wy += TO_LIGHT * toLight[1];
-        wz += TO_LIGHT * toLight[2];
+      // (Wood that runs straight between elbows, `zigzagRun`, wanders all at once at each: as much as it would
+      // have over the run, or more.)
+      const wander = WANDER * sp.crooked * (elbows > 1 ? ((rank[at] + 1) % elbows === 0 ? ELBOW * elbows : 0) : 1);
+      let wx = wander * j[0];
+      let wy = wander * j[1];
+      let wz = wander * j[2];
+      // (Turned to the light as it grows; wood that runs straight between elbows, at them, by as much at once.)
+      const elbow = elbows === 1 || (rank[at] + 1) % elbows === 0;
+      if (elbow && lookForLight(px[at], py[at], pz[at], d)) {
+        wx += elbows * TO_LIGHT * toLight[0];
+        wy += elbows * TO_LIGHT * toLight[1];
+        wz += elbows * TO_LIGHT * toLight[2];
       }
       const keep = first ? 0 : BEND_KEEP;
       first = false;
@@ -1402,7 +1423,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const unit = L;
   straightenLeads(w, h, (sp.zigzag ?? TAKE_LEAD_KEEP / DEG) * DEG, sp.zigzag === 0 ? TAKE_LEAD_STRAIGHT : TAKE_LEAD);
   smoothWood(w, h);
-  if ((sp.zigzag ?? 0) > ZIGZAG_FROM) zigzagWood(w, h, ((sp.zigzag ?? 0) - ZIGZAG_FROM) * DEG);
+  // (Wood that runs straight between elbows, `zigzagRun`, has zigzagged as it grew: not again, internode by
+  // internode, which drawn as a curve through its nodes is a wavy line.)
+  if ((sp.zigzag ?? 0) > ZIGZAG_FROM && elbows === 1) zigzagWood(w, h, ((sp.zigzag ?? 0) - ZIGZAG_FROM) * DEG);
   // (Less in a narrow crown: its wood rises steep and short-armed, and bowed it hooks.)
   sagWood(w, h, sagOf(sp) * (R / depth < NARROW ? Math.max(0.25, R / depth / NARROW) : 1), unit);
   const most = Math.round(MAX_NODES * (1 - WHIP_NODES * weep));
@@ -2139,8 +2162,11 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
   // (A conifer whose boughs are drawn as sheets keeps a twig only where its needles lie close over it: a sheet
   // lies along its bough, and a twig off it, inside a clump's ball but not under the sheet, pokes out bare.)
   if (sp.architecture !== "palm") keep = shedBare(w, hung, keep, sp.architecture === "conifer" && !tufted(sp) ? IN_SHEET : IN_SPRAY);
+  if (clothed(sp)) keep = clotheTop(size, w, hung, keep);
   fit(size, w, hung, keep, lifted);
   if (sp.architecture !== "palm") keepToOutline(env, w, hung);
+  // (And again where drawing the crown in to its outline took its clothing off its wood.)
+  if (clothed(sp)) keep = clotheTop(size, w, hung, keep);
   if (!w.radius) refineBoles(size, w, hung, sp.buttress ?? 0);
 
   // A clump keeps to its twig: its centre within its radius of the node it hangs on.
@@ -2222,6 +2248,63 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
     clumps.tz[k] = t[2];
   }
   return sp.architecture === "palm" ? { size, skeleton, clumps } : shedStrays(size, skeleton, clumps);
+}
+
+/** Whether a species' crown is a weeping one whose top is clothed in leaves (`clotheTop`): its sprays are hung over its wood there. */
+export function clothed(sp: TreeSpecies): boolean {
+  return weepOf(sp) >= CLOTHE_WEEP;
+}
+
+/**
+ * A weeping crown's top clothed: every piece of its upper wood with leaves over it. A willow's arching limbs
+ * carry the springing bases of its whips and short leafy shoots all along their tops, so from any side its
+ * top is a dome of leaves and no wood shows over it; grown, its arches' tops between the whips it hung were
+ * bare wire over the crown. Wherever a piece of wood in the crown's upper part (CLOTHE_FROM of its depth) has
+ * no clump's inner core (CLOTHE_COVER of its radius) over it, a whip's spray is hung over it, its centre
+ * CLOTHE_LIFT of its radius above the wood, the highest wood first (one hung over it covers what is under
+ * it). Kept as a whip's leaves are. Returns `keep` with the new clumps' indices.
+ */
+function clotheTop(size: TreeSize, w: Wood, h: Hung, keep: number[]): number[] {
+  const base = size.crownBase;
+  const depth = Math.max(0.01, size.height - base);
+  const from = base + CLOTHE_FROM * depth;
+  if (keep.length === 0) return keep;
+  // (The size of the whips' sprays, or the crown's.)
+  const own = keep.filter((c) => h.whip[c]).map((c) => h.r[c]);
+  const rs = (own.length > 0 ? own : keep.map((c) => h.r[c])).sort((a, b) => a - b);
+  const r = rs[rs.length >> 1];
+  const list = keep.slice();
+  const covered = (x: number, y: number, z: number): boolean => {
+    for (const c of list) {
+      const rc = h.r[c];
+      const dx = h.x[c] - x;
+      const dz = h.z[c] - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < rc * rc && h.y[c] + CLOTHE_COVER * Math.sqrt(rc * rc - d2) >= y) return true;
+    }
+    return false;
+  };
+  const samples: { node: number; x: number; y: number; z: number }[] = [];
+  for (let i = 0; i < w.x.length; i++) {
+    const p = w.parent[i];
+    if (p < 0) continue;
+    // (Along it, every half a spray's radius, each on the nearer of its ends.)
+    const steps = Math.max(1, Math.ceil(Math.hypot(w.x[i] - w.x[p], w.y[i] - w.y[p], w.z[i] - w.z[p]) / (0.5 * r)));
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps;
+      const y = w.y[p] + (w.y[i] - w.y[p]) * t;
+      if (y >= from) samples.push({ node: t < 0.5 ? p : i, x: w.x[p] + (w.x[i] - w.x[p]) * t, y, z: w.z[p] + (w.z[i] - w.z[p]) * t });
+    }
+  }
+  samples.sort((a, b) => b.y - a.y || a.node - b.node);
+  const out = keep.slice();
+  for (const s of samples) {
+    if (covered(s.x, s.y, s.z)) continue;
+    hang(h, s.node, s.x, s.y + CLOTHE_LIFT * r, s.z, r, true);
+    list.push(h.node.length - 1);
+    out.push(h.node.length - 1);
+  }
+  return out;
 }
 
 /**
