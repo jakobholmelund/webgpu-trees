@@ -370,6 +370,23 @@ export function fitToWorld(f: Fit, p: readonly number[]): [number, number, numbe
 
 /** A point of the world into the variant's frame: the fit undone. */
 export function worldToFit(f: Fit, w: readonly number[]): [number, number, number] {
+  return unfit(f, w, false);
+}
+
+/**
+ * A point of the world into the variant's frame as the start of a ray towards the sun (`dirToFit`): by the
+ * crown's stretch alone, below the crown's base as well. The fit stretches a tree up by two amounts, its trunk's
+ * below the crown's base and its crown's above, but a ray's direction is carried in by one, the crown's (it is
+ * the crown's leaves that it crosses). A point below the base carried in by the trunk's stretch would start the
+ * ray where the crown's would not: the ray bends where it meets the crown, and a shadow on the ground moves
+ * sideways by the sun's slope times the difference (size.crownBase − grown.crownBase × crownUp). Carried in by
+ * the crown's alone, the whole ray is one straight line in the frame, as in the world.
+ */
+export function worldToCrownFit(f: Fit, w: readonly number[]): [number, number, number] {
+  return unfit(f, w, true);
+}
+
+function unfit(f: Fit, w: readonly number[], crownOnly: boolean): [number, number, number] {
   const { across, trunkUp, crownUp } = stretches(f);
   const dx = w[0] - f.x;
   const y = w[1] - f.y;
@@ -380,7 +397,7 @@ export function worldToFit(f: Fit, w: readonly number[]): [number, number, numbe
   const lz = dz * c + dx * s;
   const qx = lx - f.leanX * y;
   const qz = lz - f.leanZ * y;
-  const py = y < f.size.crownBase ? y / Math.max(trunkUp, 1e-6) : f.grown.crownBase + (y - f.size.crownBase) / Math.max(crownUp, 1e-6);
+  const py = y < f.size.crownBase && !crownOnly ? y / Math.max(trunkUp, 1e-6) : f.grown.crownBase + (y - f.size.crownBase) / Math.max(crownUp, 1e-6);
   return [(qx * f.mirror) / across, py, qz / across];
 }
 

@@ -30,7 +30,7 @@ function makeDabPixels(): Pixels {
   return { data: img.data, width: img.width, height: img.height };
 }
 import { leafAtlasPixels } from "./leaves.ts";
-import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToFit } from "./light.ts";
+import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToCrownFit } from "./light.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
@@ -513,10 +513,17 @@ export function createTrees(options: TreesOptions): Trees {
     const vi = uint(T.r3.w);
     const lo = lightBoxR.element(vi.mul(2)).xyz;
     const span = lightBoxR.element(vi.mul(2).add(1)).xyz;
-    // (Into the tree's frame, unleant, unstretched, unmirrored: fitOf's `point` undone.)
+    // (Into the tree's frame, unleant, unstretched, unmirrored: fitOf's `point` undone. The ray towards the sun
+    // starts where the crown's stretch alone puts it, below the crown's base too, as its direction is the
+    // crown's stretch's (light.ts `worldToCrownFit`): the trunk's below the base bent a ray from the lower trunk
+    // where it met the crown. The sky is read where the point is, the trunk's stretch and all.)
     const l = dirToTree(T, at.sub(T.r0.xyz));
-    const py = select(l.y.lessThan(T.r1.y), l.y.div(max(fit.trunkUp, float(1e-4))), T.vrow0.y.add(l.y.sub(T.r1.y).div(max(fit.crownUp, float(1e-4)))));
-    const p = vec3(l.x.sub(T.r3.x.mul(l.y)).mul(T.r3.z).div(fit.across), py, l.z.sub(T.r3.y.mul(l.y)).div(fit.across));
+    const inCrown = T.vrow0.y.add(l.y.sub(T.r1.y).div(max(fit.crownUp, float(1e-4))));
+    const pyHere = select(l.y.lessThan(T.r1.y), l.y.div(max(fit.trunkUp, float(1e-4))), inCrown);
+    const qx = l.x.sub(T.r3.x.mul(l.y)).mul(T.r3.z).div(fit.across);
+    const qz = l.z.sub(T.r3.y.mul(l.y)).div(fit.across);
+    const p = vec3(qx, inCrown, qz);
+    const here = vec3(qx, pyHere, qz);
     const s = dirToTree(T, uSun);
     const d = normalize(vec3(s.x.sub(T.r3.x.mul(s.y)).mul(T.r3.z).div(fit.across), s.y.div(fit.crownUp), s.z.sub(T.r3.y.mul(s.y)).div(fit.across)));
     const [cx, cy, cz] = LIGHT_CELLS;
@@ -558,8 +565,8 @@ export function createTrees(options: TreesOptions): Trees {
         // (The sky: read a cell out from the crown's middle, past the same blur; at the nearest cell where a point
         // is past the box's sides, whose outermost cells see it all.)
         const mid = lo.add(span.mul(0.5));
-        const out = normalize(vec3(p.x.sub(mid.x), p.y.sub(mid.y).mul(0.5), p.z.sub(mid.z)).add(vec3(0, 1e-3, 0)));
-        r.assign(vec2(tau, read(p.add(out.mul(cell))).g));
+        const out = normalize(vec3(here.x.sub(mid.x), here.y.sub(mid.y).mul(0.5), here.z.sub(mid.z)).add(vec3(0, 1e-3, 0)));
+        r.assign(vec2(tau, read(here.add(out.mul(cell))).g));
       });
       return r;
     })();
@@ -1276,7 +1283,7 @@ export function createTrees(options: TreesOptions): Trees {
               }
             }
             // (Its own leaves and wood: the same box the shaders march, from the ground up the sun's ray.)
-            const through = structure > 0 ? sunThrough(vol, worldToFit(fit, [gx, p.y, gz]), ray.dir, density) : 1;
+            const through = structure > 0 ? sunThrough(vol, worldToCrownFit(fit, [gx, p.y, gz]), ray.dir, density) : 1;
             trans[j * nx + i] *= shade + (through - shade) * structure;
           }
         }

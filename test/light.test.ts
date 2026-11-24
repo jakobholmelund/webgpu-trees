@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { growTree } from "../src/grow.ts";
-import { bakeLight, boxSpan, cellIndex, dirToFit, type Fit, fitToWorld, leafAreaIndex, packLightAtlas, SKY_DIRECTIONS, sigmaAt, sunThrough, worldToFit, type LightVolume } from "../src/light.ts";
+import { bakeLight, boxSpan, cellIndex, dirToFit, type Fit, fitToWorld, leafAreaIndex, packLightAtlas, SKY_DIRECTIONS, sigmaAt, sunThrough, worldToCrownFit, worldToFit, type LightVolume } from "../src/light.ts";
 import { ALL_SPECIES } from "../src/species.ts";
 import { type GrownTree, type TreeSize } from "../src/tree.ts";
 import { packTrees, planVariants } from "../src/variants.ts";
@@ -158,6 +158,43 @@ test("a fitted tree reads its own leaves: each clump, fitted, turned, leant and 
     assert.ok(up.dir[1] > 0.9);
   }
   assert.ok(mirrored > 0, "some tree is mirrored");
+});
+
+test("a tree whose trunk and crown are stretched apart casts its shadow under its crown: a ray from the ground runs straight", () => {
+  const { tree } = grownOf("Oak");
+  const v = bakeLight(tree, { lai: 4.5 });
+  const g = tree.size;
+  // (The trunk stretched up twice as much as the crown: its crown's base twice as high, the crown as deep.)
+  const size: TreeSize = { ...g, crownBase: g.crownBase * 2, height: g.height + g.crownBase };
+  const fit: Fit = { x: 3, y: 1, z: -2, yaw: 0.7, leanX: 0.03, leanZ: -0.02, mirror: -1, size, grown: g };
+  const sun = [0.55, 0.6, -0.58];
+  const l = Math.hypot(sun[0], sun[1], sun[2]);
+  const d = sun.map((c) => c / l);
+  const ray = dirToFit(fit, d).dir;
+  // (The crown's middle, in the world, and the place on the ground the sun's ray through it comes down to.)
+  const middle = [0, (g.crownBase + g.height) / 2, 0];
+  const w = fitToWorld(fit, middle);
+  const down = (w[1] - fit.y) / d[1];
+  const ground = [w[0] - d[0] * down, fit.y, w[2] - d[2] * down];
+  const along = (from: number[]) => {
+    // (How far the ray from `from` along `ray` passes from the crown's middle, in the frame.)
+    const o = [0, 1, 2].map((a) => middle[a] - from[a]);
+    const t = o[0] * ray[0] + o[1] * ray[1] + o[2] * ray[2];
+    return Math.hypot(o[0] - ray[0] * t, o[1] - ray[1] * t, o[2] - ray[2] * t);
+  };
+  const start = worldToCrownFit(fit, ground);
+  assert.ok(along(start) < 1e-6, `the ray passes ${along(start)} m from the crown's middle`);
+  assert.ok(sunThrough(v, start, ray) < 0.15, "and its leaves shade it");
+  // (Taken in by the trunk's stretch, the ray started (sun's slope) × (crown base − grown base × crown stretch) aside.)
+  const bent = worldToFit(fit, ground);
+  const slope = Math.hypot(d[0], d[2]) / d[1];
+  assert.ok(along(bent) > slope * g.crownBase * 0.3, `the trunk's stretch would have moved it (${along(bent).toFixed(2)} m)`);
+  // (A point on the trunk below the crown's base: the same line.)
+  const low = [ground[0] + d[0] * (down * 0.2), fit.y + d[1] * (down * 0.2), ground[2] + d[2] * (down * 0.2)];
+  assert.ok(along(worldToCrownFit(fit, low)) < 1e-6);
+  // (Within the crown both are the fit undone.)
+  const inCrown = fitToWorld(fit, [1, g.crownBase + 1, -1]);
+  assert.deepEqual(worldToCrownFit(fit, inCrown).map((c) => +c.toFixed(6)), worldToFit(fit, inCrown).map((c) => +c.toFixed(6)));
 });
 
 test("the boxes pack into one texture, each in its own slot, and read back as baked", () => {
