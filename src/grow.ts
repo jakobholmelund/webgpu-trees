@@ -221,6 +221,11 @@ const PAD_THICK = 7;
 /** The most a crown lit through (small or narrow) is in pads, whatever its species' `pads`. */
 const PAD_LIT = 0.9;
 /**
+ * ... and a column (radius under NARROW of its depth), whose sky comes from round it as much as from above: a Scots
+ * pine drawn up in a wood kept in shelves was a pagoda of balls up its stem, a Monterey cypress's a few shelves.
+ */
+const PAD_COLUMN = 0.4;
+/**
  * Bunches (`clusters` 1): a branch's leaves only this share of its foliage depth's reach from its twigs' ends;
  * this share of branches bare; each bunch's clump this much bigger, and hanging this many of its radii under
  * its twig.
@@ -1887,7 +1892,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const padOf = new Int32Array(count).fill(-1);
   // (Less in a crown lit through, a small or narrow one, `PAD_LIT` at most: a tree grown in shelter or in a wood
   // is not shaped into such thin shelves, and kept to their tops so small a crown is a few balls.)
-  const padding = lit ? Math.min(PAD_LIT, sp.pads ?? 0) : (sp.pads ?? 0);
+  const padding = R / depth < NARROW ? Math.min(PAD_COLUMN, sp.pads ?? 0) : lit ? Math.min(PAD_LIT, sp.pads ?? 0) : (sp.pads ?? 0);
   // (Bunches only where the crown has room for them: a small or narrow crown, a tree grown in a wood, is many
   // sprays all through it, as below.)
   const clustering = Math.min(1, Math.max(0, sp.clusters ?? 0)) * (R / depth < NARROW || R < SMALL_CROWN ? CLUSTER_NARROW : 1);

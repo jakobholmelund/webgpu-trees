@@ -744,7 +744,10 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    by as much (to 0.6 of what its height gives them, at the least): as many of
    its sprays across it as its specimen has, not its specimen's few big ones
    crowded in (a stone pine of 12 m on a crown half its specimen's width was a
-   tower of four or five big cushions stacked).
+   tower of four or five big cushions stacked). A column's leaves are in pads
+   at most 0.4 (`pads`): its sky comes from round it as much as from above,
+   and a Scots pine drawn up in a wood kept in its old plates was a pagoda of
+   balls up its stem.
 5. **The wood made good**: where an axis's tip died and the shoot below it
    took the lead, that shoot turned part way back to where the axis ran (a
    twig of such corners is a zigzag); then smoothed (twice, forks held),

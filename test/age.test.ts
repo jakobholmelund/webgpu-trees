@@ -122,3 +122,30 @@ test("trees of one shape but different heights are grown near their own heights,
     assert.ok(Math.abs(Math.log(grown / list[i].height!)) < Math.log(1.5), `a tree of ${list[i].height!.toFixed(1)} m fitted from one grown at ${grown.toFixed(1)} m`);
   }
 });
+
+test("a Scots pine drawn up in a wood (Walton Heath's p10, 13.7 m on a crown 2.4 m round) is not a pagoda of shelves up its stem", () => {
+  const sp = species("Scots pine");
+  const size = sized(sp, 13.7, 2.4, 4.2);
+  // (How much of the crown's height, up its stem, has next to no leaves: the air between shelves.)
+  const thin = SEEDS.map((seed) => {
+    const c = growTree(sp, size, seed).clumps;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < c.count; i++) {
+      lo = Math.min(lo, c.y[i] - c.radius[i]);
+      hi = Math.max(hi, c.y[i] + c.radius[i]);
+    }
+    let n = 0;
+    let gaps = 0;
+    for (let y = lo; y < hi; y += 0.1) {
+      n++;
+      let cover = 0;
+      for (let i = 0; i < c.count; i++) if (Math.abs(c.y[i] - y) < 0.7 * c.radius[i]) cover++;
+      if (cover < 2) gaps++;
+    }
+    return gaps / n;
+  });
+  console.log(`Scots pine 13.7 x 2.4: ${thin.map((t) => t.toFixed(2)).join(", ")} of its height between shelves`);
+  // (In shelves, as an open old tree's plates, 0.14 on average over these seeds.)
+  assert.ok(mean(thin) <= 0.11, `${mean(thin).toFixed(2)} of its height between shelves`);
+});
