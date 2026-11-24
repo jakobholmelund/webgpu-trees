@@ -562,14 +562,74 @@ function buttresses(seed: number, hf: number, foot = 0): (angle: number, h: numb
 }
 
 /**
+ * How a stem's bark is laid over its root flare, from its centre lines (its first pieces, from its foot at
+ * `y0`), the flare's height `hf` and its buttresses (`swell`, as `buttresses`): `along(a, angle)`, how far along
+ * the wood a point is over its surface (not up its centre line: where the flare widens, and more on a
+ * buttress, the surface runs out as well as up, and bark laid up the centre line was drawn out along it in
+ * long smears); and `radius`, the stem's radius over its flare, which the bark is laid round there as round the
+ * stem above (the shader's `aWood.w`, as a share of the radius), so its furrows run on down the flare and
+ * spread out, as a real stem's do, and do not turn aside, crossing in chevrons where the bark's two sides
+ * meet. Above twice the flare's height it is the centre line's own.
+ */
+export function flareBark(lines: readonly Float64Array[], y0: number, hf: number, swell?: (angle: number, h: number) => [number, number, number]): { along: (a: number, angle: number) => number; radius: number } {
+  // (The centre line's samples up to twice the flare's height: how far along, how high, and the radius.)
+  const as: number[] = [];
+  const hs: number[] = [];
+  const rs: number[] = [];
+  let radius = 0;
+  outer: for (const l of lines) {
+    for (let o = 0; o < l.length; o += LINE_STRIDE) {
+      if (as.length > 0 && l[o + 8] <= as[as.length - 1]) continue;
+      const h = l[o + 1] - y0;
+      as.push(l[o + 8]);
+      hs.push(h);
+      rs.push(l[o + 6]);
+      if (h >= hf && radius === 0) radius = l[o + 6];
+      if (h >= 2 * hf) break outer;
+    }
+  }
+  if (radius === 0) radius = rs[rs.length - 1] ?? 0;
+  const top = as[as.length - 1] ?? 0;
+  /** The centre line's height and radius at `a` along it (on at the first piece's slope under its first sample). */
+  const at = (a: number): [number, number] => {
+    if (as.length < 2) return [a, rs[0] ?? 0];
+    let k = 0;
+    while (k + 1 < as.length - 1 && as[k + 1] <= a) k++;
+    const f = (a - as[k]) / Math.max(1e-9, as[k + 1] - as[k]);
+    return [hs[k] + (hs[k + 1] - hs[k]) * f, Math.max(0, rs[k] + (rs[k + 1] - rs[k]) * Math.max(0, f))];
+  };
+  /** The surface's distance out from the centre line at `a`, round at `angle`. */
+  const out = (a: number, angle: number): number => {
+    const [h, r] = at(a);
+    return r * (swell ? swell(angle, h)[0] : 1);
+  };
+  const STEPS = 16;
+  const along = (a: number, angle: number): number => {
+    if (as.length < 2 || a >= top) return a;
+    // (The surface's length from here up to the top of the flare, over its length up the centre line.)
+    let extra = 0;
+    let prev = out(a, angle);
+    for (let k = 1; k <= STEPS; k++) {
+      const da = (top - a) / STEPS;
+      const next = out(a + da * k, angle);
+      extra += Math.hypot(da, next - prev) - da;
+      prev = next;
+    }
+    return a - extra;
+  };
+  return { along, radius };
+}
+
+/**
  * The wood of every variant at one distance, as tubes along the curves `woodLines` draws: one tube from each
  * stem's foot, and from where each limb leaves its parent, on through each node's thickest child, its rings
  * as many-sided as the wood is thick there (a ring with fewer sides than the one before it is stitched to
  * it), each tube's end closed in a rounded cap. Each vertex: `position` a point on the centre line;
  * `aRadial` which way the surface lies from it (as long as the surface swells there: buttresses), and the
  * radius there; `aNormal` which way the surface faces; `aLimb` the foot of the limb it is on (a stem's:
- * below its foot), and its variant; `aWood` how far along the wood from the ground (m), its order, a number
- * of its own (its tube's), and how far along the piece of wood between two nodes it is; `aFrame` the ring's
+ * below its foot), and its variant; `aWood` how far along the wood from the ground (m, over the surface of
+ * a stem's root flare: `flareBark`), its order, a number of its own (its tube's), and how much of its radius
+ * the bark is laid round (under 1 on a root flare: `flareBark`); `aFrame` the ring's
  * own first direction out from the centre line (carried along the tube without twisting) and `aAxis` the
  * way the wood runs there, so a picture of bark can be wrapped round it (engine.ts).
  */
@@ -626,6 +686,7 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
       let lastKey = "";
       let end = { c: [0, 1, 0], d: [0, 1, 0], r: 0, attrs: { limb: [0, 0, 0], order: 0, along: 0 } };
       const startAlong = W.line[chain[0]]![8];
+      const bark = flared ? flareBark(chain.map((i) => W.line[i]!), sk.y[foot], hf, lobe ?? undefined) : null;
       const ownAt = (along: number) => {
         const f = Math.min(1, Math.max(0, (along - startAlong) / blend));
         return ownFrom + (own - ownFrom) * f * f * (3 - 2 * f);
@@ -655,12 +716,14 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
         const t = Math.min(1, Math.max(0, best / (1.5 * rLimb)));
         return { n, w: 1 - t * t * (3 - 2 * t) };
       };
-      const ring = (c: number[], d: number[], r: number, g: number, limb: number[], order: number, along: number, up: number, blend = false): number => {
+      const ring = (c: number[], d: number[], r: number, g: number, limb: number[], order: number, along: number, blend = false): number => {
         u = u.length ? norm(sub(u, scale(d, dot(u, d)))) : basis(d)[0];
         if (!Number.isFinite(u[0]) || Math.hypot(u[0], u[1], u[2]) < 0.5) u = basis(d)[0];
         const w = cross(d, u);
         const h = foot >= 0 ? c[1] - sk.y[foot] : 0;
         const swells = lobe !== null && h < 2.5 * hf;
+        // (Its bark laid over the root flare as over the stem above it: see `flareBark`.)
+        const barkShare = bark ? Math.min(1, bark.radius / Math.max(r, 1e-4)) : 1;
         const sides = sidesFor(shape, r, trunk) + (swells ? BUTTRESS_SIDES : 0);
         let first = -1;
         for (let s = 0; s < sides; s++) {
@@ -677,7 +740,8 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
             const at = leaving([c[0] + e[0] * r, c[1] + e[1] * r, c[2] + e[2] * r], r);
             if (at && at.w > 0) nrm = norm(add(scale(nrm, 1 - at.w), scale(at.n, at.w)));
           }
-          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [along, order, ownAt(along), up], aFrame: u, aAxis: d });
+          const barkAlong = bark ? bark.along(along, a) : along;
+          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [barkAlong, order, ownAt(along), barkShare], aFrame: u, aAxis: d });
           if (first < 0) first = k;
         }
         if (last >= 0) stitch(last, lastSides, first, sides);
@@ -705,10 +769,10 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
             if (q === 0 && foot >= 0) {
               // (A stem's foot goes on a little into the ground, so it stands in it on a slope.)
               const deep = UNDERGROUND + UNDERGROUND_RADII * line[o + 6];
-              ring([c[0] - d[0] * deep, c[1] - d[1] * deep, c[2] - d[2] * deep], d, line[o + 6] * 1.15, 0, limb, sk.order[i], line[o + 8] - deep, 0);
+              ring([c[0] - d[0] * deep, c[1] - d[1] * deep, c[2] - d[2] * deep], d, line[o + 6] * 1.15, 0, limb, sk.order[i], line[o + 8] - deep);
             }
           }
-          ring(c, d, line[o + 6], line[o + 7], limb, sk.order[i], line[o + 8], s / (samples - 1), q === 0 && parentLines.length > 0);
+          ring(c, d, line[o + 6], line[o + 7], limb, sk.order[i], line[o + 8], q === 0 && parentLines.length > 0);
         }
         lastKey = key;
       }
@@ -1336,7 +1400,7 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
       const count = fix ? base : perClump >= 4 ? Math.max(base, Math.min(shoots.length, 4 * perClump)) : base;
       // (With small cards, a few big ones too, a clump wide, set a little into it: the mass of its leaves, which
       // the small ones at its surface lay their detail over.)
-      const big = fix ? (cl.depth[c] > 0.65 ? 1 : fix.big) : 0;
+      const big = fix ? (cl.depth[c] > 0.65 ? Math.min(1, fix.big) : fix.big) : 0;
       for (let d = 0; d < count + big; d++) {
         const filler = d >= count;
         const twig = twigs[c][d % shoots.length];
@@ -1375,7 +1439,9 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const [e1, e2] = basis(face);
         const t = hash01(k, 23) * Math.PI * 2;
         const spin = [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
-        const along0 = [from.d[0] + spin[0] * 0.6 * (1 - 0.5 * rise) + n[0] * 0.3, from.d[1] + spin[1] * 0.6 * (1 - 0.5 * rise) + n[1] * 0.3 + rise, from.d[2] + spin[2] * 0.6 * (1 - 0.5 * rise) + n[2] * 0.3];
+        // (A rising spray's shoots point out of the crown as well as up: a pine's tufts bristle from its outline.)
+        const out = 0.3 + 0.5 * rise;
+        const along0 = [from.d[0] + spin[0] * 0.6 * (1 - 0.5 * rise) + n[0] * out, from.d[1] + spin[1] * 0.6 * (1 - 0.5 * rise) + n[1] * out + rise, from.d[2] + spin[2] * 0.6 * (1 - 0.5 * rise) + n[2] * out];
         const l0 = Math.hypot(along0[0], along0[1], along0[2]) || 1;
         // (A pad's sprays, its big cards too, lie level: from the side a pad is a band of them, not a ball.)
         const level = 1 - PAD_LEVEL * pads;

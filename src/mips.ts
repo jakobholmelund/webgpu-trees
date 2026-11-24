@@ -48,15 +48,18 @@ export function coverage(alpha: ArrayLike<number>, width: number, height: number
  *
  * `fill` (0..1 a level) lets a far mark close up as a painter's far masses do: each level's share goes that
  * much further from the full-size share towards the share of its outline with the gaps between its leaves
- * closed (a needled bough far off is a bough's shape, not a lace of needles).
+ * closed (a needled bough far off is a bough's shape, not a lace of needles). One for every cell, or a cell's
+ * own, row by row (a pine's tufts close up, a broad leaf's spray does not).
  */
-export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill = 0): Pixels[] {
+export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: number | readonly number[] = 0): Pixels[] {
   const levels: Pixels[] = [px];
   const base = alphaOf(px);
   const kept = coverage(base, px.width, px.height, cell, cut);
+  const fillOf = (q: number) => (typeof fill === "number" ? fill : (fill[q] ?? 0));
+  const fills = kept.some((_, q) => fillOf(q) > 0);
   // (Filling in: each level's share goes that much of the way to its cell's outline closed over its gaps.)
   // (Worked out on the picture shrunk to cells of 128 texels or fewer, which is plenty for a share.)
-  const closed = fill > 0 ? closedCoverage(base, px.width, px.height, cell, cut) : kept;
+  const closed = fills ? closedCoverage(base, px.width, px.height, cell, cut) : kept;
   let level = 0;
   let want = kept;
   // (The averaged alpha, unscaled, from which each next level is averaged: scaled alpha averaged would scale twice.)
@@ -67,7 +70,7 @@ export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill = 0
   let size = cell;
   while (w > 1 || h > 1) {
     level++;
-    if (fill > 0) want = kept.map((k, q) => k + (Math.max(k, closed[q]) - k) * Math.min(1, fill * level));
+    if (fills) want = kept.map((k, q) => k + (Math.max(k, closed[q]) - k) * Math.min(1, fillOf(q) * level));
     const nw = Math.max(1, w >> 1);
     const nh = Math.max(1, h >> 1);
     const data = new Uint8Array(nw * nh * 4);

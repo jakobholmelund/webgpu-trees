@@ -102,6 +102,8 @@ export interface ScanLook {
   hang?: number;
   /** How many leaves a near spray carries, about (else as its kind does). */
   perSpray?: number;
+  /** A pine's needles, how long (cm): its tufts are as big (else a share of `leafCm`, `sprays.ts` `needleOf`). */
+  needleCm?: number;
 }
 
 /** The photographs each of the library's species wears, by name. */
@@ -110,11 +112,12 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   // (The plane's leaf on its long stalk: some 16 cm of blade.)
   Plane: { bark: "plane", leaves: "londonPlane", leafCm: 30, spray: "alternate" },
   // (Its rough stocking, a few metres, giving way to the smooth streaked stem.)
-  Eucalyptus: { bark: "eucalyptus", upper: { set: "eucalyptusUpper", from: 0.04, to: 0.12 }, leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafBend: 0.03, hang: 0.85, perSpray: 10 },
+  // (Its adult leaves 12–30 by 1.7–3 cm (EUCLID): narrower than the picture's.)
+  Eucalyptus: { bark: "eucalyptus", upper: { set: "eucalyptusUpper", from: 0.04, to: 0.12 }, leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafWidth: 0.6, leafBend: 0.03, hang: 0.85, perSpray: 8 },
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes: the plates
   // its own grey-brown, not the orange its species is known by from afar.)
-  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts" },
+  "Scots pine": { bark: "pine", barkFoot: "#6f5a4b", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts", needleCm: 6 },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
   "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.03, to: 0.12 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
@@ -125,15 +128,15 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   Gorse: { bark: "ridged", barkScale: 0.35, leaves: "pine", leafCm: 12, spray: "tufts" },
   "Sitka spruce": { bark: "spruce", barkScale: 1.6, leaves: "fir", leafCm: 30, spray: "sprays" },
   // (Its long dark needles, 8–16 cm, in brushes at its shoots' ends: the Torrey pine's shoots, tinted dark.)
-  "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts" },
+  "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts", needleCm: 12 },
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
   "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays" },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts" },
+  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
-  "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts" },
-  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts" },
-  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts" },
+  "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
+  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8 },
+  "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14 },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
@@ -142,7 +145,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "maple", leafCm: 20, spray: "alternate" },
   "Sugar maple": { bark: "ridged", barkScale: 0.8, leaves: "maple", leafCm: 12, spray: "opposite" },
   "Red oak": { bark: "ridged", barkScale: 0.9, leaves: "redOak", leafCm: 17, spray: "alternate" },
-  "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "pine", leafCm: 26, spray: "tufts" },
+  "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 10 },
   "White spruce": { bark: "spruce", barkScale: 0.9, leaves: "fir", leafCm: 26, spray: "sprays" },
 };
 

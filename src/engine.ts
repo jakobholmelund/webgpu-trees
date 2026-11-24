@@ -64,6 +64,19 @@ const SPECIES_ROWS = 8;
 const BIG_CARD_FACE_EYE = 0.65;
 const BIG_CARD_FULL = 5;
 const BIG_CARD_GONE = 2.5;
+/** How far a pine's cards are turned about their shoots to the eye: its tufts are brushes, alike all round. */
+const PINE_FACE_EYE = 0.85;
+/** How much of a tier's hand-over each realistic piece of leaves takes to grow in or shrink away (`pieceShare`). */
+const PIECE_BAND = 0.3;
+/** How far a pine card's alpha is left soft rather than sharpened at the cut, and how steep it is then about the cut. */
+const PINE_SOFT = 0.7;
+/** How far a pine's near cards and its big card close over the gaps between their needles a mip (`coverageMips`). */
+const PINE_NEAR_FILL = 0;
+/** How many near cards to a pine's clump, as `FixedCards.fill`: this, and this much more for a dense one (openness 0). */
+const PINE_FILL = 0.45;
+const PINE_FILL_DENSE = 0.8;
+const PINE_BIG_FILL = 0.3;
+const PINE_RIM = 1.5;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -385,9 +398,9 @@ export function createTrees(options: TreesOptions): Trees {
     if (half <= 0) return null;
     // (A palm's: two of its leaves (or long stretches of one) a clump, and no big cards under them.)
     return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "tufts"
-        ? // (A pine's tufts, each a burst of needles, fill more of their card, and its clumps keep air between
-          // their tufts: one big card under them, a clump's own size; three made a pine's clumps solid balls.)
-          { half, fill: 0.35, most: 24, big: 1, bigSize: 1, hang: 0, rise: 0.8 }
+        ? // (A pine's shoots, each a few tufts with air between: as many to a clump as it is dense, and no big
+          // card under them, whose picture a clump wide, close to, was a lump, a broad leaf's.)
+          { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 24, big: 0, bigSize: 1, hang: 0, rise: 0.8 }
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
@@ -807,6 +820,19 @@ export function createTrees(options: TreesOptions): Trees {
     h = bitXor(h, shiftRight(h, uint(12)));
     return float(h.bitAnd(uint(0xffff))).div(65536);
   };
+  /**
+   * How much of a piece of leaves (a realistic card, dab or sheet) a tier draws, 0..1, by its own number: the
+   * pieces of a tree passing between tiers are handed over one by one, each growing in over a share of
+   * PIECE_BAND of the hand-over as the other tier's shrinks away, the same in both tiers for the same share.
+   * Handed over pixel by pixel instead, the two tiers' leaves, which do not lie in the same places, were a
+   * speckle of sky inside the crown and of leaves outside it over the whole hand-over.
+   */
+  const pieceShare = (shares: Vec2, own: Float): Float => {
+    // (Its own share, decorrelated from the number that chooses its picture and its turn.)
+    const u = own.mul(13.71).add(0.37).fract().mul(1 - PIECE_BAND);
+    const grow = (s: Float) => smoothstep(u, u.add(PIECE_BAND), s);
+    return grow(shares.y).mul(float(1).sub(grow(shares.x)));
+  };
   const handOver = (shares: Vec2) => {
     const s = pixelShare();
     Discard(s.lessThan(shares.x).or(s.greaterThanEqual(shares.y)));
@@ -888,6 +914,8 @@ export function createTrees(options: TreesOptions): Trees {
     // (The light through the leaves, for the pixel to finish, and a sheet's two sides' colours, where unlobed.)
     let thruV: { col: Vec4; n: Vec3; eye: Vec3 } | null = null;
     let sheetCols: { top: Vec3; under: Vec3 } | null = null;
+    /** 1 on a pine's card (its needles' outline kept soft: `PINE_SOFT`), else 0. */
+    let pineCard: Float | null = null;
     let sheetFace: Vec3 | null = null;
     // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
     // (Only on the upper half of its lobe, as sprigs stand on the tops of clay masses: from below they would
@@ -981,7 +1009,19 @@ export function createTrees(options: TreesOptions): Trees {
       // eye: a picture a clump wide seen near edge on is smeared along it, its mip chosen by the way it is
       // squeezed most, a streak through the crown from under it.)
       const big = scanned && card && t === 0 ? step(float(0.5), aOffset.w) : float(0);
-      const face = normalize(mix(face0, toEye, mix(uStyle3.w, max(uStyle3.w, float(BIG_CARD_FACE_EYE)), big)));
+      // (A mid tree's cards are big cards too, and are turned as far.)
+      const turned = scanned && card && t === 1 ? float(1) : big;
+      let face = normalize(mix(face0, toEye, mix(uStyle3.w, max(uStyle3.w, float(BIG_CARD_FACE_EYE)), turned)));
+      if (scanned && card) {
+        // (A pine's tuft is a brush, the same all round its shoot: its card is turned about its shoot to the eye,
+        // as far as PINE_FACE_EYE says. Seen aslant, a card of needles is squeezed, its mip chosen by the way it
+        // is squeezed most, and its tufts were blots, a broad leaf's.)
+        const tan = attribute<"vec4">("aTangent", "vec4");
+        const along = dirToWorld(T, normalize(fit.radial(tan.xyz).mul(vec3(fit.across, fit.crownUp, fit.across))));
+        const round = normalize(toEye.sub(along.mul(dot(toEye, along))).add(vec3(0, 1e-4, 0)));
+        pineCard = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("pine"))), float(1), float(0));
+        face = normalize(mix(face, round, pineCard.mul(PINE_FACE_EYE)));
+      }
       const seen = face.mul(select(dot(face, toEye).lessThan(0), float(-1), float(1)));
       // (A sheet's own facing, its top's side, as fitted; and its clump's, which its light is laid over.)
       const sheetN = face0;
@@ -1077,10 +1117,14 @@ export function createTrees(options: TreesOptions): Trees {
       // small sprays over it: drawn in to nothing from BIG_CARD_GONE of its half widths off to BIG_CARD_FULL.)
       const half = aDab.z.mul(fit.size);
       const bigNear = mix(float(1), smoothstep(half.mul(BIG_CARD_GONE), half.mul(BIG_CARD_FULL), length(cameraPosition.sub(at))), big);
-      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear);
+      // (Realistic: a tree passing between tiers hands its leaves over piece by piece, each card or dab
+      // growing in or shrinking away by a share of its own, a sheet coming or going whole: `pieceShare`.)
+      const handPiece = real ? pieceShare(sharesFor(t, T), own) : float(1);
+      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece);
       if (sheet) {
-        // (A sheet's point is where it is: nothing turns it to the eye.)
-        position = at;
+        // (A sheet's point is where it is: nothing turns it to the eye. One handed over is drawn to its tree's
+        // foot, its triangles to nothing.)
+        position = real ? select(handPiece.lessThan(0.5), toWorld(T, vec3(0)), at) : at;
         sheetFace = sheetN;
         if (lobeLight && frontAt && frontR) {
           const d = position.sub(frontAt);
@@ -1222,15 +1266,20 @@ export function createTrees(options: TreesOptions): Trees {
         const vTop = sheetCols ? varying(sheetCols.top, "vTreeTop") : null;
         const vThru = thruV ? varying(thruV.col, "vTreeThrough") : null;
         const vEye = sheetCols && thruV ? varying(thruV.eye, "vTreeEye") : null;
+        // (Close to only: further off a soft fringe is a lace the sky shows through, and a far crown goes pale.)
+        const vPine = pineCard && t === 0 ? varying(pineCard, "vTreePine") : null;
         // (The painted look's marks have no leaves of their own: each mark one thickness.)
         const ownLeaf = look === "stylized" ? 0 : 1;
         m.colorNode = Fn(() => {
-          handOver(vShares);
+          // (Realistic leaves are handed over piece by piece, in the vertex shader: `pieceShare`.)
+          if (!real) handOver(vShares);
           const eye = vEye ? normalize(vEye) : vec3(0, 1, 0);
           const under = underOf(eye);
           const uv = sheetUv(vUv, under);
           const tex = markTex(marks, uv);
-          const mark = vec4(tex.rgb, crisp(tex));
+          // (A pine's needles: their outline only part sharpened, so a tuft's rim of needle tips, finer than a
+          // pixel a few dozen metres off, stays a soft fringe and not the hard edge of a leaf.)
+          const mark = vec4(tex.rgb, vPine ? mix(crisp(tex), clamp(tex.a.sub(0.5).mul(PINE_RIM).add(0.5), 0, 1), vPine.mul(PINE_SOFT)) : crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
           let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
           base = base.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w));
@@ -1504,9 +1553,16 @@ export function createTrees(options: TreesOptions): Trees {
       const S4 = T.srow(4);
       const upper = smoothstep(S4.z, S4.w, surface.y.div(max(T.r1.x, float(0.01))));
       const vE = varying(nWorld, "vWoodE");
+      // (Which way round the wood the point is, for laying the bark: out from the centre line, not the way the
+      // surface faces, which turns aside on a buttress's flank and up on a flare, and drew the bark across them.)
+      const vR = varying(dirToWorld(T, normalize(fit.radial(aRadial.xyz))), "vWoodR");
       const vU = varying(toW(aFrame), "vWoodU");
       const vD = varying(toW(aAxis), "vWoodD");
-      const vGeo = varying(vec4(r0.mul(keepThin), aWood.x.mul(fit.trunkUp), upper, twig), "vWoodGeo");
+      // (The radius its bark is laid round: over a stem's root flare the stem's own above it, a share of the
+      // flare's (geometry.ts `flareBark`; a palm's surface code is no share), so the furrows run on down the
+      // flare, spreading, and do not cross in chevrons where the bark's two sides meet.)
+      const barkShare = select(aWood.w.greaterThan(0.001).and(aWood.w.lessThan(1.001)), aWood.w, float(1));
+      const vGeo = varying(vec4(r0.mul(keepThin).mul(barkShare), aWood.x.mul(fit.trunkUp), upper, twig), "vWoodGeo");
       // (Its light: the sky's, darker at its foot; the sun's share past the crown; its foot's dark; how pale.)
       const vLight = varying(vec4(C.sky.mul(foot), C.sunIn.mul(C.cloud), foot, pale), "vWoodLight");
       const vInfo = varying(vec4(T.vrow1.z, barkTone(T).mul(float(0.9).add(aWood.z.mul(0.2))), special, boots), "vWoodInfo");
@@ -1524,8 +1580,9 @@ export function createTrees(options: TreesOptions): Trees {
         const d = normalize(vD);
         const u = normalize(vU.sub(d.mul(dot(vU, d))));
         const w = cross(d, u);
-        const cu = dot(e, u);
-        const cw = dot(e, w);
+        const er = normalize(vR);
+        const cu = dot(er, u);
+        const cw = dot(er, w);
         const sa = select(cu.lessThan(0), float(-1), float(1));
         const sb = select(cw.lessThan(0), float(-1), float(1));
         const r = vGeo.x;
@@ -1890,7 +1947,11 @@ export function createTrees(options: TreesOptions): Trees {
             await new Promise((done) => setTimeout(done, 0));
           }
           if (disposed) return false;
-          const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, 0), 1);
+          // (A pine's cards close up over the gaps between their needles as they are mipped down, its big card
+          // more: far off a tuft is a tuft's shape and a branch of them a mass of tufts, not a lace of needles
+          // the sky shows through.)
+          const fills = usedSpecies.flatMap((sp) => (looks[sp].spray === "tufts" ? [PINE_NEAR_FILL, PINE_NEAR_FILL, PINE_NEAR_FILL, PINE_BIG_FILL] : [0, 0, 0, 0]));
+          const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, fills), 1);
           // (Shaders are built when first drawn: those built already are given the new cards, the rest read them.)
           for (const n of atlasNodes) n.value = cards;
           cardsTex = cards;

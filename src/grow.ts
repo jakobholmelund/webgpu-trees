@@ -245,10 +245,14 @@ const WHIP_CLUMP = 0.7;
 /** How far a whip turns down with each piece of its arch. */
 const WHIP_TURN = 35 * DEG;
 /** The steepest a whip leaves its twig upwards, and the lowest. */
-const WHIP_RISE = 35 * DEG;
+const WHIP_RISE = 25 * DEG;
 const WHIP_DIP = -20 * DEG;
 /** How much shorter a whip may stop than the crown's base, as a share of the way down to it from its twig (squared draws: most reach far). */
 const WHIP_STAGGER = 0.45;
+/** Whips spring from the tops of a weeping tree's arching limbs as well as its twigs' ends, above this share of its crown's depth. */
+const WHIP_ARCH_FROM = 0.5;
+/** How far over a whip's arch its clumps are hung there, in their radii. */
+const WHIP_ARCH_LIFT = 0.35;
 
 // Clumps.
 /** How far from a clump's centre (in its radii) the twigs it covers are: they bear its leaves, and are not shed as bare. */
@@ -1744,6 +1748,14 @@ function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, wee
   const inner = new Envelope(sp, size, rW, 0.7 * rW, rW, lift);
   const ends: number[] = [];
   for (let i = 0; i < w.x.length; i++) if (w.kids[i].length === 0 && w.parent[i] >= 0 && w.y[i] > base) ends.push(i);
+  // (And the tops of the arches its limbs make in its upper crown, where they turn over and down: a willow's
+  // whips spring from all along the top of its arching limbs. Hung only from its twigs' ends, the arches were
+  // bare wire looping over the crown.)
+  for (let i = 0; i < w.x.length; i++) {
+    const p = w.parent[i];
+    if (p < 0 || w.kids[i].length === 0 || w.y[i] < base + WHIP_ARCH_FROM * depth || w.y[i] <= w.y[p]) continue;
+    if (w.kids[i].every((k) => w.y[k] < w.y[i])) ends.push(i);
+  }
   const score = (i: number) => Math.hypot(w.x[i], w.z[i]) / R + (0.5 * (w.y[i] - base)) / depth;
   const order = ends.map((i) => ({ i, s: score(i) })).sort((a, b) => b.s - a.s || a.i - b.i);
   const chosen = order.slice(0, Math.round(weep * order.length));
@@ -1802,8 +1814,15 @@ function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, wee
       const r = Math.hypot(nx, nz);
       if (r > wd) {
         if (hangAt >= 0 && r - wd > 0.7 * piece) break;
-        nx *= wd / r;
-        nz *= wd / r;
+        // (Past the outline, it goes no further out and turns down the sooner: drawn back in to the outline, a
+        // whip arching up out of the crown's narrow top turned back on itself, and its wood was drawn as a loop
+        // of wire over the crown.)
+        const r0 = Math.hypot(x, z);
+        if (r > r0 && r0 > 1e-6) {
+          nx = x + (nx - x) - (x / r0) * (r - r0);
+          nz = z + (nz - z) - (z / r0) * (r - r0);
+        }
+        e = Math.max(-0.5 * Math.PI, e - WHIP_TURN);
       }
       x = nx;
       y = ny;
@@ -1827,7 +1846,10 @@ function hangWhips(sp: TreeSpecies, size: TreeSize, w: Wood, clumpR: number, wee
     for (let k = 0; k < n; k++) {
       q = addNode(w, path[3 * k], path[3 * k + 1], path[3 * k + 2], q, true);
       const r = rW * Math.min(1.3, Math.max(0.75, 1 + 0.25 * sp.clumpSpread * rng.gauss()));
-      hang(h, q, w.x[q], w.y[q] - 0.15 * r, w.z[q], r);
+      // (Along its arch, over the wood, which its leaves hide: hung under it there, they left the arch a bare
+      // wire over the crown's top. Hanging, a little under it.)
+      const arch = hangAt >= 0 && 3 * k < hangAt;
+      hang(h, q, w.x[q], w.y[q] + (arch ? WHIP_ARCH_LIFT : -0.15) * r, w.z[q], r);
     }
     nodesLeft -= n;
     clumpsLeft -= n;
