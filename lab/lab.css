@@ -19,6 +19,9 @@
   --gap: 12px;
   --radius: 12px;
   --shadow: 0 1px 2px rgb(20 40 29 / 0.12), 0 8px 28px rgb(20 40 29 / 0.16);
+  /* Where the bar ends, its gap included: measured as it wraps (main.ts), and the panels stand under it. */
+  --bar-bottom: 52px;
+  --under-bar: calc(var(--bar-bottom) + var(--gap));
 }
 
 html, body { margin: 0; height: 100%; overflow: hidden; background: #b9cfe0; font: 13px/1.4 var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
@@ -33,7 +36,7 @@ canvas#view.dragging { cursor: grabbing; }
 .paper { background: var(--paper-glass); border: 1px solid color-mix(in srgb, var(--paper-edge) 80%, transparent); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
 
 /* The top bar: what is looked at, and from where. */
-#bar { position: fixed; top: var(--gap); left: var(--gap); right: var(--gap); display: flex; align-items: center; gap: 10px; pointer-events: none; }
+#bar { position: fixed; top: var(--gap); left: var(--gap); right: var(--gap); z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; pointer-events: none; }
 #bar > * { pointer-events: auto; }
 #bar .group { display: flex; align-items: center; gap: 8px; padding: 5px; }
 #mark { font: 600 16px/1 var(--serif); letter-spacing: 0.01em; padding: 0 8px 0 9px; white-space: nowrap; }
@@ -50,7 +53,7 @@ canvas#view.dragging { cursor: grabbing; }
 [hidden] { display: none !important; }
 
 /* The species: a rail down the left. */
-#rail { position: fixed; top: 64px; left: var(--gap); width: 248px; max-height: calc(100vh - 64px - 64px); display: flex; flex-direction: column; overflow: hidden; }
+#rail { position: fixed; top: var(--under-bar); left: var(--gap); width: 248px; max-height: calc(100vh - var(--under-bar) - 64px); display: flex; flex-direction: column; overflow: hidden; }
 #rail h2, #inspector h2 { margin: 0; padding: 11px 14px 7px; font: 600 11px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
 #species { list-style: none; margin: 0; padding: 0 6px 6px; overflow-y: auto; }
 #species button { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px; width: 100%; text-align: left; border: 1px solid transparent; background: none; padding: 6px 8px; border-radius: 9px; }
@@ -63,7 +66,7 @@ canvas#view.dragging { cursor: grabbing; }
 #rail .foot .plain { width: 100%; }
 
 /* The inspector: down the right. */
-#inspector { position: fixed; top: 64px; right: var(--gap); width: 308px; max-height: calc(100vh - 64px - var(--gap)); display: flex; flex-direction: column; overflow: hidden; }
+#inspector { position: fixed; top: var(--under-bar); right: var(--gap); width: 308px; max-height: calc(100vh - var(--under-bar) - var(--gap)); display: flex; flex-direction: column; overflow: hidden; }
 #inspector .tabs { padding: 8px 8px 0; }
 #inspector .tabs .seg button { flex: 1; }
 #inspector .body { overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--paper-edge) transparent; }
@@ -141,17 +144,13 @@ body.bare #rail, body.bare #inspector, body.bare #status .keys { display: none; 
   #species { padding: 6px; }
   #species button { grid-template-columns: 22px; padding: 6px 7px; }
   #inspector { width: 272px; }
-  #bar { flex-wrap: wrap; }
   #mark { display: none; }
-  #rail, #inspector { top: 106px; }
-  #inspector { max-height: calc(100vh - 106px - var(--gap)); }
-  #rail { max-height: calc(100vh - 106px - 64px); }
 }
 /* A phone held upright: the bar in rows, the species a row of swatches under it, the inspector a sheet at the foot. */
 @media (max-width: 560px) {
   #bar { gap: 6px; }
   #bar .spacer { display: none; }
-  #rail { top: 166px; width: auto; max-height: none; }
+  #rail { width: auto; max-height: none; }
   #species { display: flex; gap: 2px; padding: 4px; }
   #inspector { left: var(--gap); right: var(--gap); width: auto; top: auto; bottom: var(--gap); max-height: 40vh; }
   #status { bottom: calc(40vh + 2 * var(--gap)); }
@@ -182,14 +181,8 @@ dialog#bench { width: min(760px, calc(100vw - 32px)); }
   .plain { padding: 5px 9px; }
   #mark { padding: 0 4px 0 6px; }
 }
-/* (The tree lab's bar has four rows of choices, so below this it takes two lines, and the panels move down.) */
-@media (max-width: 1340px) and (min-width: 901px) {
-  #bar { flex-wrap: wrap; }
-  #bar .spacer { display: none; }
-  #rail, #inspector { top: 106px; }
-  #inspector { max-height: calc(100vh - 106px - var(--gap)); }
-  #rail { max-height: calc(100vh - 106px - 64px); }
-}
+/* (The bar wraps to as many lines as it needs wherever it is too wide for the window; the panels stand under
+   it, however tall it is: --bar-bottom. Wrapped, its right-hand group goes to the start of its own line.) */
 
 /* A link dressed as a button (the bar's Gallery). */
 a.plain { color: inherit; text-decoration: none; }

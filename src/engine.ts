@@ -30,7 +30,7 @@ function makeDabPixels(): Pixels {
   return { data: img.data, width: img.width, height: img.height };
 }
 import { leafAtlasPixels } from "./leaves.ts";
-import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToFit } from "./light.ts";
+import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToCrownFit } from "./light.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
@@ -114,7 +114,7 @@ export interface Trees {
   readonly pieces: { dabs: number; wood: number; sheets: number }[];
   /** Once a frame, before rendering. */
   update(renderer: THREE.WebGPURenderer, camera: THREE.PerspectiveCamera, timeS: number): void;
-  /** How many trees each tier drew last frame: read back from the graphics card, so not every frame. */
+  /** How many trees each tier drew last frame (none for a tier `show` hides, or with no trees): read back from the graphics card, so not every frame. */
   countDrawn(renderer: THREE.WebGPURenderer): Promise<number[]>;
   /**
    * Read the species' colours, light and stiffness again (or from another list in the same order). What
@@ -513,10 +513,17 @@ export function createTrees(options: TreesOptions): Trees {
     const vi = uint(T.r3.w);
     const lo = lightBoxR.element(vi.mul(2)).xyz;
     const span = lightBoxR.element(vi.mul(2).add(1)).xyz;
-    // (Into the tree's frame, unleant, unstretched, unmirrored: fitOf's `point` undone.)
+    // (Into the tree's frame, unleant, unstretched, unmirrored: fitOf's `point` undone. The ray towards the sun
+    // starts where the crown's stretch alone puts it, below the crown's base too, as its direction is the
+    // crown's stretch's (light.ts `worldToCrownFit`): the trunk's below the base bent a ray from the lower trunk
+    // where it met the crown. The sky is read where the point is, the trunk's stretch and all.)
     const l = dirToTree(T, at.sub(T.r0.xyz));
-    const py = select(l.y.lessThan(T.r1.y), l.y.div(max(fit.trunkUp, float(1e-4))), T.vrow0.y.add(l.y.sub(T.r1.y).div(max(fit.crownUp, float(1e-4)))));
-    const p = vec3(l.x.sub(T.r3.x.mul(l.y)).mul(T.r3.z).div(fit.across), py, l.z.sub(T.r3.y.mul(l.y)).div(fit.across));
+    const inCrown = T.vrow0.y.add(l.y.sub(T.r1.y).div(max(fit.crownUp, float(1e-4))));
+    const pyHere = select(l.y.lessThan(T.r1.y), l.y.div(max(fit.trunkUp, float(1e-4))), inCrown);
+    const qx = l.x.sub(T.r3.x.mul(l.y)).mul(T.r3.z).div(fit.across);
+    const qz = l.z.sub(T.r3.y.mul(l.y)).div(fit.across);
+    const p = vec3(qx, inCrown, qz);
+    const here = vec3(qx, pyHere, qz);
     const s = dirToTree(T, uSun);
     const d = normalize(vec3(s.x.sub(T.r3.x.mul(s.y)).mul(T.r3.z).div(fit.across), s.y.div(fit.crownUp), s.z.sub(T.r3.y.mul(s.y)).div(fit.across)));
     const [cx, cy, cz] = LIGHT_CELLS;
@@ -558,8 +565,8 @@ export function createTrees(options: TreesOptions): Trees {
         // (The sky: read a cell out from the crown's middle, past the same blur; at the nearest cell where a point
         // is past the box's sides, whose outermost cells see it all.)
         const mid = lo.add(span.mul(0.5));
-        const out = normalize(vec3(p.x.sub(mid.x), p.y.sub(mid.y).mul(0.5), p.z.sub(mid.z)).add(vec3(0, 1e-3, 0)));
-        r.assign(vec2(tau, read(p.add(out.mul(cell))).g));
+        const out = normalize(vec3(here.x.sub(mid.x), here.y.sub(mid.y).mul(0.5), here.z.sub(mid.z)).add(vec3(0, 1e-3, 0)));
+        r.assign(vec2(tau, read(here.add(out.mul(cell))).g));
       });
       return r;
     })();
@@ -766,18 +773,28 @@ export function createTrees(options: TreesOptions): Trees {
         // vertices, was most of what a conifer cost.)
         frontAt = lobeAt;
         frontR = lobeR;
+      } else if (lobeAt && lobeR && t === 2) {
+        // (A far dab is a few pixels, standing for a gathered group of clumps: lit by its own lobe. The search
+        // below, for every vertex of every far crown, cost more than the rest of their light.)
+        frontAt = lobeAt;
+        frontR = lobeR;
       } else if (lobeAt && lobeR) {
         // (Statements, so a function of their own: TSL keeps a loop only inside one.)
+        // (In the tree's leant frame, its turn and its foot undone: the eye and the ray carried in once, so each
+        // lobe needs only fitting and leaning, not the whole way into the world. Turning and moving keep lengths,
+        // so the balls are the same balls and the ray meets them where it did.)
         const front = Fn(() => {
-          const best = vec4(lobeAt, lobeR).toVar();
+          const best = vec4(dirToTree(T, lobeAt.sub(T.r0.xyz)), lobeR).toVar();
           const nearest = float(1e9).toVar();
-          const ray = normalize(at.sub(cameraPosition));
+          const eye = dirToTree(T, cameraPosition.sub(T.r0.xyz));
+          const ray = dirToTree(T, normalize(at.sub(cameraPosition)));
           Loop({ start: uint(0), end: uint(T.vrow1.w), type: "uint", condition: "<" }, ({ i }) => {
             const L = lobesR.element(uint(aLimb.w).mul(MAX_LOBES).add(i));
             If(L.w.greaterThan(0), () => {
-              const c = toWorld(T, fit.point(L.xyz).add(blown));
+              const q = fit.point(L.xyz).add(blown);
+              const c = vec3(q.x.add(T.r3.x.mul(q.y)), q.y, q.z.add(T.r3.y.mul(q.y)));
               const r = L.w.mul(fit.size);
-              const oc = c.sub(cameraPosition);
+              const oc = c.sub(eye);
               const along = dot(oc, ray);
               const miss = dot(oc, oc).sub(along.mul(along));
               const enter = along.sub(sqrt(max(r.mul(r).sub(miss), float(0))));
@@ -789,7 +806,7 @@ export function createTrees(options: TreesOptions): Trees {
           });
           return best;
         })();
-        frontAt = front.xyz;
+        frontAt = T.r0.xyz.add(dirToWorld(T, front.xyz));
         frontR = max(front.w, float(0.05));
       }
 
@@ -949,7 +966,7 @@ export function createTrees(options: TreesOptions): Trees {
       const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
       // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
       // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
-      const markSize = aDab.z.mul(fitOf(T).size).mul(uStyle2.x);
+      const markSize = aDab.z.mul(fit.size).mul(uStyle2.x);
       let share: Float = float(LEAF_SHARE.broad);
       let allowed: Float = float(LEAF_SIZE_OF.broad);
       MARK_KINDS.forEach((k, row) => {
@@ -1276,7 +1293,7 @@ export function createTrees(options: TreesOptions): Trees {
               }
             }
             // (Its own leaves and wood: the same box the shaders march, from the ground up the sun's ray.)
-            const through = structure > 0 ? sunThrough(vol, worldToFit(fit, [gx, p.y, gz]), ray.dir, density) : 1;
+            const through = structure > 0 ? sunThrough(vol, worldToCrownFit(fit, [gx, p.y, gz]), ray.dir, density) : 1;
             trans[j * nx + i] *= shade + (through - shade) * structure;
           }
         }
@@ -1354,9 +1371,13 @@ export function createTrees(options: TreesOptions): Trees {
       speciesAttr.needsUpdate = true;
     },
     async countDrawn(renderer) {
-      const buf = new Uint32Array(await renderer.getArrayBufferAsync(dabArgs));
       const out = [0, 0, 0];
-      for (let t = 0; t < TIERS; t++) for (let v = 0; v < V; v++) out[t] += buf[(t * V + v) * 5 + 1];
+      // (No trees: nothing is culled, and the counts were never on the graphics card to read back.)
+      if (N === 0 || V === 0) return out;
+      const buf = new Uint32Array(await renderer.getArrayBufferAsync(dabArgs));
+      // (A tier counts only as drawn when its meshes are shown: `show`.)
+      const shown = [show.near, show.mid, show.far].map((on) => on && (show.wood || show.leaves));
+      for (let t = 0; t < TIERS; t++) if (shown[t]) for (let v = 0; v < V; v++) out[t] += buf[(t * V + v) * 5 + 1];
       return out;
     },
     dispose() {
