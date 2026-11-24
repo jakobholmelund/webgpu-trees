@@ -1,0 +1,894 @@
+{
+  "about": "The painterly look's painted marks: hand-painted leaf clusters and boughs (AI-generated, not CC0; SOURCES.md), keyed, toned and cut into their leaves. Written by tools/marks/build.mjs.",
+  "tools": {
+    "magick": "Version: ImageMagick 7.1.1-47 Q16-HDRI aarch64 22763",
+    "avifenc": "Version: 1.4.2 (dav1d [dec]:1.5.4, aom [enc/dec]:3.15.2)"
+  },
+  "channels": "red tone, green each painted leaf's own number, blue 0, alpha coverage; rows bottom first (row 0 of the file is v = 0)",
+  "painterly": {
+    "file": "painterly.avif",
+    "bytes": 1183917,
+    "cell": 256,
+    "cols": 9,
+    "rows": 6,
+    "kinds": {
+      "broad": {
+        "row": 0,
+        "upright": false,
+        "leafShare": 0.191,
+        "cells": [
+          {
+            "paintings": [
+              "broad-a-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.196,
+            "cover": 0.417,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-b-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.171,
+            "cover": 0.37,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-c-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.205,
+            "cover": 0.36,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-a-2",
+              "broad-b-2",
+              "broad-c-2"
+            ],
+            "copies": 4,
+            "leafShare": 0.114,
+            "cover": 0.319,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-b-2",
+              "broad-c-2",
+              "broad-a-2"
+            ],
+            "copies": 4,
+            "leafShare": 0.114,
+            "cover": 0.339,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-c-2",
+              "broad-a-2",
+              "broad-b-2"
+            ],
+            "copies": 4,
+            "leafShare": 0.114,
+            "cover": 0.325,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-dense-1",
+              "broad-dense-2"
+            ],
+            "copies": 3,
+            "leafShare": 0.065,
+            "cover": 0.268,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-dense-2",
+              "broad-dense-1"
+            ],
+            "copies": 3,
+            "leafShare": 0.069,
+            "cover": 0.287,
+            "border": 0,
+            "tone": 0.818,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "broad-dense-1",
+              "broad-dense-2"
+            ],
+            "copies": 3,
+            "leafShare": 0.066,
+            "cover": 0.269,
+            "border": 0,
+            "tone": 0.818,
+            "owns": 16
+          }
+        ]
+      },
+      "narrow": {
+        "row": 1,
+        "upright": true,
+        "leafShare": 0.352,
+        "cells": [
+          {
+            "paintings": [
+              "narrow-a-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.364,
+            "cover": 0.331,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-b-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.373,
+            "cover": 0.444,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-a-2"
+            ],
+            "copies": 1,
+            "leafShare": 0.32,
+            "cover": 0.361,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-b-2",
+              "narrow-a-1",
+              "narrow-b-1"
+            ],
+            "copies": 3,
+            "leafShare": 0.211,
+            "cover": 0.267,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-a-1",
+              "narrow-b-1",
+              "narrow-b-2"
+            ],
+            "copies": 3,
+            "leafShare": 0.211,
+            "cover": 0.262,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-b-1",
+              "narrow-b-2",
+              "narrow-a-1"
+            ],
+            "copies": 3,
+            "leafShare": 0.211,
+            "cover": 0.262,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-a-2",
+              "narrow-b-2",
+              "narrow-a-1"
+            ],
+            "copies": 6,
+            "leafShare": 0.127,
+            "cover": 0.27,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-b-2",
+              "narrow-a-1",
+              "narrow-a-2"
+            ],
+            "copies": 7,
+            "leafShare": 0.127,
+            "cover": 0.303,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "narrow-a-1",
+              "narrow-a-2",
+              "narrow-b-2"
+            ],
+            "copies": 7,
+            "leafShare": 0.127,
+            "cover": 0.299,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          }
+        ]
+      },
+      "needle": {
+        "row": 2,
+        "upright": true,
+        "leafShare": 0.45,
+        "cells": [
+          {
+            "paintings": [
+              "pine-b-2",
+              "pine-a-2"
+            ],
+            "copies": 2,
+            "leafShare": 0.227,
+            "cover": 0.255,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-2",
+              "pine-b-1",
+              "pine-b-2"
+            ],
+            "copies": 3,
+            "leafShare": 0.184,
+            "cover": 0.221,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-1",
+              "pine-b-2",
+              "pine-a-2"
+            ],
+            "copies": 4,
+            "leafShare": 0.167,
+            "cover": 0.22,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-1",
+              "pine-b-2",
+              "pine-a-2"
+            ],
+            "copies": 18,
+            "leafShare": 0.09,
+            "cover": 0.28,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-2",
+              "pine-a-2",
+              "pine-a-1"
+            ],
+            "copies": 19,
+            "leafShare": 0.096,
+            "cover": 0.321,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-2",
+              "pine-a-1",
+              "pine-b-2"
+            ],
+            "copies": 15,
+            "leafShare": 0.115,
+            "cover": 0.389,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-1",
+              "pine-a-1",
+              "pine-b-2"
+            ],
+            "copies": 32,
+            "leafShare": 0.069,
+            "cover": 0.238,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-1",
+              "pine-b-2",
+              "pine-b-1"
+            ],
+            "copies": 32,
+            "leafShare": 0.069,
+            "cover": 0.247,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-2",
+              "pine-b-1",
+              "pine-a-1"
+            ],
+            "copies": 32,
+            "leafShare": 0.069,
+            "cover": 0.247,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          }
+        ]
+      },
+      "small": {
+        "row": 3,
+        "upright": true,
+        "leafShare": 0.129,
+        "cells": [
+          {
+            "paintings": [
+              "small-a-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.127,
+            "cover": 0.322,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-b-1"
+            ],
+            "copies": 1,
+            "leafShare": 0.126,
+            "cover": 0.308,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-a-2"
+            ],
+            "copies": 1,
+            "leafShare": 0.133,
+            "cover": 0.339,
+            "border": 0,
+            "tone": 0.838,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-b-2",
+              "small-a-1",
+              "small-b-1"
+            ],
+            "copies": 4,
+            "leafShare": 0.077,
+            "cover": 0.323,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-a-1",
+              "small-b-1",
+              "small-b-2"
+            ],
+            "copies": 4,
+            "leafShare": 0.077,
+            "cover": 0.33,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-b-1",
+              "small-b-2",
+              "small-a-1"
+            ],
+            "copies": 4,
+            "leafShare": 0.077,
+            "cover": 0.313,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-a-2",
+              "small-b-2",
+              "small-a-1"
+            ],
+            "copies": 7,
+            "leafShare": 0.046,
+            "cover": 0.289,
+            "border": 0,
+            "tone": 0.825,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-b-2",
+              "small-a-1",
+              "small-a-2"
+            ],
+            "copies": 7,
+            "leafShare": 0.046,
+            "cover": 0.286,
+            "border": 0,
+            "tone": 0.822,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "small-a-1",
+              "small-a-2",
+              "small-b-2"
+            ],
+            "copies": 7,
+            "leafShare": 0.046,
+            "cover": 0.286,
+            "border": 0,
+            "tone": 0.822,
+            "owns": 16
+          }
+        ]
+      },
+      "pine": {
+        "row": 5,
+        "upright": true,
+        "leafShare": 0.4,
+        "cells": [
+          {
+            "paintings": [
+              "pine-a-1",
+              "pine-b-1",
+              "pine-a-2"
+            ],
+            "copies": 3,
+            "leafShare": 0.191,
+            "cover": 0.227,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-1",
+              "pine-a-2",
+              "pine-a-1"
+            ],
+            "copies": 4,
+            "leafShare": 0.176,
+            "cover": 0.232,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-2",
+              "pine-a-1",
+              "pine-b-1"
+            ],
+            "copies": 4,
+            "leafShare": 0.172,
+            "cover": 0.263,
+            "border": 0,
+            "tone": 0.819,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-2",
+              "pine-a-1",
+              "pine-b-1"
+            ],
+            "copies": 18,
+            "leafShare": 0.098,
+            "cover": 0.272,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-1",
+              "pine-b-1",
+              "pine-b-2"
+            ],
+            "copies": 28,
+            "leafShare": 0.082,
+            "cover": 0.298,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-1",
+              "pine-b-2",
+              "pine-a-1"
+            ],
+            "copies": 32,
+            "leafShare": 0.08,
+            "cover": 0.321,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-2",
+              "pine-b-2",
+              "pine-a-1"
+            ],
+            "copies": 32,
+            "leafShare": 0.065,
+            "cover": 0.254,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-b-2",
+              "pine-a-1",
+              "pine-a-2"
+            ],
+            "copies": 32,
+            "leafShare": 0.065,
+            "cover": 0.254,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          },
+          {
+            "paintings": [
+              "pine-a-1",
+              "pine-a-2",
+              "pine-b-2"
+            ],
+            "copies": 32,
+            "leafShare": 0.065,
+            "cover": 0.259,
+            "border": 0,
+            "tone": 0.82,
+            "owns": 16
+          }
+        ]
+      }
+    },
+    "leafShare": {
+      "broad": 0.191,
+      "narrow": 0.352,
+      "needle": 0.45,
+      "small": 0.129,
+      "pine": 0.4
+    }
+  },
+  "sheets": {
+    "file": "sheets.avif",
+    "bytes": 517524,
+    "cell": 512,
+    "cols": 3,
+    "rows": 2,
+    "columns": [
+      {
+        "kind": "fir",
+        "parts": [
+          {
+            "painting": "fir-b-1",
+            "side": "right",
+            "from": 471,
+            "to": 1162,
+            "scale": 0.765
+          },
+          {
+            "painting": "fir-b-2",
+            "side": "left",
+            "from": 257,
+            "to": 1189,
+            "scale": 0.512
+          }
+        ],
+        "top": {
+          "cover": 0.256,
+          "border": 0,
+          "tone": 0.896,
+          "owns": 16
+        },
+        "under": {
+          "cover": 0.256,
+          "border": 0,
+          "tone": 0.736,
+          "owns": 16
+        }
+      },
+      {
+        "kind": "fir",
+        "parts": [
+          {
+            "painting": "fir-b-2",
+            "side": "right",
+            "from": 257,
+            "to": 1189,
+            "scale": 0.512
+          },
+          {
+            "painting": "fir-b-1",
+            "side": "left",
+            "from": 471,
+            "to": 1162,
+            "scale": 0.765
+          }
+        ],
+        "top": {
+          "cover": 0.256,
+          "border": 0,
+          "tone": 0.898,
+          "owns": 16
+        },
+        "under": {
+          "cover": 0.256,
+          "border": 0,
+          "tone": 0.737,
+          "owns": 16
+        }
+      },
+      {
+        "kind": "scale",
+        "parts": [
+          {
+            "painting": "scale-a-1",
+            "side": "right",
+            "from": 171,
+            "to": 1239,
+            "scale": 0.483
+          },
+          {
+            "painting": "scale-b-1",
+            "side": "left",
+            "from": 454,
+            "to": 1292,
+            "scale": 0.55
+          }
+        ],
+        "top": {
+          "cover": 0.258,
+          "border": 0,
+          "tone": 0.899,
+          "owns": 16
+        },
+        "under": {
+          "cover": 0.258,
+          "border": 0,
+          "tone": 0.738,
+          "owns": 16
+        }
+      }
+    ]
+  },
+  "sources": [
+    {
+      "id": "broad-a-1",
+      "file": "painterly-broad-a-1.jpg",
+      "title": "Painted broadleaf cluster (a)",
+      "leaves": 172,
+      "leafTexels": 110
+    },
+    {
+      "id": "broad-b-1",
+      "file": "painterly-broad-b-1.jpg",
+      "title": "Painted broadleaf cluster (b)",
+      "leaves": 188,
+      "leafTexels": 101
+    },
+    {
+      "id": "broad-c-1",
+      "file": "painterly-broad-c-1.jpg",
+      "title": "Painted broadleaf cluster, lopsided (c)",
+      "leaves": 140,
+      "leafTexels": 115
+    },
+    {
+      "id": "broad-a-2",
+      "file": "painterly-broad-a-2.jpg",
+      "title": "Painted broadleaf cluster (a, second)",
+      "leaves": 140,
+      "leafTexels": 120
+    },
+    {
+      "id": "broad-b-2",
+      "file": "painterly-broad-b-2.jpg",
+      "title": "Painted broadleaf cluster (b, second)",
+      "leaves": 128,
+      "leafTexels": 115
+    },
+    {
+      "id": "broad-c-2",
+      "file": "painterly-broad-c-2.jpg",
+      "title": "Painted broadleaf cluster, lopsided (c, second)",
+      "leaves": 129,
+      "leafTexels": 125
+    },
+    {
+      "id": "broad-dense-1",
+      "file": "painterly-broad-dense-1.jpg",
+      "title": "Painted broadleaf cluster, dense",
+      "leaves": 358,
+      "leafTexels": 67
+    },
+    {
+      "id": "broad-dense-2",
+      "file": "painterly-broad-dense-2.jpg",
+      "title": "Painted broadleaf cluster, dense (second)",
+      "leaves": 408,
+      "leafTexels": 65
+    },
+    {
+      "id": "narrow-a-1",
+      "file": "painterly-narrow-a-1.jpg",
+      "title": "Painted narrow-leaved spray (a)",
+      "leaves": 128,
+      "leafTexels": 187
+    },
+    {
+      "id": "narrow-b-1",
+      "file": "painterly-narrow-b-1.jpg",
+      "title": "Painted narrow-leaved spray (b)",
+      "leaves": 134,
+      "leafTexels": 181
+    },
+    {
+      "id": "narrow-a-2",
+      "file": "painterly-narrow-a-2.jpg",
+      "title": "Painted narrow-leaved spray (a, second)",
+      "leaves": 152,
+      "leafTexels": 168
+    },
+    {
+      "id": "narrow-b-2",
+      "file": "painterly-narrow-b-2.jpg",
+      "title": "Painted narrow-leaved spray (b, second)",
+      "leaves": 124,
+      "leafTexels": 204
+    },
+    {
+      "id": "pine-b-2",
+      "file": "painterly-pine-b-2.jpg",
+      "title": "Painted pine tufts (b, second)",
+      "leaves": 114,
+      "leafTexels": 162
+    },
+    {
+      "id": "pine-a-2",
+      "file": "painterly-pine-a-2.jpg",
+      "title": "Painted pine tufts (a, second)",
+      "leaves": 121,
+      "leafTexels": 150
+    },
+    {
+      "id": "pine-b-1",
+      "file": "painterly-pine-b-1.jpg",
+      "title": "Painted pine tufts (b)",
+      "leaves": 82,
+      "leafTexels": 201
+    },
+    {
+      "id": "pine-a-1",
+      "file": "painterly-pine-a-1.jpg",
+      "title": "Painted pine tufts (a)",
+      "leaves": 101,
+      "leafTexels": 174
+    },
+    {
+      "id": "small-a-1",
+      "file": "painterly-small-a-1.jpg",
+      "title": "Painted small-leaved cluster (a)",
+      "leaves": 346,
+      "leafTexels": 66
+    },
+    {
+      "id": "small-b-1",
+      "file": "painterly-small-b-1.jpg",
+      "title": "Painted small-leaved cluster (b)",
+      "leaves": 307,
+      "leafTexels": 66
+    },
+    {
+      "id": "small-a-2",
+      "file": "painterly-small-a-2.jpg",
+      "title": "Painted small-leaved cluster (a, second)",
+      "leaves": 325,
+      "leafTexels": 69
+    },
+    {
+      "id": "small-b-2",
+      "file": "painterly-small-b-2.jpg",
+      "title": "Painted small-leaved cluster (b, second)",
+      "leaves": 280,
+      "leafTexels": 74
+    },
+    {
+      "id": "fir-b-1",
+      "file": "painterly-fir-b-1.jpg",
+      "title": "Painted fir bough (b)",
+      "leaves": 142,
+      "leafTexels": 101
+    },
+    {
+      "id": "fir-b-2",
+      "file": "painterly-fir-b-2.jpg",
+      "title": "Painted fir bough (b, second)",
+      "leaves": 229,
+      "leafTexels": 97
+    },
+    {
+      "id": "scale-a-1",
+      "file": "painterly-scale-a-1.jpg",
+      "title": "Painted cedar bough (a)",
+      "leaves": 161,
+      "leafTexels": 99
+    },
+    {
+      "id": "scale-b-1",
+      "file": "painterly-scale-b-1.jpg",
+      "title": "Painted cedar bough (b)",
+      "leaves": 176,
+      "leafTexels": 106
+    }
+  ]
+}

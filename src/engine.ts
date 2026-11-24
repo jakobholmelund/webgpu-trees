@@ -36,6 +36,7 @@ import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTE
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
+import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
 import { growTree } from "./grow.ts";
@@ -136,7 +137,8 @@ export interface TreesOptions {
    * assets/ is, for a host whose bundler moves the package's modules away from its files); until they come
    * the trees are drawn as without them. `looks` gives species (by name) photographs of their own; `barkSize`
    * the bark's texels across (1024; 512 for less memory); `leafCell` a leaf card's (512 for up to six
-   * species, else 256). `false`: none, the drawn bark and sprays.
+   * species, else 256). `false`: none, the drawn bark and sprays. The painterly look's painted marks
+   * (paintedMarks.ts) come the same way, from the same place, and `false` leaves its drawn marks.
    */
   scans?: false | { base?: string; looks?: Readonly<Record<string, Partial<ScanLook>>>; barkSize?: number; leafCell?: number };
 }
@@ -182,8 +184,8 @@ export interface Trees {
    */
   sunAt(xz: Vec2): Float;
   /**
-   * Settles once the realistic look's photographs are in (true), or could not be had or are not used
-   * (false): until then the trees are drawn without them.
+   * Settles once the realistic look's photographs are in (true), or the painterly look's painted marks (and
+   * its palms' pictures), or could not be had or are not used (false): until then the trees are drawn without them.
    */
   readonly ready: Promise<boolean>;
   /** Which tiers are drawn (for looking at one alone). */
@@ -200,6 +202,9 @@ function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs
   const levels = (atlasMips[which] ??= coverageMips(from ?? (which === "painterly" ? painterlyAtlasPixels() : which === "sculpted" ? sculptedAtlasPixels() : which === "sheets" ? sheetAtlasPixels() : leafAtlasPixels()), cell, ALPHA_CUT, fill));
   return atlasTexture(levels, which === "sheets" ? 4 : 1);
 }
+
+/** The painterly look's painted marks' mips (paintedMarks.ts), once they came: worked out once a page. */
+let paintedMips: { painterly: Pixels[]; sheets: Pixels[] } | null = null;
 
 /** An atlas's texture from its mips (`coverageMips`). */
 function atlasTexture(levels: Pixels[], anisotropy: number): THREE.DataTexture {
@@ -466,6 +471,13 @@ export function createTrees(options: TreesOptions): Trees {
   const uStyle5 = uniform(new THREE.Vector4(1, 0, 0, 1));
   /** leafSize (m). */
   const uLeafSize = uniform(0.22);
+  /** Each kind's leaf at the coarsest density, a share of its mark's half width: the drawn marks', then the painted ones' once in (paintedMarks.ts). */
+  const uLeafShare = MARK_KINDS.map((k) => uniform(LEAF_SHARE[k]));
+  /**
+   * The finest a mid dab's cluster may be at the coarsest, a density's index: a gathered dab the second with
+   * the drawn marks; with the painted ones, whose coarsest clusters' leaves are already small, as its leaf size says.
+   */
+  const uMidDensity = uniform(1);
   /** throughPower, throughWarp, throughVary, moss. */
   const uThrough = uniform(new THREE.Vector4(4, 0, 0, 0));
   /** structure, density (styles.ts). */
@@ -872,9 +884,13 @@ export function createTrees(options: TreesOptions): Trees {
   const atlasNodes: ReturnType<typeof texture>[] = [];
   // (The cards as they are now: a shader built after the photographs came reads theirs from the start.)
   let cardsTex: THREE.DataTexture = atlas;
+  // (The painterly look's sheets as they are now: drawn, then painted.)
+  const sheetNodes: ReturnType<typeof texture>[] = [];
+  let sheetTex: THREE.DataTexture | null = sheetAtlas;
   const markTex = (marks: THREE.Texture, uv: Vec2) => {
-    const n = texture(marks === atlas ? cardsTex : marks, uv);
+    const n = texture(marks === atlas ? cardsTex : marks === sheetAtlas && sheetTex ? sheetTex : marks, uv);
     if (marks === atlas) atlasNodes.push(n);
+    if (marks === sheetAtlas) sheetNodes.push(n);
     return n;
   };
 
@@ -1111,6 +1127,9 @@ export function createTrees(options: TreesOptions): Trees {
         // (A painterly conifer's sprays are boughs, a pine's plates of tufts: kept level, give or take a little.)
         const needle = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("needle"))).or(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("pine")))), float(1), float(0));
         ang = mix(ang, own.sub(0.5).mul(0.5).add(flutter), needle);
+        // (A willow's or a birch's sprays hang, their leaves' tips down: kept upright, give or take.)
+        const hanging = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("narrow"))).or(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("small")))), float(1), float(0));
+        ang = mix(ang, own.sub(0.5).mul(0.7).add(flutter), hanging);
       }
       if (lobeAt && look === "sculpted") {
         // (A sprig stands up out of its lobe, as the eye sees it: its picture's up turned away from the lobe's middle.)
@@ -1127,7 +1146,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (Realistic: a tree passing between tiers hands its leaves over piece by piece, each card or dab
       // growing in or shrinking away by a share of its own, a sheet coming or going whole: `pieceShare`.)
       const handPiece = real ? pieceShare(sharesFor(t, T), own) : float(1);
-      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece);
+      // (Painterly: each cluster a size of its own, give or take an eighth, so the same picture does not repeat at one size.)
+      const ownSize = look === "painterly" && !sheet ? own.mul(5.13).fract().mul(0.26).add(0.87) : float(1);
+      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece).mul(ownSize);
       if (sheet) {
         // (A sheet's point is where it is: nothing turns it to the eye. One handed over is drawn to its tree's
         // foot, its triangles to nothing.)
@@ -1185,16 +1206,16 @@ export function createTrees(options: TreesOptions): Trees {
       // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
       // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
       const markSize = aDab.z.mul(fit.size).mul(uStyle2.x);
-      let share: Float = float(LEAF_SHARE.broad);
+      let share: Float = uLeafShare[0];
       let allowed: Float = float(LEAF_SIZE_OF.broad);
       MARK_KINDS.forEach((k, row) => {
-        share = select(kind.equal(float(row)), float(LEAF_SHARE[k]), share);
+        share = select(kind.equal(float(row)), uLeafShare[row], share);
         allowed = select(kind.equal(float(row)), float(LEAF_SIZE_OF[k]), allowed);
       });
       const want = uLeafSize.mul(allowed).div(max(markSize.mul(share), float(1e-4)));
       let density: Float = float(PAINTERLY_DENSITIES.length - 1);
       for (let d = PAINTERLY_DENSITIES.length - 2; d >= 0; d--) density = select(want.greaterThanEqual(float(PAINTERLY_DENSITIES[d])), float(d), density);
-      if (t > 0) density = max(density, float(1));
+      if (t > 0) density = max(density, uMidDensity);
       const painterlyCell = vec2(floor(own.mul(PAINTERLY_VARIANTS - 0.001)).add(density.mul(PAINTERLY_VARIANTS)), kind);
       const disc = floor(own.mul(7.31).fract().mul(2.999));
       const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
@@ -1218,7 +1239,9 @@ export function createTrees(options: TreesOptions): Trees {
       const underOf = (eye: Vec3): Float => (vSheetN ? step(dot(vSheetN, eye), float(0)) : float(0));
       const sheetUv = (uv: Vec2, under: Float): Vec2 => (sheet && !real ? uv.add(vec2(0, under.div(SHEET_ROWS))) : uv);
       // (Where in the atlas each corner is: linear across the dab, so worked out once a corner.)
-      const vUv = varying(cell.add(aDab.xy.mul(0.5).add(0.5)).div(cells), "vTreeUv");
+      // (Painterly: half the clusters mirrored, by their own numbers, so no two dabs show one picture the same way.)
+      const mirror = look === "painterly" && !sheet ? select(own.mul(17.3).fract().lessThan(0.5), float(-1), float(1)) : float(1);
+      const vUv = varying(cell.add(vec2(aDab.x.mul(mirror), aDab.y).mul(0.5).add(0.5)).div(cells), "vTreeUv");
       if (lobeLight) {
         const L = lobeLight;
         const vShade = varying(L.shade, "vTreeShade");
@@ -1979,7 +2002,33 @@ export function createTrees(options: TreesOptions): Trees {
           return false;
         }
       })();
-  const ready: Promise<boolean> = Promise.all([cardsReady, palmsReady]).then(([cards, palmsIn]) => (scanned ? cards : palmsIn));
+  // (The painterly look's painted marks, in place of the drawn ones: paintedMarks.ts.)
+  const marksReady: Promise<boolean> = look !== "painterly" || scanOpts === null
+    ? Promise.resolve(false)
+    : (async () => {
+        try {
+          const px = await loadPaintedMarks();
+          if (disposed) return false;
+          const mips = (paintedMips ??= { painterly: coverageMips(px.painterly, MARK_CELL, ALPHA_CUT, 0), sheets: coverageMips(px.sheets, SHEET_CELL, ALPHA_CUT, 0.3) });
+          const marks = atlasTexture(mips.painterly, 1);
+          for (const n of atlasNodes) n.value = marks;
+          cardsTex = marks;
+          atlas.dispose();
+          if (sheetAtlas) {
+            const sheets = atlasTexture(mips.sheets, 4);
+            for (const n of sheetNodes) n.value = sheets;
+            sheetTex?.dispose();
+            sheetTex = sheets;
+          }
+          MARK_KINDS.forEach((k, row) => (uLeafShare[row].value = PAINTED_LEAF_SHARE[k]));
+          uMidDensity.value = 0;
+          return true;
+        } catch (err) {
+          console.warn("webgpu-trees: the painterly look's painted marks could not be had; drawing its marks.", err);
+          return false;
+        }
+      })();
+  const ready: Promise<boolean> = Promise.all([cardsReady, palmsReady, marksReady]).then(([cards, palmsIn, marksIn]) => (scanned ? cards : look === "painterly" ? marksIn && (palmsIn || !palms) : palmsIn));
 
   const frustum = new THREE.Frustum();
   const pv = new THREE.Matrix4();

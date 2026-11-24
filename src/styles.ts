@@ -115,7 +115,7 @@ export const REAL_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 3, rou
  * (no bands), wrapping well round them, a cluster's leaves each a little their own tone, the lit side warm
  * and the shade cool, the colour a step richer than the species', a bright rim against the sun.
  */
-export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.4, dabScale: 1.4, through: 0.7, throughPower: 3, throughWarp: 0.12, throughVary: 0.65, moss: 0.45, wrap: 0.5, strokes: 0.55, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.6, sprigs: 0, bright: 1.7, structure: 0.8, density: 0.8 };
+export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.5, dabScale: 1.4, through: 0.7, throughPower: 3, throughWarp: 0.12, throughVary: 0.65, moss: 0.45, wrap: 0.5, strokes: 0.85, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.6, sprigs: 0, bright: 1.7, structure: 0.8, density: 0.8 };
 
 /** The sculpted look's style: clay lobes, lit smooth and soft, each dab a little ball on its lobe, a few sprigs. */
 export const SCULPTED_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0, jitter: 0.08, dabScale: 1.5, through: 0.3, throughPower: 3, throughWarp: 0.2, throughVary: 0.4, moss: 0.35, wrap: 0.35, strokes: 0.25, selfShade: 0.25, fullLight: 0.8, bark: 0, lobe: 0.85, bulge: 0.45, warm: 0.45, cool: 0.5, chroma: 1.25, rim: 0.25, sprigs: 0.14, bright: 1.5, structure: 0.6, density: 0.6 };

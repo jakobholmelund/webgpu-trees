@@ -97,7 +97,7 @@ replaces them.
 | Look | Its crowns | Its light |
 | --- | --- | --- |
 | `stylized` (painted) | brush marks, a few dabs to a clump | the crown's form and each clump's, in flat bands |
-| `painterly` | lumpy clusters of small crisp leaves of the species' kind (`marks.ts`), never longer than `leafSize` metres however big the crown: ovate leaves for broadleaves, round leaves for small-leaved trees, curved leaflets for palms; a conifer's boughs as sheets of needles (*Boughs*) | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
+| `painterly` | lumpy clusters of small crisp leaves of the species' kind, hand-painted (`paintedMarks.ts`, *Painted marks*), never longer than `leafSize` metres however big the crown: oval leaves for broadleaves, small diamond leaves for small-leaved trees, hanging lance leaves for willows and eucalyptus, brushes of needles for pines, curved leaflets for palms; a conifer's boughs as sheets of painted sprays (*Boughs*) | a few big lobes, warm yellow-green where lit, cool teal in shade, a rim against the sun |
 | `sculpted` | soft lumpy clay discs, and sprigs of two or three leaves on the tops of its lobes | the lobes as clay balls, each dab a small ball on its lobe |
 | `real` | leaf cards set in the crown, each a spray of the species' leaves; a conifer's boughs as sheets carrying its sprays | as the sun gives it, with light through the leaves |
 
@@ -131,13 +131,43 @@ A cluster is a lumpy mass of a few round lobes, darker under its leaves,
 the leaves pointing out from their lobe, so its outline is ragged leaf
 tips all round and no ring of tips pointing out like a star.
 
-**Marks.** All drawn by arithmetic, no picture loaded. A painterly leaf is
+**Marks.** Until the painted marks come (and with `scans: false`), drawn by
+arithmetic (`marks.ts`), no picture loaded. A painterly leaf is
 an outline about its midrib, folded (one half a little darker), lighter
 to its tip, its own tone, casting a thin shadow on what it lies over;
 green carries a number of each leaf's own, so leaves in the light vary one
 by one. A mark's edge is sharpened over one pixel, so leaves stay crisp
 close to, where a texel covers more than a pixel, and keep their coverage
 far off (see *Far leaves*).
+
+**Painted marks.** The painterly look lays its crowns with clusters and
+boughs cut from hand-painted pictures (generated for this project, not
+CC0: `assets/SOURCES.md`), cell for cell where the drawn marks are
+(`assets/marks/`, made offline by `tools/marks/build.mjs` from the pictures
+`tools/marks/recipe.mjs` lists). The shader still colours each leaf from
+its species and the light, so a picture gives only its form: its lightness
+over its own blurred over a leaf and a half (the painter's light on the
+whole clump taken out, the lobes' laid in its place) is the tone, brought
+to the same mean in every cell; its coverage is keyed off its magenta; and
+each painted leaf, found by flooding from the flat insides of the leaves
+up the edges and dark valleys between them, is a number of its own, so
+the light varies leaf by painted leaf. Broadleaves come from three clumps
+of some thirty leaves and, densest, one of a hundred and twenty; birch,
+hawthorn and alder from airy drooping clumps; willow and eucalyptus from
+hanging sprays (kept upright, as a pine's brushes are); a pine's (and a
+spruce's far dabs) from shoots ending in brushes, laid level side by
+side in plates. A finer density is several pictures smaller, set round
+as a clump's lobes are; each dab is turned, mirrored and sized by its
+own number, so no picture repeats the same way. A painted cluster holds
+more and smaller leaves than a drawn one, and the shader is told how much
+smaller (`PAINTED_LEAF_SHARE`), so each dab still takes the coarsest
+density whose leaves keep under `leafSize`, mid dabs too. A conifer's
+sheets are painted boughs turned along their twig, their sprays reaching
+out to either side (another bough's, mirrored, on the far side), the
+sprays painted behind the others left out so air shows between them, the
+underside a shade darker. 1.7 MB of AVIF (4:4:4, no colour matrix: tone,
+number and coverage kept apart); some 0.2 s once a page to make their
+mips. The same views drew within a few percent of the drawn marks' time.
 
 **Boughs.** A conifer grown whorl by whorl (spruces, firs, cedars) lays
 its boughs, near and mid, as sheets lying along them, in the painterly and

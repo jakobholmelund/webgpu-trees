@@ -1135,7 +1135,9 @@ const manifest = {
   leaves: { albedo: "colour (sRGB), coverage in alpha", normal: "normal x, normal y (OpenGL), light let through 0..1", sprite: "x, y, w, h in texels from the top left; base (stalk end) and tip in the sprite's texels; size: its length over its set's longest", sets: leaves },
 };
 writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
-writeFileSync(join(OUT, "SOURCES.md"), sourcesMd());
+// (Keeping the painted marks' section, which tools/marks/build.mjs writes.)
+const kept = existsSync(join(OUT, "SOURCES.md")) ? readFileSync(join(OUT, "SOURCES.md"), "utf8").match(/<!-- painted marks: [\s\S]*<!-- end of painted marks -->/)?.[0] : null;
+writeFileSync(join(OUT, "SOURCES.md"), kept ? `${sourcesMd().trimEnd()}\n\n${kept}\n` : sourcesMd());
 console.log("done");
 
 function sourcesMd() {
