@@ -384,7 +384,13 @@ directly (its rachis, the frame of its leaf along it, its length, width, age
 and colour), and the crown is fitted to the tree's envelope (its height, its
 crown's radius and base, what a ball meets) by how long its fronds are and how
 far they droop together: a crown wider than deep holds its leaves flatter, a
-deep narrow one lets them hang.
+deep narrow one lets them hang. Its leaves are kept near its kind's size (within
+a fifth of its specimen's, a young palm's a little smaller), whatever head a
+survey hands over: a Mexican fan palm's head measured 1.4 m round had fans a
+third of their size, a feather duster, and one 4.7 m round leaves half as long
+again. A head too narrow for them holds them up, and a skinned fan palm's that
+narrow (under 0.6 of its specimen's reach) is cut hard, its hanging leaves gone,
+as an over-pruned course palm is.
 
 - **Leaves** (`palmLeaf`): a feather palm's frond is a ribbon along its
   rachis, folded up in a V (`fold`, a Canary palm's stiff leaflets), a queen
@@ -644,6 +650,18 @@ AVIF, 5.3 MB in all) and its `manifest.json` from the owner's originals,
 which stay out of the repository; `test/referenceRow.test.ts` holds the
 manifest to its files and the library's species.
 
+*Course sizes* (`?fitted=1`, or `fitted: true` from a script) draws each
+species at the sizes the game's courses give it (`lab/courseSizes.ts`: the
+10th, 50th and 90th percentiles of height, crown radius and crown base on
+the first holes of Riviera, Torrey Pines and Walton Heath, measured in the
+game; for a species on none of them, a young and a typical course tree),
+under its specimen and its reference pictures, from the tee (25 m), from
+60 m and from the gallery's own tee (two and a half crown widths off), in
+the reference pictures' light. A wood's species (Walton Heath's Scots pine
+and birch) are drawn at a wood's edge too, their open side to the eye, and
+a single tree the owner saw in the game (a stone pine of 12 m on a crown
+5.9 m round) has a row of its own.
+
 For scripts: `await __gallery.render({ look, views, species, refs })` gives every
 cell as a PNG data URL with the tiers drawn; `await __gallery.sheet({...})`
 the contact sheet; and with the dev server started as
@@ -655,6 +673,19 @@ sheet into that folder and returns where.
 `growTree(species, size, seed)` grows one tree, the same every time for the
 same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
 
+0. **Its habit at its size** (`age.ts`). A species' row is its specimen, a
+   tree old enough to show all it comes to, and most trees a survey hands
+   over are smaller or narrower. So a broadleaf's row is taken as its own
+   size grows it: how young it is, by its height or its crown's reach beside
+   its specimen's, whichever is more (none at 0.8 of it, all at 0.3), fades
+   what comes with age: a flat or umbrella top rounds, its pads and its
+   blue gum's hanging bunches are fewer, it keeps its leader, its trunk is
+   not yet forked (a stone pine's V-forks) nor its underside lifted bare; and
+   how much narrower its crown is for its depth than its specimen's rounds a
+   flat top too, to a dome at half as wide (docs/MORPHOLOGY.md, *Young, old
+   and narrow trees*). A tree at its specimen's size grows exactly as its row
+   says; palms, whorled conifers and shrubs do at any size, and a weeping
+   tree weeps young.
 1. **The crown's outline**: the shape's profile (above), turned round the
    trunk, `size.crownRadius` round, from `size.crownBase` to
    `size.height`. Nothing grows out of it.
@@ -708,7 +739,12 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    deeper the species keeps its leaves, `foliageDepth`, the further back),
    bigger the more light they have, and never more than a fifth of the
    crown's radius round (a crown grown narrow in a wood is many sprays, not
-   a few balls on a stick).
+   a few balls on a stick; a column, narrower than 0.35 of its depth, a sixth).
+   A crown narrower for its height than its specimen's has its clumps smaller
+   by as much (to 0.6 of what its height gives them, at the least): as many of
+   its sprays across it as its specimen has, not its specimen's few big ones
+   crowded in (a stone pine of 12 m on a crown half its specimen's width was a
+   tower of four or five big cushions stacked).
 5. **The wood made good**: where an axis's tip died and the shoot below it
    took the lead, that shoot turned part way back to where the axis ran (a
    twig of such corners is a zigzag); then smoothed (twice, forks held),
@@ -752,8 +788,11 @@ upper crowns to Rautiainen's exponents.
 
 - **A few are grown.** Each species' trees are sorted by where they stand
   (in the open, at a wood's edge, inside a wood: see *Where a tree
-  stands*), then into shapes by how wide their crowns are for their height
-  and how high the crown starts (and, in a wood, how closed in they are);
+  stands*), then into shapes by how wide their crowns are for their height,
+  how high the crown starts and how tall they are for their kind (a
+  doubling counting as a crown a sixth of its height wider: a tree's habit
+  changes with its size, so a 14 m Torrey pine is not a 4 m one's young
+  habit stretched) (and, in a wood, how closed in they are);
   each shape is grown once a seed (two by default), at the shape's typical
   size (see *How a tree grows*), in the light its trees' neighbours leave
   them. Leaves hang in clumps at the twigs, never in the air. A species

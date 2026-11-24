@@ -239,6 +239,12 @@ export function sizeOf(packed: Float32Array, i: number, species: TreeSpecies): T
   return { height, crownRadius: Math.max(0.15, crownRadius), crownBase, trunkRadius: Math.max(0.01, trunkRadius) };
 }
 
+/**
+ * How far apart two trees' heights set their shapes, for each doubling of one over the other, beside their
+ * crowns' shares of their heights (a doubling counts as much as a crown a sixth of its height wider).
+ */
+const HEIGHT_WEIGHT = 0.17;
+
 /** The classes of variant, in the order they are grown, and how many shapes each takes of `shapes`. */
 const STANDINGS: { standing: Standing; shapes: (n: number) => number }[] = [
   { standing: "open", shapes: (n) => n },
@@ -311,7 +317,11 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
       // (A tree's shape: how wide its crown is for its height, how high its crown starts, as shares of its height;
       // and, in a wood, how closed it stands, which shapes it as much: a tree one row in from the edge is not
       // one deep inside.)
-      const shapes = sizes.map((z, j) => (standing === "open" ? [z.crownRadius / z.height, z.crownBase / z.height] : [z.crownRadius / z.height, z.crownBase / z.height, 0.5 * stOf[j].enclosure]));
+      // And how tall it is for its kind (on a log scale, HEIGHT_WEIGHT a doubling): a tree's habit changes with its
+      // size (age.ts: a stone pine of 4 m is a young rounded one, of 15 m an umbrella), so a shape's variant is
+      // grown near its trees' heights, not a 4 m tree's habit stretched over a 14 m one.
+      const tall = (z: TreeSize) => HEIGHT_WEIGHT * Math.log2(z.height / sp.height);
+      const shapes = sizes.map((z, j) => (standing === "open" ? [z.crownRadius / z.height, z.crownBase / z.height, tall(z)] : [z.crownRadius / z.height, z.crownBase / z.height, 0.5 * stOf[j].enclosure, tall(z)]));
       const { centres, of } = groups(shapes, shapesOf(options.shapes));
       const firstOf: number[] = [];
       const seedsOf: number[] = [];

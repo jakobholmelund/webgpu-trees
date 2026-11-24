@@ -55,6 +55,7 @@
 //
 // Plain Math and no three, so growing runs anywhere: in a worker, in node.
 
+import { habitAt } from "./age.ts";
 import { growPalm } from "./palm.ts";
 import { type TreeSpecies } from "./species.ts";
 import { type Stand, standShare } from "./stand.ts";
@@ -347,6 +348,18 @@ const CLUMP_MIN = 0.55;
 const CLUMP_MAX = 1.6;
 /** The largest a clump's radius may be, as a share of the crown's radius: five clumps across it at the least. */
 const CLUMP_OF_CROWN = 0.2;
+/** ... and of a column's (a crown narrower than NARROW of its depth): six across it. */
+const CLUMP_OF_COLUMN = 0.17;
+/**
+ * ... and, for a broadleaf or a shrub whose crown is narrower for its height than its specimen's, smaller by as much
+ * (to this power): as many of its sprays across its crown, and not its specimen's few big ones crowded in (a stone
+ * pine of 12 m on a crown half its specimen's width was a tower of four or five cushions stacked, its specimen's
+ * 3 m cushions on a crown 12 m across). A tree small all over keeps its clumps as its height has them: a pine's
+ * tufts are its needles' size, and do not shrink with its crown.
+ */
+const CLUMP_NARROW = 1;
+/** ... down to this share of what its height gives them, at the least: a pine's tufts drawn up in a wood stay tufts, not beads. */
+const CLUMP_NARROW_LEAST = 0.6;
 
 // Fitting to size.
 /** How far the outermost clump reaches, as a share of the crown radius. */
@@ -567,8 +580,10 @@ function branchAngle(sp: TreeSpecies, rng: Random): number {
  * Grow one tree of a species to a size. The same arguments give the same tree. A `stand` (in the tree's own
  * frame: its open side along +x) grows it in the light its neighbours leave it; left out, it stands alone.
  */
-export function growTree(species: TreeSpecies, size: TreeSize, seed: number, stand?: Stand): GrownTree {
+export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?: Stand): GrownTree {
   const sz = soundSize(size);
+  // (Its row as a tree of its own size grows: a small or narrow one as a younger tree of its kind, age.ts.)
+  const species = habitAt(row, sz);
   const rng = new Random(seed);
   const wood = newWood();
   // (Nothing round it is no stand: it grows exactly as one alone.)
@@ -578,8 +593,14 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
   // The species' clump, scaled by the tree's height against the species' own (a younger tree's twigs
   // are smaller, but less so than the tree). No more than a share of the crown's radius, though: a crown
   // grown narrow in a wood is still a crown of many sprays, not two or three balls on a stick.
-  const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height);
-  const clumpR = species.architecture === "palm" ? own : Math.min(own, CLUMP_OF_CROWN * sz.crownRadius);
+  const budGrown = species.architecture === "broadleaf" || species.architecture === "shrub";
+  // And smaller in a crown narrower for its height than its specimen's (CLUMP_NARROW).
+  const narrower = (sz.crownRadius / Math.max(0.01, species.crownRadius)) / (sz.height / Math.max(0.01, species.height));
+  const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height) * (budGrown ? Math.max(CLUMP_NARROW_LEAST, Math.min(1, narrower) ** CLUMP_NARROW) : 1);
+  // (A broadleaf's column, narrower than NARROW of its depth, a little smaller again: its clumps are round its stem,
+  // CLUMP_OF_COLUMN. A conifer's boughs are laid whorl by whorl, as long as its crown is wide, whatever its shape.)
+  const ofCrown = budGrown && sz.crownRadius / Math.max(0.01, sz.height - sz.crownBase) < NARROW ? CLUMP_OF_COLUMN : CLUMP_OF_CROWN;
+  const clumpR = species.architecture === "palm" ? own : Math.min(own, ofCrown * sz.crownRadius);
   // (Its form at the foot, from its own seed: one stem, a forked trunk, or a clump of stems.)
   const form = species.architecture === "broadleaf" ? formOf(species, seed, st) : { stems: 1, fork: 1, clump: false, join: 0 };
   let hung: Hung;

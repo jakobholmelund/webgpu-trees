@@ -1450,6 +1450,32 @@ A South American feather palm (Atlantic and semideciduous forests of the Paraná
 
 **Sources:** Broschat et al., UF/IFAS ENH-767 (UFQP); Noblick 2017, *Phytotaxa* (NOB17); Frew, Botany Brisbane (BBNE); Virginia Tech factsheet 899 (VT); Broschat, ENH1182 (UFPP). Palmpedia, PACSOA and PalmWeb were not reachable.
 
+## Young, old and narrow trees: what a fitted tree is
+
+The species sections above describe each kind's **specimen**: a grown tree old enough to show all it comes to. The game fits each tree to its own survey (height, crown radius, crown base from lidar), and most course trees are much smaller or narrower than that. Measured on the first holes of three courses in the game on 2026-11-25 (10th, 50th and 90th percentiles, each number on its own; lab/courseSizes.ts) [S:COURSE]:
+
+| Course | Species | n | Height (m) | Crown radius (m) | Crown base (m) |
+|---|---|---|---|---|---|
+| Riviera | Stone pine | 29 | 3.6 / 5.7 / 10.5 | 2.3 / 3 / 5 | 2 / 3.5 / 5.5 |
+| Riviera | Eucalyptus | 350 | 4.9 / 10.6 / 26.5 | 1.4 / 3.6 / 6 | 2 / 4.5 / 11.5 |
+| Riviera | Mexican fan palm | 66 | 6.8 / 14 / 31 | 1 / 1.4 / 4.7 | 4.6 / 9.3 / 22 |
+| Torrey Pines | Torrey pine | 179 | 3.4 / 4.8 / 14.1 | 1.9 / 2.9 / 5.2 | 0.8 / 2 / 6 |
+| Torrey Pines | Eucalyptus | 376 | 4.4 / 12.3 / 17.8 | 1.9 / 3.6 / 5.6 | 1 / 4.6 / 9.5 |
+| Torrey Pines | Mexican fan palm | 42 | 6.7 / 13.2 / 19.8 | 1 / 2.3 / 4.2 | 3.6 / 6.5 / 12 |
+| Walton Heath | Scots pine | 357 | 13.7 / 15.9 / 18.2 | 2.4 / 3.9 / 4.8 | 4.2 / 7.5 / 10.3 |
+| Walton Heath | Silver birch | 316 | 13.4 / 15.6 / 18 | 2.8 / 4.1 / 4.9 | 3.6 / 5.8 / 9.1 |
+
+So a Torrey pine on its own course is mostly a young tree a third of its specimen's height, and a Riviera stone pine of 12 m may have a crown half as wide as its specimen's. The grower takes such a tree as a younger or narrower tree of its kind (src/age.ts). What the sources say changes with age, by species:
+
+- **Stone pine.** "Globose and shrubby when young, umbrella-shaped in mid-age and flat and broad in maturity" [S:EUAT]; conic only in its first 2 years, and its juvenile glaucous needles last 3–10 years [S:GDB]. So the umbrella, its flat top and its bare underside on V-forked limbs, come with age; a young tree is a rounded crown on one short stem. A crown deep for its width (12 m tall, 5.9 m radius from 5.5 m) is a domed umbrella, not the flat slab of a wide old one stood on edge [obs.]. TALLO's stone pines of 3–10 m have r/H 0.35 (0.29–0.42), of 10–18 m 0.29 [S:TALLO]: the course's 0.5 is an open tree's.
+- **Torrey pine.** Wild crowns "rounded to flattened or irregular", trunks crooked and leaning in the wild, tall and straight in planted stands [S:GDB]. The sparse candelabra of long bare upcurved limbs with tufts at their ends is an old tree's [obs.]; a young tree is a rounded, bushy, irregular crown of tufts with branches low, its leader still leading [est.].
+- **Eucalyptus (blue gum).** Excurrent when young; mature trees have a long clean bole and an open irregular crown of a few big ascending limbs, the trunk often splitting in its upper third [est.; S:EUCLID for size]. Its juvenile foliage is opposite, sessile and glaucous on young trees and coppice [S:EUCLID]. TALLO's blue gums are narrow at every size: r/H 0.12 (0.11–0.16) at 3–10 m, 0.10 at 10–18 m [S:TALLO], about what the courses measure (3.6 m on 10.6–12.3 m). The hanging bunches with sky between are the open adult crown's [obs.].
+- **Scots pine.** "Open ovoid-conic when young", old trees "dense, broadly domed or even flat-topped" and often forking into sub-leaders [S:GDB]. TALLO's 10–18 m Scots pines have r/H 0.15 (0.10–0.21) [S:TALLO]: Walton Heath's 3.9 m on 15.9 m (0.25) is a wood's edge or a heath tree, not an old open one (the specimen's 0.42).
+- **Silver birch.** Excurrent while young, a single slender stem and a narrow conic-oval crown; the leader is lost in the top third with age, and the pendulous twigs hang in long curtains on mature trees [S:WT; est.]. TALLO's birches are r/H 0.12 at every height band [S:TALLO], the courses' 0.26 is an open or edge tree's.
+- **Mexican fan palm.** A palm's leaves are its kind's size at any height: blades 0.9–1.5 m across on stalks of 1.2–1.8 m [S:UFMF]; the head is about 3–5 m across [est.]. A head lidar measures 1.4 m round is a narrow one, most likely over-pruned ("feather-duster" heads, [S:UFPP]) or one whose spread lidar under-reads; its leaves are not a third of their size. The grower keeps a palm's leaves within a fifth of its specimen's length and, for a narrow head, cuts its hanging leaves and holds the rest up (palm.ts).
+
+A weeping willow is a cultivar that weeps from its first years [obs.]: its whips are not an old tree's, and are kept at any size.
+
 ## Forked trunks and clumps of stems
 
 Many trees divide low into a few great trunks, or rise as a clump of stems from one root plate. The library decides this per tree from its seed (`forkShare`, `fork` ± `forkSpread`, `forkStems`..`forkStemsMost`; `stemShare`, `stemRange`). No free source gives a forking *frequency* for an open-grown tree of any of these species. The shares below are therefore `[est.]`: set from the sources' qualitative statements and checked against the reference photographs. In a closed wood, the library makes forks 60 % rarer and clumps 35 % rarer, and raises the remaining forks halfway towards the crown base. This follows the forest-versus-open contrast the sources draw: oak and beech are "drawn up" on one stem in woodland [S:TSO], and a coast live oak in a stand is "branchless up to 20 feet" [S:FEIS].
@@ -1600,6 +1626,7 @@ At 1 m, the stems still lie within 0.1–0.3 m of a single trunk cylinder, and w
 | UFWF | Gilman E.F., Watson D.G., Klein R.W. & Hilbert D.R., *Washingtonia filifera: Desert Palm*, UF/IFAS ENH-826 (EDIS ST669), revised April 2024 | Height, spread, crown, leaf type and colour, petticoat skirt, fire hazard, removal by law | https://ask.ifas.ufl.edu/publication/ST669 | Free to read, © UF/IFAS. No licence stated in the copy read; ENH1182 from the same series is CC BY-NC-ND 4.0. |
 | UFQP | Broschat T.K., Klein R.W. & Hilbert D.R., *Syagrus romanzoffiana: Queen Palm*, UF/IFAS ENH-767 (EDIS ST609), revised March 2024 | Height, spread, trunk diameter, not self-cleaning, fruit, pruning cautions | https://ask.ifas.ufl.edu/publication/ST609 | As UFWF |
 | UFMF | Broschat T.K., Klein R.W. & Hilbert D.R., *Washingtonia robusta: Mexican Fan Palm*, UF/IFAS ENH-827 (EDIS ST670), revised April 2024 | Leaf count, leaf width, petiole length, trunk colour and taper, skirt shedding | https://ask.ifas.ufl.edu/publication/ST670 | As UFWF |
+| COURSE | Couch Golf Club's courses, measured in the game on 2026-11-25 (library a66c411): p10, p50 and p90 of each tree's lidar height, crown radius and crown base by species on the first holes of Riviera (c01), Torrey Pines (c03) and Walton Heath (c05) | The sizes the game fits trees to (lab/courseSizes.ts) | not public | the game's own data |
 | UFPC | Broschat T.K., *Phoenix canariensis: Canary Island Date Palm*, UF/IFAS ENH-598 (EDIS ST439), revised 2013 | Leaf count (130–150), leaf production, pineapple cut discouraged | https://ask.ifas.ufl.edu/publication/ST439 | As UFWF |
 | UFNA | Broschat T.K. & Elliott M.L., *Normal "Abnormalities" in Palms*, UF/IFAS ENH1077 (EDIS EP344), revised 2013 | *Washingtonia* skirt and leaf-base retention and shedding; booted versus smooth trunks | https://ask.ifas.ufl.edu/publication/EP344 | As UFWF |
 | UFPP | Broschat T.K., *Pruning Palms*, UF/IFAS ENH1182 (EDIS EP443), 2011, revised May 2014, doi:10.32473/EDIS-EP443-2011 | Proper canopy, pineapple and hurricane cuts, ANSI A300 9:00–3:00 rule, skirts and wildlife, leaf counts and leaf production table, wounding | https://ask.ifas.ufl.edu/publication/EP443 | CC BY-NC-ND 4.0 (stated in the PDF), © UF/IFAS |
