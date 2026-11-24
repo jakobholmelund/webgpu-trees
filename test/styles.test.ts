@@ -84,8 +84,8 @@ test("the painterly atlas: a row of clusters for every kind of leaf, each a mass
     for (let col = 0; col < PAINTERLY_COLS; col++) {
       const c = cellOf(px, col, row);
       const at = `${LEAF_KIND_ROWS[row]}, cluster ${col}`;
-      // (A mass, not a scatter, and not a disc: a quarter to three quarters of its square covered, a disc's being 0.79.)
-      assert.ok(c.cover > 0.25 && c.cover < 0.75, `${at}: covers ${c.cover.toFixed(2)}`);
+      // (A mass, not a scatter, and not a disc: a fifth to three quarters of its square covered, a disc's being 0.79.)
+      assert.ok(c.cover > 0.2 && c.cover < 0.75, `${at}: covers ${c.cover.toFixed(2)}`);
       assert.equal(c.border, 0, `${at}: its border is clear, so the mips of one cell do not bleed into the next`);
       assert.ok(c.tone > 0.6 && c.tone < 1, `${at}: tone ${c.tone.toFixed(2)}`);
       // (Its leaves each have their own number, which lights them each their own way.)

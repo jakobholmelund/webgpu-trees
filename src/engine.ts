@@ -510,11 +510,12 @@ export function createTrees(options: TreesOptions): Trees {
       const aLobe = lobed ? attribute<"vec4">("aLobe", "vec4") : null;
       const lobeAt = aLobe ? toWorld(T, fit.point(aLobe.xyz).add(blown)) : null;
       const lobeR = aLobe ? max(aLobe.w.mul(fit.size), float(0.05)) : null;
-      // (A sprig stands on its lobe's skin, out from its middle, where it shows.)
+      // (A sprig stands out of its own clump, away from its lobe's middle, where it shows: not on the lobe's
+      // ball, which reaches past the crown's dabs here and there and would leave it in the air.)
       if (aLobe && look === "sculpted") {
         const lc = fit.point(aLobe.xyz);
         const out = centre.sub(lc);
-        const onSkin = lc.add(out.div(max(length(out), float(1e-3))).mul(aLobe.w.mul(fit.size).mul(0.92)));
+        const onSkin = centre.add(out.div(max(length(out), float(1e-3))).mul(aDab.z.mul(fit.size).mul(0.6)));
         centre = mix(centre, onSkin, sprig);
       }
       const at = toWorld(T, centre.add(blown));

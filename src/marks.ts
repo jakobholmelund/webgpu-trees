@@ -195,6 +195,19 @@ function cluster(kind: (typeof KINDS)[number], seed: number, scale: number): Lea
   return [...back, ...rimLeaves, ...shuffle(middle), ...over];
 }
 
+/** How much of `len` a leaf from (x, y) pointing at `ang` may have and keep its tip (and a little bend) inside the mark's reach. */
+function inside(x: number, y: number, ang: number, len: number): number {
+  const reach = REACH - 0.03;
+  const tx = Math.cos(ang) * len;
+  const ty = Math.sin(ang) * len;
+  let f = 1;
+  if (x + tx > reach) f = Math.min(f, (reach - x) / tx);
+  if (x + tx < -reach) f = Math.min(f, (-reach - x) / tx);
+  if (y + ty > reach) f = Math.min(f, (reach - y) / ty);
+  if (y + ty < -reach) f = Math.min(f, (-reach - y) / ty);
+  return Math.max(0, f);
+}
+
 /**
  * A conifer's spray, as painters of stylized firs lay one: a bough across the mark, arching and drooping at
  * its ends, its needles hanging from it in a fringe, longer below than above, so a crown of them is tiers of
@@ -226,17 +239,16 @@ function bough(seed: number, scale: number): Leaf[] {
       // (Longest in the middle of the bough, shorter to its tip; above it, a short brush.)
       const len = (below ? 0.3 + 0.5 * (1 - Math.abs(out) ** 2) * (0.4 + 0.6 * rnd()) : 0.1 + rnd() * 0.14) * s;
       const y = axis(x);
-      // (Kept inside the cell.)
-      const tipY = y + Math.sin(ang) * len;
-      const fit = tipY < -REACH ? (y + REACH) / (y - tipY) : 1;
+      const fit = inside(x, y, ang, len);
       leaves.push({ x, y, ang, len: len * fit, wid: len * fit * 0.09, p: 0.35, q: 1, bend: (rnd() - 0.5) * 0.15, tone: 0.8 + rnd() * 0.2, own: rnd(), sprig: 0 });
     }
     // (The bough's tip: a few needles on along it, so it ends in a point.)
     for (const side of [-1, 1]) {
       const x = side * reach * 0.82;
       for (let k = 0; k < 4; k++) {
-        const len = (0.12 + rnd() * 0.08) * s;
-        leaves.push({ x, y: axis(x), ang: (side > 0 ? 0 : Math.PI) - side * (0.25 + rnd() * 0.5), len, wid: len * 0.1, p: 0.35, q: 1, bend: 0, tone: 0.85 + rnd() * 0.15, own: rnd(), sprig: 0 });
+        const ang = (side > 0 ? 0 : Math.PI) - side * (0.25 + rnd() * 0.5);
+        const len = (0.12 + rnd() * 0.08) * s * inside(x, axis(x), ang, (0.12 + 0.08) * s);
+        leaves.push({ x, y: axis(x), ang, len, wid: len * 0.1, p: 0.35, q: 1, bend: 0, tone: 0.85 + rnd() * 0.15, own: rnd(), sprig: 0 });
       }
     }
   }

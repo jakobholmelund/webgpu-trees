@@ -12,6 +12,7 @@
 //   ?wind=4          the wind's speed (m/s)
 //   ?eye=standing | tree | overhead | course   where the eye starts
 //   ?at=x,y,z,tx,ty,tz   exactly a view, as "Share view" writes it
+//   ?look=painterly  the look: stylized (painted), painterly, sculpted or real
 //   ?tier=0|1|2      draw one tier alone
 //   ?fresh           ignore what the lab kept from last time
 
