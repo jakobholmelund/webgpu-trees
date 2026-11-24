@@ -1,7 +1,8 @@
 // What the realistic look's photographs are made from: every scanned source (a bark, a sheet of leaves, a
 // conifer's twig cards), where it is published, who made it and under what licence, and how it is cut,
-// cleaned and packed into what the library loads (assets/). All CC0 (public domain), from ambientCG and
-// Poly Haven; credited all the same (assets/SOURCES.md is written from this list).
+// cleaned and packed into what the library loads (assets/). The scans are all CC0 (public domain), from
+// ambientCG and Poly Haven; where no scan exists, a picture was generated (not CC0, owner-approved). All are
+// credited (assets/SOURCES.md is written from this list).
 //
 // fetch.mjs downloads exactly these files into a folder of your choosing; build.mjs turns them into
 // assets/. Nothing here is fetched while the library runs.
@@ -13,7 +14,7 @@ export const SITES = {
     licence: "AI-generated, not CC0: made for this project (owner-approved)",
     licenceUrl: null,
     page: () => null,
-    author: "AI-generated (Nano Banana, gemini-nano-banana-2.1)",
+    author: "AI-generated (each picture names its tool)",
   },
   ambientcg: {
     name: "ambientCG",
@@ -65,8 +66,14 @@ const phModel = (id, part, title, authors, extra = {}) => ({
 });
 
 /**
- * A picture generated where no scan exists: one PNG, copied by hand into <raw>/<key>/ (fetch.mjs does not
- * fetch it). Not CC0: generated for this project with the owner's approval; SOURCES.md says so.
+ * A picture generated where no scan exists: one PNG or JPG (or, for a sheet of leaves, several, set side by
+ * side), copied by hand into <raw>/<key>/ (fetch.mjs does not fetch it). Not CC0: generated for this project
+ * with the owner's approval; SOURCES.md says so, with the tool (`extra.tool`, else Nano Banana) and the prompt.
+ * `crop`: a bark, cut square at `x` (a share of the spare width) and made to tile; `grade`: its colour brought
+ * nearer a real bark's before (`saturation` scaled, its mean moved `toward` an sRGB colour); `overlap`: made to
+ * tile from that share of itself, pieced (else cross-faded with itself moved half a tile); `streaks`: its
+ * streaks lined up before. `key: "magenta"`: leaves on magenta, keyed out; `unmix`: each edge unmixed from the
+ * magenta against the leaf beside it.
  */
 const generated = (id, file, title, prompt, extra = {}) => ({
   site: "generated",
@@ -76,20 +83,18 @@ const generated = (id, file, title, prompt, extra = {}) => ({
   tool: "Nano Banana (gemini-nano-banana-2.1)",
   date: "2026-11-24",
   prompt,
-  map: () => file,
+  map: () => [file].flat()[0],
   ...extra,
 });
+/** The tool the realistic look's later pictures (tools/ai-textures/PROMPTS.md) were made with. */
+const ANTIGRAVITY = { tool: "Antigravity / gemini-3.8-flash image", date: "2026-11-24" };
 
 export const SOURCES = {
   // Barks.
-  bark_bluegum: phTex("bark_bluegum", "Bark Blue gum", ["Dimitrios Savva"], { sizeMm: [1820, 1820] }),
   plane: acg("Bark009", "1K", { title: "Bark 009", sizeMm: null }),
-  // (A scan twice as long as it is wide, for which Poly Haven states one size: taken as its length.)
-  chinese_hackberry_bark: phTex("chinese_hackberry_bark", "Chinese Hackberry Bark", ["Charlotte Baglioni"], { sizeMm: [900, 1800], sizeFrom: "measured: Poly Haven's stated 1.8 m, taken as the length of this 1:2 scan" }),
   oak: acg("Bark001", "2K", { title: "Bark 001", sizeMm: null }),
   bark_willow_02: phTex("bark_willow_02", "Bark Willow 02", ["Charlotte Baglioni"], { sizeMm: [2150, 2150] }),
   pine_bark: phTex("pine_bark", "Pine Bark", ["Dimitrios Savva"], { sizeMm: [2000, 2000] }),
-  japanese_zelkova_bark: phTex("japanese_zelkova_bark", "Japanese Zelkova Bark", ["Charlotte Baglioni"], { sizeMm: [1800, 1800] }),
   spruce: acg("Bark006", "1K", { title: "Bark 006", sizeMm: null }),
   douglas: acg("Bark014", "1K", { title: "Bark 014", sizeMm: [1200, 1200] }),
   metasequoia_bark: phTex("metasequoia_bark", "Metasequoia Bark", ["Charlotte Baglioni"], { sizeMm: [1940, 1940] }),
@@ -107,6 +112,17 @@ export const SOURCES = {
   ai_pineapple: generated("real-pineapple-cut-2", "real-pineapple-cut-2.jpg", "Canary date palm pineapple cut", "The pruned leaf-base crown (\"pineapple cut\") of a Canary Island date palm, photographed straight-on as a flat seamless tileable texture, square. Neatly trimmed short leaf stubs in a tight interlocking diamond spiral, fresh cut faces pale tan and cream, darker brown fibres between them. Even diffuse light, no cast shadows, no perspective, no edges visible. Photographic scan quality.", { crop: { x: 0.5, size: 1 } }),
   ai_paint_frond: generated("painterly-frond-2", "painterly-frond-2.jpg", "Painted feather palm frond", "A hand-painted stylized palm frond for a game tree, on a pure flat magenta #FF00FF background, tall 1:2. One arching feather palm frond, a curved yellow-green midrib from bottom to top with many narrow pointed leaflets on both sides angled forward in a V, longest in the middle; bright yellow-green on top, teal-green beneath, soft painted gradients. Flat orthographic, the whole frond inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
   ai_paint_fan: generated("painterly-fan-1", "painterly-fan-1.jpg", "Painted fan palm leaf", "A hand-painted stylized fan palm leaf for a game tree, on a pure flat magenta #FF00FF background, square. One round fan-shaped leaf of a Mexican fan palm on a short stalk, many pleated narrow segments radiating from the centre with their tips split and drooping, a few hanging threads; yellow-green on top, teal beneath, soft painted gradients. Flat orthographic, centred, inside the frame with a margin, no outlines, no text.", { key: "magenta" }),
+  // The realistic look's species no scan covers (generated 2026-11-24; the prompts as given in
+  // tools/ai-textures/PROMPTS.md).
+  ai_beech_bark: generated("real-beech-bark-1", "real-beech-bark-1.jpg", "European beech bark", "European beech (Fagus sylvatica) bark, photographed straight-on as a flat seamless tileable texture, square. Smooth silver-grey bark filling the whole frame edge to edge, faint darker grey mottling, a few small horizontal lenticel lines and pale lichen spots, very fine texture. Even diffuse overcast light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality, neutral colour.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, relief: 0.35 } }),
+  ai_eucalyptus_bark: generated("real-eucalyptus-bark-2", "real-eucalyptus-bark-2.jpg", "Tasmanian blue gum bark, rough and peeling", "Tasmanian blue gum (Eucalyptus globulus) trunk bark, photographed straight-on as a flat seamless tileable texture, square. Smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, streaks: true } }),
+  ai_eucalyptus_bark_upper: generated("real-eucalyptus-bark-1", "real-eucalyptus-bark-1.jpg", "Tasmanian blue gum bark, smooth and streaked", "Tasmanian blue gum (Eucalyptus globulus) trunk bark, photographed straight-on as a flat seamless tileable texture, square. Smooth pale cream and blue-grey bark with patches of fresh yellow-green and grey, long ribbons of peeling brown bark strips hanging in places, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16, streaks: true } }),
+  // (Generated far too saturated an orange: brought to a copper that sits with the scanned plates below it.)
+  ai_scotspine_upper: generated("real-scotspine-upper-bark-1", "real-scotspine-upper-bark-1.jpg", "Scots pine upper-stem bark", "Scots pine (Pinus sylvestris) bark from high on the stem, photographed straight-on as a flat seamless tileable texture, square. Thin flaking papery plates of bright orange to copper-red bark peeling in small curls, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16 }, grade: { saturation: 0.6, toward: [0.71, 0.39, 0.24] } }),
+  ai_torrey_shoot: generated("real-torrey-shoot", ["real-torrey-shoot-3.jpg", "real-torrey-shoot-1.jpg"], "Torrey pine shoots", "One Torrey pine (Pinus torreyana) shoot laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. A stout grey-brown twig ending in a dense tuft of long stiff grey-green needles in bundles of five, 20–30 cm long, spreading forward like a brush. The whole shoot inside the frame with a margin, no shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_liveoak_leaves: generated("real-liveoak-leaves-2", "real-liveoak-leaves-2.jpg", "Coast live oak leaves", "Ten coast live oak (Quercus agrifolia) leaves laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. Each leaf small, 3–6 cm, oval, cupped and holly-like with spiny toothed edges, dark glossy green; arranged in rows, upright, not touching, each fully inside the frame with a margin. No shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_plane_leaves: generated("real-plane-leaves", ["real-plane-leaves-1.jpg", "real-plane-leaves-2.jpg"], "London plane leaves", "Six London plane (Platanus × hispanica) leaves laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. Each leaf palmate with five pointed lobes and toothed edges, 12–20 cm, mid green with paler veins, a long stalk at the bottom; side by side, upright, not touching, each fully inside the frame with a margin. No shadows on the background, sharp edges.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_cypress_spray: generated("real-cypress-spray", ["real-cypress-spray-1.jpg", "real-cypress-spray-2.jpg"], "Monterey cypress sprays", "One Monterey cypress (Hesperocyparis macrocarpa) branchlet laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. Dense rope-like cord sprays of tiny scale leaves branching in three dimensions, dark bright green, a thin brown axis; the whole spray inside the frame with a margin, no shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
   // Leaves.
   LeafSet016: acg("LeafSet016", "2K", { title: "Leaf Set 016" }),
   LeafSet030: acg("LeafSet030", "2K", { title: "Leaf Set 030" }),
@@ -135,9 +151,24 @@ export const SOURCES = {
 export const BARK = [
   {
     id: "eucalyptus",
-    source: "bark_bluegum",
-    look: "smooth, peeling plates, mottled grey-brown-cream (Tasmanian blue gum itself)",
+    source: "ai_eucalyptus_bark",
+    look: "a blue gum's lower stem: cream, blue-grey and yellow-green patches under strips of rough brown bark peeling away",
     for: ["Eucalyptus"],
+    // Smooth patches 5–30 cm and ribbons a metre and more on a blue gum (MORPHOLOGY.md): the patches here span
+    // a twentieth to a sixth of the tile, the strips up to half its height. (The tile is the picture's middle
+    // 84 %, the rest its overlap: so for all the generated barks here.)
+    tileCm: [85, 85],
+    tileFrom: "estimated: patches ~5–17 cm, strips up to ~50 cm long, a blue gum's patches 5–30 cm",
+    delight: 0.6,
+  },
+  {
+    id: "eucalyptusUpper",
+    source: "ai_eucalyptus_bark_upper",
+    look: "a blue gum's smooth upper stem: long cream, blue-grey and yellow-green streaks, a few ribbons hanging",
+    for: ["Eucalyptus"],
+    // Streaks 3–15 cm wide on a blue gum's smooth stem: about ten across the tile.
+    tileCm: [85, 85],
+    tileFrom: "estimated: ~10 streaks across, a blue gum's 3–15 cm wide",
     delight: 0.6,
   },
   {
@@ -152,10 +183,14 @@ export const BARK = [
   },
   {
     id: "beech",
-    source: "chinese_hackberry_bark",
-    look: "smooth grey skin with lichen dots and faint horizontal lines",
+    source: "ai_beech_bark",
+    look: "smooth silver-grey skin, darker mottling, small horizontal lenticels and lichen spots",
     for: ["Beech"],
-    delight: 0.7,
+    // A beech's lenticels 0.5–2 cm long, longer on an old stem: some 15–30 texels of the 860 here. (At 50 cm its
+    // mottling repeated in columns round a trunk: taken at the long end.)
+    tileCm: [85, 85],
+    tileFrom: "estimated: lenticels ~1.5–3 cm long, a beech's 0.5–2 cm on a young stem, longer on an old",
+    delight: 0.85,
   },
   {
     id: "birch",
@@ -193,9 +228,12 @@ export const BARK = [
   },
   {
     id: "pineFlakes",
-    source: "japanese_zelkova_bark",
-    look: "thin papery flakes, orange on a pale ground (a Scots pine's upper stem, once tinted)",
+    source: "ai_scotspine_upper",
+    look: "thin papery flakes, copper-orange, peeling in small curls (a Scots pine's upper stem and limbs)",
     for: ["Scots pine"],
+    // A Scots pine's upper flakes 1–5 cm (MORPHOLOGY.md): most here 60–150 texels of the 860.
+    tileCm: [30, 30],
+    tileFrom: "estimated: flakes ~2–5 cm, a Scots pine's upper flakes 1–5 cm",
     delight: 0.6,
   },
   {
@@ -271,19 +309,24 @@ export const BARK = [
 export const LEAVES = [
   { id: "oak", source: "LeafSet016", look: "lobed oak leaves", for: ["Oak", "Hawthorn"], base: "down", px: 320, lengthCm: 11 },
   { id: "redOak", source: "LeafSet030", look: "bristle-lobed red oak leaves (autumn colours, kept as lightness only)", for: ["Red oak"], base: "right", px: 288, lengthCm: 17, tone: true },
-  { id: "maple", source: "LeafSet010", look: "palmate maple leaves", for: ["Plane", "California sycamore", "Sugar maple"], base: "down", px: 352, lengthCm: 16 },
+  { id: "maple", source: "LeafSet010", look: "palmate maple leaves", for: ["California sycamore", "Sugar maple"], base: "down", px: 352, lengthCm: 16 },
+  // (Six leaves to each of two pictures: the first row of each and two more, as the sheet holds eight.)
+  { id: "londonPlane", source: "ai_plane_leaves", look: "palmate London plane leaves, five-lobed, on long stalks", for: ["Plane"], base: "down", px: 288, lengthCm: 30 },
   { id: "round", source: "LeafSet009", look: "round leaves, toothed", for: ["Black alder"], base: "down", px: 288, lengthCm: 9 },
   { id: "deltoid", source: "LeafSet004", look: "triangular leaves on long stalks", for: ["Lombardy poplar", "Silver birch"], base: "down", px: 320, lengthCm: 10 },
   { id: "serrate", source: "LeafSet014", look: "ovate leaves, finely toothed, straight veins", for: ["Silver birch"], base: "down", px: 320, lengthCm: 9 },
   { id: "beech", source: "LeafSet024", look: "oval leaves with wavy margins and straight veins", for: ["Beech"], base: "down", px: 288, lengthCm: 9 },
-  { id: "elliptic", source: "LeafSet003", look: "elliptic leaves, toothed", for: ["Coast live oak", "Shrub"], base: "down", px: 320, lengthCm: 7 },
+  { id: "elliptic", source: "LeafSet003", look: "elliptic leaves, toothed", for: ["Shrub"], base: "down", px: 320, lengthCm: 7 },
+  { id: "liveOak", source: "ai_liveoak_leaves", look: "small cupped holly-like coast live oak leaves, spiny-toothed, glossy dark green", for: ["Coast live oak"], base: "down", px: 256, lengthCm: 6 },
   { id: "lance", source: "LeafSet013", look: "narrow lanceolate leaves", for: ["Weeping willow"], base: "down", px: 384, lengthCm: 12, skip: [2, 4, 5] },
-  { id: "scale", source: "LeafSet019", look: "sprays of scale leaves", for: ["Western red cedar", "Monterey cypress"], base: "left", px: 448, lengthCm: 18, deskew: false },
+  { id: "scale", source: "LeafSet019", look: "sprays of scale leaves", for: ["Western red cedar"], base: "left", px: 448, lengthCm: 18, deskew: false },
+  // (Each picture one branchlet: one to a sprite.)
+  { id: "cypress", source: "ai_cypress_spray", look: "Monterey cypress branchlets of scale leaves, dense, dark green", for: ["Monterey cypress"], base: "down", px: 512, lengthCm: 30, deskew: false, whole: true },
   {
     id: "pine",
     source: "pine_tree_01",
     look: "pine shoots with their needles",
-    for: ["Scots pine", "Corsican pine", "Monterey pine", "Torrey pine", "Aleppo pine", "Stone pine", "Eastern white pine", "Gorse"],
+    for: ["Scots pine", "Corsican pine", "Monterey pine", "Aleppo pine", "Stone pine", "Eastern white pine", "Gorse"],
     base: "down",
     px: 448,
     lengthCm: 22,
@@ -316,6 +359,8 @@ export const LEAVES = [
     px: 448,
     lengthCm: 24,
   },
+  // (Each picture one shoot, its needles apart: one to a sprite. Needles 20–30 cm, about half the shoot.)
+  { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
   { id: "frond", source: "ai_canary_frond", look: "a whole feather-shaped palm frond", for: ["Canary date palm"], base: "down", px: 640, lengthCm: 450, deskew: false },
   { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
   // The palms' whole leaves, each one to a picture (palm.ts lays them on its own fronds).

@@ -3,8 +3,8 @@
 // and loading them.
 //
 // A species' bark is a set (a tile of bark, its colour and its relief) laid round its wood at its real size,
-// or two, one giving way to the other up the stem (a Scots pine's grey plates to its orange flakes, a birch's
-// black foot to its white). Its leaves are a sheet of single leaves, each laid on the species' own twigs at
+// or two, one giving way to the other up the stem (a Scots pine's grey plates to its copper flakes, a blue
+// gum's rough stocking to its smooth streaks, a birch's black foot to its white). Its leaves are a sheet of single leaves, each laid on the species' own twigs at
 // its own size (sprays.ts). Which a species wears is looked up by its name here (a host may give its own:
 // `TreesOptions.scans.looks`), and failing that by its kind of leaf.
 //
@@ -86,9 +86,10 @@ export interface ScanLook {
   barkFoot?: string;
   /**
    * The bark it takes on up the stem: from `from` to `to` (shares of the tree's height) the one gives way to
-   * the other, raggedly, in tongues up and down the furrows.
+   * the other, raggedly, in tongues up and down the furrows; and its colour (sRGB), where not the species' bark
+   * colour paled up the trunk (a Scots pine's copper flakes over its grey-brown plates).
    */
-  upper?: { set: string; from: number; to: number; scale?: number };
+  upper?: { set: string; from: number; to: number; scale?: number; color?: string };
   /** Its leaves: the sheet, and how long one is on this species, stalk to tip (cm). */
   leaves: string;
   leafCm: number;
@@ -106,10 +107,13 @@ export interface ScanLook {
 /** The photographs each of the library's species wears, by name. */
 export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   Oak: { bark: "oak", leaves: "oak", leafCm: 10, spray: "alternate" },
-  Plane: { bark: "plane", leaves: "maple", leafCm: 18, spray: "alternate" },
-  Eucalyptus: { bark: "eucalyptus", leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafBend: 0.03, hang: 0.85, perSpray: 10 },
+  // (The plane's leaf on its long stalk: some 16 cm of blade.)
+  Plane: { bark: "plane", leaves: "londonPlane", leafCm: 30, spray: "alternate" },
+  // (Its rough stocking, a few metres, giving way to the smooth streaked stem.)
+  Eucalyptus: { bark: "eucalyptus", upper: { set: "eucalyptusUpper", from: 0.04, to: 0.12 }, leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafBend: 0.03, hang: 0.85, perSpray: 10 },
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
-  "Scots pine": { bark: "pine", upper: { set: "pineFlakes", from: 0.3, to: 0.55, scale: 0.6 }, leaves: "pine", leafCm: 28, spray: "tufts" },
+  // (Its grey-brown plates giving way, from about a third of the way up, to copper-orange flakes.)
+  "Scots pine": { bark: "pine", upper: { set: "pineFlakes", from: 0.25, to: 0.5, color: "#b4643c" }, leaves: "pine", leafCm: 28, spray: "tufts" },
   Shrub: { bark: "ridged", barkScale: 0.4, leaves: "elliptic", leafCm: 5, spray: "alternate" },
   Beech: { bark: "beech", leaves: "beech", leafCm: 8, spray: "alternate" },
   "Silver birch": { bark: "oak", barkScale: 0.6, barkFoot: "#2f2c29", upper: { set: "birch", from: 0.02, to: 0.09 }, leaves: "deltoid", leafCm: 5, spray: "weeping", hang: 0.7 },
@@ -122,22 +126,43 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "pine", leafCm: 32, spray: "tufts" },
   "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
-  "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "scale", leafCm: 28, spray: "sprays" },
+  "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays" },
   "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts" },
-  "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "pine", leafCm: 42, spray: "tufts" },
+  // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
+  "Torrey pine": { bark: "pine", barkScale: 1.1, leaves: "torreyPine", leafCm: 48, spray: "tufts" },
   "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts" },
   "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts" },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
   "Queen palm": { bark: "palmRings", barkScale: 0.75, leaves: "frond", leafCm: 400, spray: "whole" },
-  "Coast live oak": { bark: "oak", barkScale: 0.9, leaves: "elliptic", leafCm: 5, spray: "alternate", perSpray: 12 },
+  "Coast live oak": { bark: "oak", barkScale: 0.9, leaves: "liveOak", leafCm: 5, spray: "alternate", perSpray: 12 },
   "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "maple", leafCm: 20, spray: "alternate" },
   "Sugar maple": { bark: "ridged", barkScale: 0.8, leaves: "maple", leafCm: 12, spray: "opposite" },
   "Red oak": { bark: "ridged", barkScale: 0.9, leaves: "redOak", leafCm: 17, spray: "alternate" },
   "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "pine", leafCm: 26, spray: "tufts" },
   "White spruce": { bark: "spruce", barkScale: 0.9, leaves: "fir", leafCm: 26, spray: "sprays" },
 };
+
+/**
+ * A look's upper bark colour packed in one number for the shaders (a float holds it exactly): its sRGB bytes,
+ * red · 65536 + green · 256 + blue, plus 1; 0 where it has none.
+ */
+export function upperColorCode(look: ScanLook): number {
+  const hex = look.upper?.color;
+  if (!hex) return 0;
+  if (!/^#?[0-9a-f]{6}$/i.test(hex)) throw new Error(`upper bark colour ${hex}: not #rrggbb`);
+  return parseInt(hex.replace(/^#/, ""), 16) + 1;
+}
+
+/** The sRGB colour (0..1) an upper bark colour code holds (as the shader reads it), or null for none. */
+export function upperColorOf(code: number): [number, number, number] | null {
+  if (code < 0.5) return null;
+  const v = code - 1;
+  const r = Math.floor(v / 65536);
+  const g = Math.floor((v - r * 65536) / 256);
+  return [r / 255, g / 255, (v - r * 65536 - g * 256) / 255];
+}
 
 /** What a species with no look of its own here wears: by its kind of leaf. */
 const BY_KIND: Readonly<Record<TreeSpecies["leafKind"], ScanLook>> = {

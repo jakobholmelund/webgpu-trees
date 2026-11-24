@@ -36,7 +36,7 @@ import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTE
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
-import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase } from "./scans.ts";
+import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow } from "./sprays.ts";
 import { growTree } from "./grow.ts";
 import { PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture } from "./palmAtlas.ts";
@@ -294,13 +294,14 @@ export function createTrees(options: TreesOptions): Trees {
   const packSpecies = () => {
     species.forEach((s, i) => {
       // (Its photographs: its bark's layers, the share of its height the lower gives way to the upper over,
-      // its leaves' row of cards, its bark's scale on each, and its foot's colour where not its bark's.)
+      // its leaves' row of cards, its bark's scale on each, the upper's own colour where it has one (packed:
+      // scans.ts), and its foot's colour where not its bark's.)
       const sl = looks[i] ?? scanLookOf(s, scanOpts?.looks);
       const up = sl.upper;
       const foot = sl.barkFoot ? linear(sl.barkFoot) : null;
       const lower = barkIds.indexOf(sl.bark);
       const upper = up ? barkIds.indexOf(up.set) : -1;
-      speciesData.set([Math.max(0, lower), upper >= 0 ? upper : Math.max(0, lower), up && upper >= 0 ? up.from : 9, up && upper >= 0 ? up.to : 10, leafRowOf.get(i) ?? 0, sl.barkScale ?? 1, up?.scale ?? 1, 0, foot?.r ?? 0, foot?.g ?? 0, foot?.b ?? 0, foot ? 1 : 0], (i * SPECIES_ROWS + 4) * 4);
+      speciesData.set([Math.max(0, lower), upper >= 0 ? upper : Math.max(0, lower), up && upper >= 0 ? up.from : 9, up && upper >= 0 ? up.to : 10, leafRowOf.get(i) ?? 0, sl.barkScale ?? 1, up?.scale ?? 1, upperColorCode(sl), foot?.r ?? 0, foot?.g ?? 0, foot?.b ?? 0, foot ? 1 : 0], (i * SPECIES_ROWS + 4) * 4);
       const leaf = linear(s.leafColor);
       const bark = linear(s.barkColor);
       // (Leaf area per cubic metre of crown, about 0.3 in an open crown to 1.4 in a dense one, half of it
@@ -1467,11 +1468,18 @@ export function createTrees(options: TreesOptions): Trees {
         const kA = wA.div(max(wA.add(wB), float(1e-4)));
         const kB = float(1).sub(kA);
         // (Its colour, light as it adds (the picture is sRGB), scaled from the set's own mean to the species'
-        // bark (paler up the trunk where the species' is), or to its foot's where it has one of its own.)
+        // bark (paler up the trunk where the species' is), or to its foot's where it has one of its own, or up
+        // the stem to the upper bark's where that has one (a Scots pine's copper: its sRGB bytes in one number,
+        // plus one).)
         const albedo = pow(max(colA.rgb.mul(kA).add(colB.rgb.mul(kB)), vec3(0)), vec3(2.2));
         const bark = speciesR.element(sp.add(1)).xyz;
         const paled = mix(bark, vec3(0.42, 0.4, 0.35), vLight.w.mul(0.7));
-        const target = mix(mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), paled, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
+        const upCode = S5.w.sub(1);
+        const upR = floor(upCode.div(65536));
+        const upG = floor(upCode.sub(upR.mul(65536)).div(256));
+        const upB = upCode.sub(upR.mul(65536)).sub(upG.mul(256));
+        const upperCol = select(S5.w.greaterThan(0.5), pow(vec3(upR, upG, upB).div(255), vec3(2.2)), paled);
+        const target = mix(mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), upperCol, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
         const tinted = mix(albedo.mul(target).div(max(L0.xyz, vec3(0.005))), target, float(1).sub(uBarkOn)).mul(vInfo.y);
         // (Its relief: each side's normal from its picture, round the wood (across the picture) and along it
         // (up the picture), as far as the style's `bark` takes it.)

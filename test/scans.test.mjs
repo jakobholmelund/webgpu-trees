@@ -79,3 +79,26 @@ test("the manifest says which sets are generated, as the recipe does", () => {
     assert.equal(set.origin, site === "generated" ? "generated" : "scan", set.id);
   }
 });
+
+test("a Scots pine's upper bark is copper-orange, packed for the shader and read back as it was given", async () => {
+  const { SCAN_LOOKS, upperColorCode, upperColorOf } = await import("../src/scans.ts");
+  const look = SCAN_LOOKS["Scots pine"];
+  assert.ok(look.upper?.color, "Scots pine's upper bark has no colour of its own");
+  const code = upperColorCode(look);
+  // (A float holds it exactly: under 2^24.)
+  assert.ok(code > 0 && code <= 2 ** 24 && Math.fround(code) === code);
+  const [r, g, b] = upperColorOf(code);
+  assert.equal("#" + [r, g, b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join(""), look.upper.color.toLowerCase());
+  // Copper-orange: its hue between red and yellow, more orange than either; saturated, but not a crayon's.
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const hue = (60 * (g - b)) / (max - min);
+  const sat = (max - min) / max;
+  assert.ok(r === max && hue > 12 && hue < 40, `hue ${hue.toFixed(0)}°`);
+  assert.ok(sat > 0.4 && sat < 0.75, `saturation ${sat.toFixed(2)}`);
+  // (No colour, no code; and a species without one keeps its paled bark.)
+  assert.equal(upperColorCode(SCAN_LOOKS.Oak), 0);
+  assert.equal(upperColorOf(0), null);
+  assert.equal(upperColorCode({ ...look, upper: { ...look.upper, color: "#000000" } }), 1);
+  assert.deepEqual(upperColorOf(upperColorCode({ ...look, upper: { ...look.upper, color: "#ffffff" } })), [1, 1, 1]);
+});

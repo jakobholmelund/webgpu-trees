@@ -2,7 +2,10 @@
 // assets/scans.json (what each picture holds and how big it is in the world) and assets/SOURCES.md (who made
 // each, under what licence). Same sources, same tools, same bytes out.
 //
-//   node tools/scans/build.mjs <raw> [--preview <dir>]
+//   node tools/scans/build.mjs <raw> [--preview <dir>] [--only id,id]
+//
+// --only rebuilds just those sets (`bark:id` or `leaves:id` for one of a bark set and a leaf set of one name),
+// keeping the others as assets/scans.json has them.
 //
 // Bark: each set is a tile 1024 texels square, resampled from the scan as a tile (wrapping round its edges,
 // in linear light), with the light left in the photograph evened out over long distances (so a repeat is not
@@ -80,7 +83,8 @@ function prepareGenerated(key) {
   const s = SOURCES[key];
   const dir = join(TMP, "generated", key);
   mkdirSync(dir, { recursive: true });
-  const src = join(raw, key, s.file);
+  const files = [s.file].flat();
+  const src = join(raw, key, files[0]);
   if (s.crop) {
     const { w, h } = sizeOf(src);
     const n = Math.round(Math.min(w, h) * s.crop.size);
@@ -103,71 +107,66 @@ function prepareGenerated(key) {
             }
           sq.set(x, y, c, sum / cnt);
         }
-    // (Made to tile: near its edges it is itself moved half a tile, whose middle runs on across them.)
-    const tiled = new Img(N, N, 3);
-    const band = N * 0.22;
-    for (let y = 0; y < N; y++)
-      for (let x = 0; x < N; x++) {
-        const edge = Math.min(x, N - 1 - x, y, N - 1 - y);
-        const t = Math.min(1, edge / band);
-        const wgt = t * t * (3 - 2 * t);
-        for (let c = 0; c < 3; c++) tiled.set(x, y, c, toSrgb(sq.get(x, y, c) * wgt + sq.get((x + N / 2) % N, (y + N / 2) % N, c) * (1 - wgt)));
-      }
+    if (s.grade) grade(sq, s.grade);
+    let tiled;
+    if (s.crop.overlap) {
+      // (Made to tile by its own overlap: cut where it best runs on into itself, a strip `overlap` wide.)
+      const t = quiltTile(sq, Math.round(N * s.crop.overlap), { streaks: !!s.crop.streaks });
+      tiled = new Img(t.w, t.h, 3, t.data.map(toSrgb));
+    } else {
+      // (Made to tile: near its edges it is itself moved half a tile, whose middle runs on across them.)
+      tiled = new Img(N, N, 3);
+      const band = N * 0.22;
+      for (let y = 0; y < N; y++)
+        for (let x = 0; x < N; x++) {
+          const edge = Math.min(x, N - 1 - x, y, N - 1 - y);
+          const t = Math.min(1, edge / band);
+          const wgt = t * t * (3 - 2 * t);
+          for (let c = 0; c < 3; c++) tiled.set(x, y, c, toSrgb(sq.get(x, y, c) * wgt + sq.get((x + N / 2) % N, (y + N / 2) % N, c) * (1 - wgt)));
+        }
+    }
     writePng(tiled, join(dir, "diff.png"));
     // Its relief from its lightness: lightly smoothed, its long-range light taken off.
-    const L = new Img(N, N, 1);
-    for (let i = 0; i < N * N; i++) L.data[i] = luminance(toLinear(tiled.data[i * 3]), toLinear(tiled.data[i * 3 + 1]), toLinear(tiled.data[i * 3 + 2]));
+    const T = tiled.w;
+    const TH = tiled.h;
+    const L = new Img(T, TH, 1);
+    for (let i = 0; i < T * TH; i++) L.data[i] = luminance(toLinear(tiled.data[i * 3]), toLinear(tiled.data[i * 3 + 1]), toLinear(tiled.data[i * 3 + 2]));
     const fine = blur(L, 1, { passes: 2 });
-    const broad = blur(L, Math.round(N / 16));
+    const broad = blur(L, Math.round(T / 16));
     const hRaw = fine.data.map((v, i) => Math.log(v + 0.01) - Math.log(broad.data[i] + 0.01));
     const lo = quantile(hRaw, 0.01);
     const hi = quantile(hRaw, 0.99);
-    const H = new Img(N, N, 1, hRaw.map((v) => Math.min(1, Math.max(0, (v - lo) / (hi - lo)))));
+    const H = new Img(T, TH, 1, hRaw.map((v) => Math.min(1, Math.max(0, (v - lo) / (hi - lo)))));
     writePng(H, join(dir, "disp.png"));
-    writePng(normalsFrom(H, 5), join(dir, "nor_gl.png"));
+    // (As deep as `crop.relief` says: a smooth bark's mottling is colour, not relief.)
+    writePng(normalsFrom(H, 5 * (s.crop.relief ?? 1)), join(dir, "nor_gl.png"));
     // (Rougher in its furrows.)
-    writePng(new Img(N, N, 1, H.data.map((v) => 0.95 - 0.25 * v)), join(dir, "rough.png"));
+    writePng(new Img(T, TH, 1, H.data.map((v) => 0.95 - 0.25 * v)), join(dir, "rough.png"));
   } else if (s.key === "magenta") {
-    const img = read(src, { channels: 3 });
-    const { w, h } = img;
+    // (Each picture keyed on its own magenta, then set side by side, a gap between, tops aligned: one sheet to
+    // cut its leaves from. Where each lies across it is kept, so a whole leaf is one to a picture.)
+    const keyed = files.map((f) => keyMagenta(read(join(raw, key, f), { channels: 3 }), { unmix: !!s.unmix }));
+    const GAP = 16;
+    const w = keyed.reduce((sum, k) => sum + k.rgb.w, 0) + GAP * (keyed.length - 1);
+    const h = Math.max(...keyed.map((k) => k.rgb.h));
     const rgb = new Img(w, h, 3);
     const alpha = new Img(w, h, 1);
     const L = new Img(w, h, 1);
-    // (The magenta this picture lies on, as sampled from its border: generated pictures' backgrounds run from
-    // #FF00FF to a lighter pink-magenta. How magenta a texel is: red and blue both over green, against the key's.)
-    const border = [];
-    for (let x = 0; x < w; x += 4) for (const y of [2, h - 3]) border.push(x, y);
-    for (let y = 0; y < h; y += 4) for (const x of [2, w - 3]) border.push(x, y);
-    const key = [0, 1, 2].map((k) => {
-      const v = [];
-      for (let i = 0; i < border.length; i += 2) v.push(img.get(border[i], border[i + 1], k));
-      return quantile(v, 0.5);
-    });
-    const keyM = Math.max(0.3, Math.min(key[0], key[2]) - key[1]);
-    for (let i = 0; i < w * h; i++) {
-      const r = img.data[i * 3];
-      const g = img.data[i * 3 + 1];
-      const b = img.data[i * 3 + 2];
-      const m = Math.min(r, b) - g;
-      // (Opaque under a third of the key's magenta-ness, clear over four fifths of it; and as near the key's
-      // own colour as a texel is, clear too.)
-      const near = Math.hypot(r - key[0], g - key[1], b - key[2]);
-      const a = Math.min(Math.min(1, Math.max(0, (0.8 * keyM - m) / (0.45 * keyM))), Math.min(1, Math.max(0, (near - 0.06) / 0.18)));
-      alpha.data[i] = a;
-      // (An edge texel is part leaf, part magenta: the magenta's share taken out of its colour, as it was mixed
-      // in, and any magenta left (red and blue both over green) taken off both, so no pink rim is left.)
-      const un = (o, bg) => Math.min(1, Math.max(0, (o - (1 - a) * bg) / Math.max(a, 0.05)));
-      let rr = a < 1 ? un(r, key[0]) : r;
-      const gg = a < 1 ? un(g, key[1]) : g;
-      let bb = a < 1 ? un(b, key[2]) : b;
-      const spill = Math.max(0, Math.min(rr, bb) - gg);
-      rr -= spill;
-      bb -= spill;
-      rgb.data[i * 3] = rr;
-      rgb.data[i * 3 + 1] = gg;
-      rgb.data[i * 3 + 2] = bb;
-      L.data[i] = luminance(toLinear(rr), toLinear(gg), toLinear(bb));
+    const cols = [];
+    let at = 0;
+    for (const k of keyed) {
+      for (let y = 0; y < k.rgb.h; y++)
+        for (let x = 0; x < k.rgb.w; x++) {
+          const i = y * k.rgb.w + x;
+          const j = y * w + at + x;
+          for (let c = 0; c < 3; c++) rgb.data[j * 3 + c] = k.rgb.data[i * 3 + c];
+          alpha.data[j] = k.alpha.data[i];
+          L.data[j] = k.L.data[i];
+        }
+      cols.push([at, at + k.rgb.w]);
+      at += k.rgb.w + GAP;
     }
+    pictures.set(key, cols);
     writePng(rgb, join(dir, "diff.png"));
     writePng(alpha, join(dir, "alpha.png"));
     // (Its relief: the midrib and veins lighter, and so proud.)
@@ -178,6 +177,308 @@ function prepareGenerated(key) {
   }
   prepared.set(key, dir);
   return dir;
+}
+
+/**
+ * A square picture (linear, M texels) made to tile, M - m texels square, from its own overlap: as a quilt is
+ * pieced, each edge's strip `m` wide laid over the strip at the far side, the two joined along the path where
+ * they differ least (a few texels feathered), first across, then up (that path also running on round the
+ * tile). No ghost of one over the other, as a cross-fade leaves, and no seam of its own. With `streaks` (long
+ * streaks running up the picture, which a path across cannot join where they wander), the picture is first
+ * sheared, a little more each row, until its streaks at the foot lie where those at its head do. Last, it is
+ * turned round on itself (as a tile may be) so its edges fall where it changes least, as far as an overlap.
+ */
+function quiltTile(src, m, { streaks = false } = {}) {
+  const M = src.w;
+  const n = M - m;
+  const C = 3;
+  const F = 2;
+  const diff = (a, ia, b, ib) => {
+    let d = 0;
+    for (let c = 0; c < C; c++) {
+      const e = a.data[ia * C + c] - b.data[ib * C + c];
+      d += e * e;
+    }
+    return d;
+  };
+  // The least-cost path along `len` steps through places lo..hi, moving at most one a step (each move costing
+  // `turn`); `cost(step, place)`. Round, when `round`: it ends beside where it began.
+  const path = (len, lo, hi, cost, round, turn = 0) => {
+    const span = hi - lo + 1;
+    const cs = new Float64Array(len * span);
+    for (let t = 0; t < len; t++) for (let k = 0; k < span; k++) cs[t * span + k] = cost(t, lo + k);
+    const run = (start) => {
+      const D = new Float64Array(len * span).fill(Infinity);
+      const from = new Int16Array(len * span);
+      for (let k = 0; k < span; k++) if (start < 0 || k === start) D[k] = cs[k];
+      for (let t = 1; t < len; t++)
+        for (let k = 0; k < span; k++) {
+          let best = Infinity;
+          let bk = k;
+          for (let dk = -1; dk <= 1; dk++) {
+            const j = k + dk;
+            if (j < 0 || j >= span) continue;
+            const v = D[(t - 1) * span + j] + (dk ? turn : 0);
+            if (v < best) {
+              best = v;
+              bk = j;
+            }
+          }
+          D[t * span + k] = best + cs[t * span + k];
+          from[t * span + k] = bk;
+        }
+      let end = -1;
+      let total = Infinity;
+      for (let k = 0; k < span; k++) {
+        if (start >= 0 && Math.abs(k - start) > 1) continue;
+        if (D[(len - 1) * span + k] < total) {
+          total = D[(len - 1) * span + k];
+          end = k;
+        }
+      }
+      const p = new Int32Array(len);
+      for (let t = len - 1, k = end; t >= 0; t--) {
+        p[t] = lo + k;
+        k = from[t * span + k];
+      }
+      return { p, total };
+    };
+    if (!round) return run(-1).p;
+    let best = null;
+    for (let s = 0; s < span; s += 2) {
+      const r = run(s);
+      if (!best || r.total < best.total) best = r;
+    }
+    return best.p;
+  };
+  const smooth = (d, f = F) => {
+    const t = Math.min(1, Math.max(0, (d + f) / (2 * f)));
+    return t * t * (3 - 2 * t);
+  };
+  // Across: column x < m is the far strip's (x + n) left of the path, its own right of it.
+  const p = path(M, F + 1, m - F - 2, (y, x) => diff(src, y * M + x, src, y * M + x + n), false);
+  let A = new Img(n, M, C);
+  for (let y = 0; y < M; y++)
+    for (let x = 0; x < n; x++) {
+      const w = x < m ? smooth(x - p[y]) : 1;
+      for (let c = 0; c < C; c++) A.data[(y * n + x) * C + c] = x < m ? src.get(x + n, y, c) * (1 - w) + src.get(x, y, c) * w : src.get(x, y, c);
+    }
+  if (streaks) {
+    // Where each streak along the strip at its foot (rows n..M) lies against the strip at its head (0..m): the
+    // shift d(x) taking the one onto the other, smooth and round the tile, matched over a few texels about x.
+    const profile = (y0, y1) => {
+      const out = new Float64Array(n * C);
+      for (let y = y0; y < y1; y++) for (let i = 0; i < n * C; i++) out[i] += A.data[y * n * C + i] / (y1 - y0);
+      return out;
+    };
+    const head = profile(0, m);
+    const foot = profile(n, M);
+    // (Found every K texels, moving at most one texel a step, so the shear never folds or smears the picture;
+    // in between, as the line between.)
+    const D = Math.round(n * 0.06);
+    const K = 4;
+    const R = 8;
+    const steps = Math.floor(n / K);
+    const dk = path(
+      steps,
+      -D,
+      D,
+      (t, sft) => {
+        let e = 0;
+        for (let k = -R; k <= R; k++) {
+          const i = (((t * K + k) % n) + n) % n;
+          const j = (((t * K + k + sft) % n) + n) % n;
+          for (let c = 0; c < C; c++) e += (head[i * C + c] - foot[j * C + c]) ** 2;
+        }
+        return e;
+      },
+      true,
+      0.05,
+    );
+    const d = new Float64Array(n);
+    for (let x = 0; x < n; x++) {
+      const t = x / K;
+      const t0 = Math.floor(t) % steps;
+      const t1 = (t0 + 1) % steps;
+      d[x] = dk[t0] + (dk[t1] - dk[t0]) * (t - Math.floor(t));
+    }
+    // Sheared: row y takes its texels from x + d(x) · y / n (all the way by row n, the head's match).
+    const sheared = new Img(n, M, C);
+    for (let y = 0; y < M; y++) {
+      const f = Math.min(1, y / n);
+      for (let x = 0; x < n; x++) {
+        const sx = x + d[x] * f;
+        const x0 = Math.floor(sx);
+        const t = sx - x0;
+        const a = ((x0 % n) + n) % n;
+        const b = (a + 1) % n;
+        for (let c = 0; c < C; c++) sheared.data[(y * n + x) * C + c] = A.data[(y * n + a) * C + c] * (1 - t) + A.data[(y * n + b) * C + c] * t;
+      }
+    }
+    A = sheared;
+  }
+  // Up: row y < m is the far strip's (y + n) above the path, its own below; the path round the tile. (Feathered
+  // further where streaks, lined up, run on across it: their colours drift rather than step.)
+  const FU = streaks ? Math.round(m * 0.15) : F;
+  const q = path(n, FU + 1, m - FU - 2, (x, y) => diff(A, y * n + x, A, (y + n) * n + x), true);
+  const out = new Img(n, n, C);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const w = y < m ? smooth(y - q[x], FU) : 1;
+      for (let c = 0; c < C; c++) out.data[(y * n + x) * C + c] = y < m ? A.get(x, y + n, c) * (1 - w) + A.get(x, y, c) * w : A.get(x, y, c);
+    }
+  // (Turned round: its first column and row the ones least unlike the ones before them.)
+  const edgeCost = (k, across) => {
+    let e = 0;
+    for (let j = 0; j < n; j++) e += across ? diff(out, j * n + ((k - 1 + n) % n), out, j * n + k) : diff(out, ((k - 1 + n) % n) * n + j, out, k * n + j);
+    return e;
+  };
+  const least = (across) => {
+    const c = Array.from({ length: m }, (_, k) => edgeCost(k, across));
+    return c.indexOf(Math.min(...c));
+  };
+  const sx = least(true);
+  const sy = least(false);
+  if (!sx && !sy) return out;
+  const turned = new Img(n, n, C);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      for (let c = 0; c < C; c++) turned.data[(y * n + x) * C + c] = out.data[(((y + sy) % n) * n + ((x + sx) % n)) * C + c];
+  return turned;
+}
+
+/** Where across its sheet each of a generated source's pictures lies (texels), as prepareGenerated set them. */
+const pictures = new Map();
+
+/**
+ * A picture on magenta keyed out: its coverage where it is not magenta, the magenta's spill taken off its
+ * edges; and its lightness (linear). With `unmix`, each edge texel's coverage is how far it lies from the
+ * magenta towards the leaf beside it (that leaf's own magenta-ness, read off the leaf's inside round about),
+ * and its colour that inside's (a JPEG's colour is smeared further than its lightness: no unmixing gets the
+ * magenta out of a needle's edge), so a thin needle or stalk keeps its own colour, without a pink rim.
+ */
+function keyMagenta(img, { unmix = false } = {}) {
+  const { w, h } = img;
+  const rgb = new Img(w, h, 3);
+  const alpha = new Img(w, h, 1);
+  const L = new Img(w, h, 1);
+  // (The magenta this picture lies on, as sampled from its border: generated pictures' backgrounds run from
+  // #FF00FF to a lighter pink-magenta. How magenta a texel is: red and blue both over green, against the key's.)
+  const border = [];
+  for (let x = 0; x < w; x += 4) for (const y of [2, h - 3]) border.push(x, y);
+  for (let y = 0; y < h; y += 4) for (const x of [2, w - 3]) border.push(x, y);
+  const key = [0, 1, 2].map((k) => {
+    const v = [];
+    for (let i = 0; i < border.length; i += 2) v.push(img.get(border[i], border[i + 1], k));
+    return quantile(v, 0.5);
+  });
+  const keyM = Math.max(0.3, Math.min(key[0], key[2]) - key[1]);
+  // (The leaf's own magenta-ness about each texel: of the texels surely leaf (green over red or blue, and far
+  // from the key's colour), averaged over a few texels round; where none are near, a green leaf's.)
+  let leafM = null;
+  let leafRgb = null;
+  let bgRgb = null;
+  if (unmix) {
+    const sure = new Img(w, h, 1);
+    const sureM = new Img(w, h, 1);
+    const sureC = [0, 1, 2].map(() => new Img(w, h, 1));
+    // (And the magenta round about, which is duller in the shade between needles than at the border: of the
+    // texels surely magenta, averaged over more texels round.)
+    const bg = new Img(w, h, 1);
+    const bgC = [0, 1, 2].map(() => new Img(w, h, 1));
+    for (let i = 0; i < w * h; i++) {
+      const r = img.data[i * 3];
+      const g = img.data[i * 3 + 1];
+      const b = img.data[i * 3 + 2];
+      if (Math.min(r, b) - g > 0.45 * keyM) {
+        bg.data[i] = 1;
+        for (let c = 0; c < 3; c++) bgC[c].data[i] = img.data[i * 3 + c];
+      }
+    }
+    const bw = blur(bg, 6, { wrap: false });
+    const bc = bgC.map((im) => blur(im, 6, { wrap: false }));
+    bgRgb = new Float32Array(w * h * 3);
+    for (let i = 0; i < w * h; i++) for (let c = 0; c < 3; c++) bgRgb[i * 3 + c] = bw.data[i] > 0.02 ? bc[c].data[i] / bw.data[i] : key[c];
+    for (let i = 0; i < w * h; i++) {
+      const r = img.data[i * 3];
+      const g = img.data[i * 3 + 1];
+      const b = img.data[i * 3 + 2];
+      const m = Math.min(r, b) - g;
+      const near = Math.hypot(r - key[0], g - key[1], b - key[2]);
+      if (m < -0.015 && near > 0.5) {
+        sure.data[i] = 1;
+        sureM.data[i] = m;
+        for (let c = 0; c < 3; c++) sureC[c].data[i] = img.data[i * 3 + c];
+      }
+    }
+    // (The colour from the inside right beside it; failing that, from further round, so the clear texels a
+    // leaf's edge is sampled between carry a leaf's colour too.)
+    const wt2 = blur(sure, 1, { wrap: false });
+    const c2 = sureC.map((im) => blur(im, 1, { wrap: false }));
+    const wt8 = blur(sure, 8, { wrap: false });
+    const c8 = sureC.map((im) => blur(im, 8, { wrap: false }));
+    // (Where no leaf is near, as a needle's tip: the picture's leaves' mean.)
+    const all = [0, 1, 2].map((c) => sureC[c].data.reduce((a, v) => a + v, 0) / Math.max(1, sure.data.reduce((a, v) => a + v, 0)));
+    leafRgb = new Float32Array(w * h * 3);
+    for (let i = 0; i < w * h; i++) {
+      const [wt, cs] = wt2.data[i] > 0.02 ? [wt2, c2] : [wt8, c8];
+      for (let c = 0; c < 3; c++) leafRgb[i * 3 + c] = wt.data[i] > 1e-4 ? cs[c].data[i] / wt.data[i] : all[c];
+    }
+    const wt = blur(sure, 4, { wrap: false });
+    const sm = blur(sureM, 4, { wrap: false });
+    leafM = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) leafM[i] = wt.data[i] > 0.01 ? Math.min(0.1 * keyM, sm.data[i] / wt.data[i]) : -0.1;
+  }
+  for (let i = 0; i < w * h; i++) {
+    const r = img.data[i * 3];
+    const g = img.data[i * 3 + 1];
+    const b = img.data[i * 3 + 2];
+    const m = Math.min(r, b) - g;
+    // (Opaque under a third of the key's magenta-ness, clear over four fifths of it; and as near the key's
+    // own colour as a texel is, clear too.)
+    const k = bgRgb ? [bgRgb[i * 3], bgRgb[i * 3 + 1], bgRgb[i * 3 + 2]] : key;
+    const near = Math.hypot(r - k[0], g - k[1], b - k[2]);
+    const kM = Math.min(k[0], k[2]) - k[1];
+    const byM = leafM ? Math.min(1, Math.max(0, ((kM - m) / Math.max(0.05, kM - leafM[i]) - 0.04) / 0.92)) : Math.min(1, Math.max(0, (0.8 * keyM - m) / (0.45 * keyM)));
+    const a = Math.min(byM, Math.min(1, Math.max(0, (near - 0.06) / 0.18)));
+    alpha.data[i] = a;
+    // (An edge texel is part leaf, part magenta: the magenta's share taken out of its colour, as it was mixed
+    // in, and any magenta left (red and blue both over green) taken off both, so no pink rim is left.)
+    const un = (o, bg) => Math.min(1, Math.max(0, (o - (1 - a) * bg) / Math.max(a, 0.05)));
+    const inside = leafRgb && a < 0.98;
+    let rr = inside ? leafRgb[i * 3] : a < 1 ? un(r, key[0]) : r;
+    const gg = inside ? leafRgb[i * 3 + 1] : a < 1 ? un(g, key[1]) : g;
+    let bb = inside ? leafRgb[i * 3 + 2] : a < 1 ? un(b, key[2]) : b;
+    const spill = Math.max(0, Math.min(rr, bb) - gg);
+    rr -= spill;
+    bb -= spill;
+    rgb.data[i * 3] = rr;
+    rgb.data[i * 3 + 1] = gg;
+    rgb.data[i * 3 + 2] = bb;
+    L.data[i] = luminance(toLinear(rr), toLinear(gg), toLinear(bb));
+  }
+  return { rgb, alpha, L };
+}
+
+/**
+ * Bring a generated bark's colour (linear, in place) nearer a real one's: its saturation scaled about each
+ * texel's lightness (`saturation`, 1 as it is), then each channel scaled so its mean is `toward` (sRGB 0..1)
+ * as far as `amount` says (1 all the way); its lightness's pattern kept.
+ */
+function grade(img, { saturation = 1, toward = null, amount = 1 }) {
+  const n = img.w * img.h;
+  for (let i = 0; i < n; i++) {
+    const l = luminance(img.data[i * 3], img.data[i * 3 + 1], img.data[i * 3 + 2]);
+    for (let c = 0; c < 3; c++) img.data[i * 3 + c] = Math.max(0, l + (img.data[i * 3 + c] - l) * saturation);
+  }
+  if (!toward) return;
+  const mean = [0, 1, 2].map((c) => {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += img.data[i * 3 + c];
+    return sum / n;
+  });
+  const f = toward.map((v, c) => Math.pow(toLinear(v) / Math.max(1e-4, mean[c]), amount));
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) img.data[i * 3 + c] = Math.min(1, img.data[i * 3 + c] * f[c]);
 }
 
 /** Normals (OpenGL: y up the picture) from a height picture, `k` its relief's strength, wrapping round. */
@@ -433,19 +734,24 @@ function buildLeaves(set) {
   let { lab, comps } = found;
   if (set.whole) {
     // (A whole leaf whose parts the picture shows apart (a fan's split tips, its threads, dead leaves side by
-    // side): every patch but specks, one leaf.)
+    // side, a pine shoot's needles): every patch but specks, one leaf; one to each picture where the source is
+    // several set side by side.)
+    const cols = pictures.get(key) ?? [[0, w]];
     const keep = comps.filter((c) => c.n >= 40);
-    const one = { id: 0, n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, y0: h, x1: 0, y1: 0 };
+    const merged = cols.map((_, id) => ({ id, n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, y0: h, x1: 0, y1: 0 }));
+    const into = new Map();
     for (const c of keep) {
+      const mx = c.sx / c.n;
+      const one = merged[Math.max(0, cols.findIndex(([a, b]) => mx >= a && mx < b))];
+      into.set(c.id, one.id);
       for (const k of ["n", "sx", "sy", "sxx", "syy", "sxy"]) one[k] += c[k];
       one.x0 = Math.min(one.x0, c.x0);
       one.y0 = Math.min(one.y0, c.y0);
       one.x1 = Math.max(one.x1, c.x1);
       one.y1 = Math.max(one.y1, c.y1);
     }
-    const ids = new Set(keep.map((c) => c.id));
-    lab = lab.map((l) => (ids.has(l) ? 0 : -1));
-    comps = [one];
+    lab = lab.map((l) => into.get(l) ?? -1);
+    comps = merged.filter((c) => c.n > 0);
   }
 
   // The leaves: patches at least a tenth the size of the biggest in their rectangle (not specks, not bits).
@@ -741,13 +1047,16 @@ function bleed(img, levels, ks) {
 
 const manifestFile = join(OUT, "scans.json");
 const prev = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, "utf8")) : { bark: { sets: [] }, leaves: { sets: [] } };
+// (A set not rebuilt is kept as it was made, but at its place now and with what the recipe now says of it.)
+const wanted = (kind, id) => !only || only.includes(id) || only.includes(`${kind}:${id}`);
+const kept = (was, set, extra = {}) => was && { ...was, ...extra, look: set.look, for: set.for };
 const bark = BARK.map((set, layer) => {
-  if (only && !only.includes(set.id)) return prev.bark.sets.find((b) => b.id === set.id);
+  if (!wanted("bark", set.id)) return kept(prev.bark.sets.find((b) => b.id === set.id), set, { layer });
   console.log(`bark ${set.id}`);
   return buildBark(set, layer);
 }).filter(Boolean);
 const leaves = LEAVES.map((set) => {
-  if (only && !only.includes(set.id)) return prev.leaves.sets.find((b) => b.id === set.id);
+  if (!wanted("leaves", set.id)) return kept(prev.leaves.sets.find((b) => b.id === set.id), set);
   console.log(`leaves ${set.id}`);
   return buildLeaves(set);
 }).filter(Boolean);
@@ -769,7 +1078,7 @@ function sourcesMd() {
     "AI-generated pictures. Every scan is **CC0 1.0 Universal** (public domain dedication) as its publisher states for everything",
     "it publishes: ambientCG (" + SITES.ambientcg.licenceUrl + ") and Poly Haven (" + SITES.polyhaven.licenceUrl + "). Credit is not",
     "required; it is given here anyway, with thanks. The **AI-generated** pictures (marked so below) are not CC0 scans: they were",
-    "made for this project with Nano Banana (gemini-nano-banana-2.1), with the owner's approval; their prompts are listed below.",
+    "made for this project with the owner's approval, each with the tool and on the date listed below, with its prompt.",
     "",
     "They are cut, cleaned, resampled and packed by `tools/scans/build.mjs` from the files `tools/scans/fetch.mjs` downloads",
     "(the list is `tools/scans/recipe.mjs`). This file is written by the build.",
@@ -800,7 +1109,7 @@ function sourcesMd() {
   for (const key of used) {
     const s = SOURCES[key];
     if (s.site !== "generated") continue;
-    lines.push(`- \`${s.file}\` (${s.title}): ${s.tool}, ${s.date}. Prompt: "${s.prompt}"`);
+    lines.push(`- ${[s.file].flat().map((f) => `\`${f}\``).join(", ")} (${s.title}): ${s.tool}, ${s.date}. Prompt: "${s.prompt}"`);
   }
   lines.push("", "## Downloaded files", "");
   for (const key of used) {

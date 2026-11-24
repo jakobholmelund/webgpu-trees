@@ -13,31 +13,57 @@
         "id": "eucalyptus",
         "layer": 0,
         "tileCm": [
-          182,
-          182
+          85,
+          85
         ],
-        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "tileFrom": "estimated: patches ~5–17 cm, strips up to ~50 cm long, a blue gum's patches 5–30 cm",
         "meanLinear": [
-          0.108,
-          0.078,
-          0.055
+          0.345,
+          0.315,
+          0.272
         ],
-        "meanColor": "#5c4f42",
-        "roughness": 0.888,
+        "meanColor": "#9f988e",
+        "roughness": 0.778,
         "seams": {
-          "albedo": 1.28,
-          "normal": 1.492
+          "albedo": 0.919,
+          "normal": 1.117
         },
-        "origin": "scan",
-        "look": "smooth, peeling plates, mottled grey-brown-cream (Tasmanian blue gum itself)",
+        "origin": "generated",
+        "look": "a blue gum's lower stem: cream, blue-grey and yellow-green patches under strips of rough brown bark peeling away",
         "for": [
           "Eucalyptus"
         ],
-        "source": "bark_bluegum"
+        "source": "ai_eucalyptus_bark"
+      },
+      {
+        "id": "eucalyptusUpper",
+        "layer": 1,
+        "tileCm": [
+          85,
+          85
+        ],
+        "tileFrom": "estimated: ~10 streaks across, a blue gum's 3–15 cm wide",
+        "meanLinear": [
+          0.376,
+          0.333,
+          0.252
+        ],
+        "meanColor": "#a59c89",
+        "roughness": 0.763,
+        "seams": {
+          "albedo": 0.649,
+          "normal": 0.639
+        },
+        "origin": "generated",
+        "look": "a blue gum's smooth upper stem: long cream, blue-grey and yellow-green streaks, a few ribbons hanging",
+        "for": [
+          "Eucalyptus"
+        ],
+        "source": "ai_eucalyptus_bark_upper"
       },
       {
         "id": "plane",
-        "layer": 1,
+        "layer": 2,
         "tileCm": [
           80,
           80
@@ -64,33 +90,33 @@
       },
       {
         "id": "beech",
-        "layer": 2,
+        "layer": 3,
         "tileCm": [
-          90,
-          180
+          85,
+          85
         ],
-        "tileFrom": "measured: Poly Haven's stated 1.8 m, taken as the length of this 1:2 scan",
+        "tileFrom": "estimated: lenticels ~1.5–3 cm long, a beech's 0.5–2 cm on a young stem, longer on an old",
         "meanLinear": [
-          0.091,
-          0.065,
-          0.035
+          0.303,
+          0.298,
+          0.281
         ],
-        "meanColor": "#554835",
-        "roughness": 0.925,
+        "meanColor": "#959590",
+        "roughness": 0.8,
         "seams": {
-          "albedo": 1.086,
-          "normal": 0.999
+          "albedo": 0.841,
+          "normal": 1.005
         },
-        "origin": "scan",
-        "look": "smooth grey skin with lichen dots and faint horizontal lines",
+        "origin": "generated",
+        "look": "smooth silver-grey skin, darker mottling, small horizontal lenticels and lichen spots",
         "for": [
           "Beech"
         ],
-        "source": "chinese_hackberry_bark"
+        "source": "ai_beech_bark"
       },
       {
         "id": "birch",
-        "layer": 3,
+        "layer": 4,
         "tileCm": [
           70,
           70
@@ -116,7 +142,7 @@
       },
       {
         "id": "oak",
-        "layer": 4,
+        "layer": 5,
         "tileCm": [
           35,
           70
@@ -145,7 +171,7 @@
       },
       {
         "id": "ridged",
-        "layer": 5,
+        "layer": 6,
         "tileCm": [
           215,
           215
@@ -174,7 +200,7 @@
       },
       {
         "id": "pine",
-        "layer": 6,
+        "layer": 7,
         "tileCm": [
           200,
           200
@@ -206,33 +232,33 @@
       },
       {
         "id": "pineFlakes",
-        "layer": 7,
+        "layer": 8,
         "tileCm": [
-          180,
-          180
+          30,
+          30
         ],
-        "tileFrom": "measured: Poly Haven's stated size of the scan",
+        "tileFrom": "estimated: flakes ~2–5 cm, a Scots pine's upper flakes 1–5 cm",
         "meanLinear": [
-          0.334,
-          0.239,
-          0.162
+          0.466,
+          0.126,
+          0.047
         ],
-        "meanColor": "#9c8670",
-        "roughness": 0.683,
+        "meanColor": "#b6633d",
+        "roughness": 0.782,
         "seams": {
-          "albedo": 1.158,
-          "normal": 1.211
+          "albedo": 0.81,
+          "normal": 0.956
         },
-        "origin": "scan",
-        "look": "thin papery flakes, orange on a pale ground (a Scots pine's upper stem, once tinted)",
+        "origin": "generated",
+        "look": "thin papery flakes, copper-orange, peeling in small curls (a Scots pine's upper stem and limbs)",
         "for": [
           "Scots pine"
         ],
-        "source": "japanese_zelkova_bark"
+        "source": "ai_scotspine_upper"
       },
       {
         "id": "spruce",
-        "layer": 8,
+        "layer": 9,
         "tileCm": [
           60,
           60
@@ -260,7 +286,7 @@
       },
       {
         "id": "douglas",
-        "layer": 9,
+        "layer": 10,
         "tileCm": [
           120,
           120
@@ -286,7 +312,7 @@
       },
       {
         "id": "fibrous",
-        "layer": 10,
+        "layer": 11,
         "tileCm": [
           194,
           194
@@ -313,7 +339,7 @@
       },
       {
         "id": "palmRings",
-        "layer": 11,
+        "layer": 12,
         "tileCm": [
           65,
           130
@@ -341,7 +367,7 @@
       },
       {
         "id": "palmLattice",
-        "layer": 12,
+        "layer": 13,
         "tileCm": [
           75,
           75
@@ -367,7 +393,7 @@
       },
       {
         "id": "palmPineapple",
-        "layer": 13,
+        "layer": 14,
         "tileCm": [
           120,
           120
@@ -734,11 +760,153 @@
         ],
         "look": "palmate maple leaves",
         "for": [
-          "Plane",
           "California sycamore",
           "Sugar maple"
         ],
         "source": "LeafSet010"
+      },
+      {
+        "id": "londonPlane",
+        "size": [
+          512,
+          1200
+        ],
+        "lengthCm": 30,
+        "tone": false,
+        "meanLinear": [
+          0.175,
+          0.258,
+          0.068
+        ],
+        "meanColor": "#748b4a",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 604,
+            "w": 220,
+            "h": 291,
+            "base": [
+              113.5,
+              285
+            ],
+            "tip": [
+              112,
+              6
+            ],
+            "size": 0.966
+          },
+          {
+            "x": 228,
+            "y": 604,
+            "w": 209,
+            "h": 291,
+            "base": [
+              107.5,
+              285
+            ],
+            "tip": [
+              103.5,
+              6
+            ],
+            "size": 0.966
+          },
+          {
+            "x": 4,
+            "y": 899,
+            "w": 219,
+            "h": 291,
+            "base": [
+              106,
+              285
+            ],
+            "tip": [
+              107,
+              5
+            ],
+            "size": 0.966
+          },
+          {
+            "x": 220,
+            "y": 4,
+            "w": 220,
+            "h": 292,
+            "base": [
+              112,
+              286
+            ],
+            "tip": [
+              108.5,
+              6
+            ],
+            "size": 0.971
+          },
+          {
+            "x": 4,
+            "y": 308,
+            "w": 216,
+            "h": 292,
+            "base": [
+              109,
+              286
+            ],
+            "tip": [
+              109,
+              6
+            ],
+            "size": 0.971
+          },
+          {
+            "x": 224,
+            "y": 308,
+            "w": 219,
+            "h": 292,
+            "base": [
+              112.5,
+              285
+            ],
+            "tip": [
+              111.5,
+              6
+            ],
+            "size": 0.969
+          },
+          {
+            "x": 227,
+            "y": 899,
+            "w": 234,
+            "h": 287,
+            "base": [
+              121,
+              280
+            ],
+            "tip": [
+              115,
+              6
+            ],
+            "size": 0.952
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 212,
+            "h": 300,
+            "base": [
+              111,
+              294
+            ],
+            "tip": [
+              107,
+              5
+            ],
+            "size": 1
+          }
+        ],
+        "look": "palmate London plane leaves, five-lobed, on long stalks",
+        "for": [
+          "Plane"
+        ],
+        "source": "ai_plane_leaves"
       },
       {
         "id": "round",
@@ -1302,10 +1470,152 @@
         ],
         "look": "elliptic leaves, toothed",
         "for": [
-          "Coast live oak",
           "Shrub"
         ],
         "source": "LeafSet003"
+      },
+      {
+        "id": "liveOak",
+        "size": [
+          512,
+          784
+        ],
+        "lengthCm": 6,
+        "tone": false,
+        "meanLinear": [
+          0.066,
+          0.107,
+          0.034
+        ],
+        "meanColor": "#495c34",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 254,
+            "y": 276,
+            "w": 124,
+            "h": 248,
+            "base": [
+              64.5,
+              241
+            ],
+            "tip": [
+              60,
+              6
+            ],
+            "size": 0.919
+          },
+          {
+            "x": 4,
+            "y": 276,
+            "w": 120,
+            "h": 252,
+            "base": [
+              58.5,
+              246
+            ],
+            "tip": [
+              58.5,
+              6
+            ],
+            "size": 0.937
+          },
+          {
+            "x": 139,
+            "y": 4,
+            "w": 129,
+            "h": 257,
+            "base": [
+              67.5,
+              251
+            ],
+            "tip": [
+              63.5,
+              5
+            ],
+            "size": 0.956
+          },
+          {
+            "x": 382,
+            "y": 276,
+            "w": 124,
+            "h": 245,
+            "base": [
+              58,
+              239
+            ],
+            "tip": [
+              59,
+              6
+            ],
+            "size": 0.908
+          },
+          {
+            "x": 128,
+            "y": 276,
+            "w": 122,
+            "h": 249,
+            "base": [
+              62,
+              243
+            ],
+            "tip": [
+              60,
+              6
+            ],
+            "size": 0.925
+          },
+          {
+            "x": 272,
+            "y": 4,
+            "w": 126,
+            "h": 255,
+            "base": [
+              56.5,
+              249
+            ],
+            "tip": [
+              61,
+              6
+            ],
+            "size": 0.947
+          },
+          {
+            "x": 4,
+            "y": 532,
+            "w": 117,
+            "h": 244,
+            "base": [
+              63,
+              238
+            ],
+            "tip": [
+              56,
+              5
+            ],
+            "size": 0.902
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 131,
+            "h": 268,
+            "base": [
+              62.5,
+              262
+            ],
+            "tip": [
+              61.5,
+              6
+            ],
+            "size": 1
+          }
+        ],
+        "look": "small cupped holly-like coast live oak leaves, spiny-toothed, glossy dark green",
+        "for": [
+          "Coast live oak"
+        ],
+        "source": "ai_liveoak_leaves"
       },
       {
         "id": "lance",
@@ -1439,10 +1749,62 @@
         ],
         "look": "sprays of scale leaves",
         "for": [
-          "Western red cedar",
-          "Monterey cypress"
+          "Western red cedar"
         ],
         "source": "LeafSet019"
+      },
+      {
+        "id": "cypress",
+        "size": [
+          768,
+          544
+        ],
+        "lengthCm": 30,
+        "tone": false,
+        "meanLinear": [
+          0.06,
+          0.094,
+          0.024
+        ],
+        "meanColor": "#45572b",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 279,
+            "h": 524,
+            "base": [
+              135.5,
+              518
+            ],
+            "tip": [
+              143.5,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 287,
+            "y": 4,
+            "w": 271,
+            "h": 491,
+            "base": [
+              124,
+              485
+            ],
+            "tip": [
+              129,
+              6
+            ],
+            "size": 0.935
+          }
+        ],
+        "look": "Monterey cypress branchlets of scale leaves, dense, dark green",
+        "for": [
+          "Monterey cypress"
+        ],
+        "source": "ai_cypress_spray"
       },
       {
         "id": "pine",
@@ -1496,7 +1858,6 @@
           "Scots pine",
           "Corsican pine",
           "Monterey pine",
-          "Torrey pine",
           "Aleppo pine",
           "Stone pine",
           "Eastern white pine",
@@ -1717,6 +2078,59 @@
           "Eucalyptus"
         ],
         "source": "ai_eucalyptus_leaves"
+      },
+      {
+        "id": "torreyPine",
+        "size": [
+          768,
+          544
+        ],
+        "lengthCm": 50,
+        "tone": false,
+        "meanLinear": [
+          0.157,
+          0.161,
+          0.123
+        ],
+        "meanColor": "#6e7062",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 273,
+            "h": 524,
+            "base": [
+              128,
+              518
+            ],
+            "tip": [
+              110,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 281,
+            "y": 4,
+            "w": 259,
+            "h": 517,
+            "base": [
+              119.5,
+              511
+            ],
+            "tip": [
+              121,
+              7
+            ],
+            "size": 0.986
+          }
+        ],
+        "look": "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles",
+        "for": [
+          "Torrey pine"
+        ],
+        "source": "ai_torrey_shoot"
       },
       {
         "id": "frond",

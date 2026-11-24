@@ -748,14 +748,21 @@ and leans its own way.
 
 The realistic look wears photographs: scanned bark and scanned leaves, CC0
 from [ambientCG](https://ambientcg.com) and [Poly Haven](https://polyhaven.com),
-and, where no scan exists, a few AI-generated pictures (a silver birch's bark,
-a Canary palm's trunk and frond, a blue gum's sickle leaves, the palms' fans,
-queen palm frond, dead skirt and pineapple cut, and the painted fronds and fans
-of the other looks), all credited in
-`assets/SOURCES.md` (the generated ones marked so: they are not CC0).
+and, where no scan exists, AI-generated pictures (a silver birch's bark, a
+beech's, a blue gum's rough stocking and smooth streaked stem, a Scots pine's
+copper upper flakes; a Canary palm's trunk and frond, a blue gum's sickle
+leaves, a London plane's leaves, a coast live oak's, a Monterey cypress's
+sprays, a Torrey pine's shoots; the palms' fans, queen palm frond, dead skirt
+and pineapple cut, and the painted fronds and fans of the other looks), all
+credited in `assets/SOURCES.md` with the tool and the prompt each was made with
+(the generated ones marked so: they are not CC0). A generated bark is pieced
+into a tile from its own overlap, along the path where its two edges differ
+least (its streaks first lined up, where it has long ones), and its relief
+read from its lightness; a generated sheet of leaves is keyed off its magenta,
+each edge taking the colour of the leaf beside it, so no pink rim is left.
 `tools/scans/fetch.mjs` downloads the sources, `tools/scans/build.mjs` makes
 `assets/` from them (`tools/scans/recipe.mjs` lists both, and how each is cut).
-8.3 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
+10.5 MB of AVIF (4:4:4 for the normal maps, which WebP's halved colour planes
 spoil).
 
 - **Bark** is a set a species wears (`scans.ts` `SCAN_LOOKS`): a tile of
@@ -771,7 +778,9 @@ spoil).
   the trunk where the species' is); its relief lights each ridge's sunny side,
   and the sky's light is less deep in its furrows, where moss gathers first.
   A species may give way to a second set up its stem, raggedly, in tongues up
-  the furrows: a Scots pine's plates to its orange flakes, a birch's black
+  the furrows: a Scots pine's plates to its copper flakes (which take a colour
+  of their own, not its bark's paled), a blue gum's rough stocking to its
+  smooth streaks, a birch's black
   foot to its white. Twigs stay a twig's dark grey-brown. Only the near tier's
   wood wears them; further off the bark is drawn as before.
 - **Leaves** are a sheet of single leaves a species wears, cut from a scan
