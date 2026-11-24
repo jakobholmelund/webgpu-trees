@@ -114,7 +114,7 @@ export interface Trees {
   readonly pieces: { dabs: number; wood: number; sheets: number }[];
   /** Once a frame, before rendering. */
   update(renderer: THREE.WebGPURenderer, camera: THREE.PerspectiveCamera, timeS: number): void;
-  /** How many trees each tier drew last frame: read back from the graphics card, so not every frame. */
+  /** How many trees each tier drew last frame (none for a tier `show` hides, or with no trees): read back from the graphics card, so not every frame. */
   countDrawn(renderer: THREE.WebGPURenderer): Promise<number[]>;
   /**
    * Read the species' colours, light and stiffness again (or from another list in the same order). What
@@ -1361,9 +1361,13 @@ export function createTrees(options: TreesOptions): Trees {
       speciesAttr.needsUpdate = true;
     },
     async countDrawn(renderer) {
-      const buf = new Uint32Array(await renderer.getArrayBufferAsync(dabArgs));
       const out = [0, 0, 0];
-      for (let t = 0; t < TIERS; t++) for (let v = 0; v < V; v++) out[t] += buf[(t * V + v) * 5 + 1];
+      // (No trees: nothing is culled, and the counts were never on the graphics card to read back.)
+      if (N === 0 || V === 0) return out;
+      const buf = new Uint32Array(await renderer.getArrayBufferAsync(dabArgs));
+      // (A tier counts only as drawn when its meshes are shown: `show`.)
+      const shown = [show.near, show.mid, show.far].map((on) => on && (show.wood || show.leaves));
+      for (let t = 0; t < TIERS; t++) if (shown[t]) for (let v = 0; v < V; v++) out[t] += buf[(t * V + v) * 5 + 1];
       return out;
     },
     dispose() {
