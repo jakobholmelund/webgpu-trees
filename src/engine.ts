@@ -19,7 +19,7 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, texture3D, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
 
 /** The painted look's brush marks' texels (dabs.ts makes them as a texture). */
@@ -30,6 +30,7 @@ function makeDabPixels(): Pixels {
   return { data: img.data, width: img.width, height: img.height };
 }
 import { leafAtlasPixels } from "./leaves.ts";
+import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToFit } from "./light.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
@@ -123,8 +124,10 @@ export interface Trees {
   /**
    * Work out the trees' shade on the ground over an area (`cell` metres to a texel), for the sun as
    * `environment.sun` has it now: how much of the sun reaches each place past the crowns, which take it
-   * as their leaves do (exp(-k L) over the leafy shell it crosses, the crown as its ellipsoid). The ground
-   * is taken as level at each tree's foot. Do it again when the sun has moved.
+   * as their leaves do (exp(-k L) over the leaves and wood it crosses, in each tree's own box of light, as
+   * far as the style's `structure` says, and over its ellipsoid's leafy shell for the rest), so a crown's
+   * shadow has its gaps. The ground is taken as level at each tree's foot. Do it again when the sun has
+   * moved, or `structure` or `density` has changed.
    */
   bakeShade(area: { x0: number; z0: number; width: number; depth: number; cell: number }): void;
   /**
@@ -194,6 +197,8 @@ export function createTrees(options: TreesOptions): Trees {
   // (A lobed look's crowns gathered into lobes, which their dabs are lit over: lobes.ts.)
   const lobeShape = LOOK_LOBES[look];
   const lobes = lobed ? grown.map((g) => crownLobes(g, Math.min(MAX_LOBES, lobeCount(g, lobeShape.share, lobeShape.least, lobeShape.most)))) : [];
+  // (Each variant's box of light: its own leaves and wood, and the sky they leave it. light.ts.)
+  const volumes: LightVolume[] = grown.map((g, i) => bakeLight(g, { lai: leafAreaIndex(species[plan.variants[i].species].openness) }));
   const detail: TreeDetail = { ...DEFAULT_DETAIL };
   const show = { near: true, mid: true, far: true, wood: true, leaves: true };
 
@@ -252,6 +257,23 @@ export function createTrees(options: TreesOptions): Trees {
   lobes.forEach((list, v) => list.slice(0, MAX_LOBES).forEach((l, i) => lobeData.set([l.x, l.y, l.z, l.radius], (v * MAX_LOBES + i) * 4)));
   const lobeAttr = new THREE.StorageBufferAttribute(lobeData, 4);
   const lobesR = storage(lobeAttr, "vec4", lobeData.length / 4).toReadOnly();
+  // (Each variant's box of light: its corner and size in its own frame, two rows; its cells in one 3D texture.)
+  const lightBoxData = new Float32Array(Math.max(1, V) * 8);
+  volumes.forEach((vol, v) => lightBoxData.set([...vol.min, 0, ...vol.size, 0], v * 8));
+  const lightBoxAttr = new THREE.StorageBufferAttribute(lightBoxData, 4);
+  const lightBoxR = storage(lightBoxAttr, "vec4", lightBoxData.length / 4).toReadOnly();
+  const lightPack = packLightAtlas(volumes);
+  // (The sky is in the texture now; the ground's shade marches only the leaves.)
+  for (const vol of volumes) vol.sky = new Float32Array(0);
+  const lightTex = new THREE.Data3DTexture(lightPack.data, lightPack.width, lightPack.height, lightPack.depth);
+  lightTex.format = THREE.RGFormat;
+  lightTex.type = THREE.UnsignedByteType;
+  lightTex.colorSpace = THREE.NoColorSpace;
+  lightTex.magFilter = lightTex.minFilter = THREE.LinearFilter;
+  lightTex.generateMipmaps = false;
+  lightTex.wrapS = lightTex.wrapT = lightTex.wrapR = THREE.ClampToEdgeWrapping;
+  lightTex.unpackAlignment = 1;
+  lightTex.needsUpdate = true;
 
   // The lists: for each variant, a run of places for each tier, as many as it has trees.
   const visibleAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, N * TIERS)), 1);
@@ -321,6 +343,8 @@ export function createTrees(options: TreesOptions): Trees {
   const uLeafSize = uniform(0.22);
   /** throughPower, throughWarp, throughVary, moss. */
   const uThrough = uniform(new THREE.Vector4(4, 0, 0, 0));
+  /** structure, density (styles.ts). */
+  const uLight = uniform(new THREE.Vector4(1, 1, 0, 0));
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -398,7 +422,7 @@ export function createTrees(options: TreesOptions): Trees {
     // (Its yaw's cosine and sine, once: every turn into and out of the tree's frame uses them.)
     const yawC = cos(r0.w);
     const yawS = sin(r0.w);
-    return { vrow0, vrow1, r0, r1, r2, r3, r4, srow, yawC, yawS };
+    return { vrow0, vrow1, r0, r1, r2, r3, r4, srow, yawC, yawS, tier: t };
   };
   type TreeRows = ReturnType<typeof treeOf>;
 
@@ -472,12 +496,84 @@ export function createTrees(options: TreesOptions): Trees {
   };
 
   /**
+   * Steps a ray towards the sun is marched in through a tree's box of light, by tier: fewer far off, where a
+   * dab is a few pixels and there are thousands of trees. Each step is put at a place of its own along its
+   * share of the way, so fewer steps are as bright on the whole, only rougher dab to dab.
+   */
+  const LIGHT_STEPS = [6, 3, 3];
+  /**
+   * What a tree's own leaves and wood leave of the sun and the sky at `at` (the world), from its variant's box of
+   * light (light.ts): the point carried back into the variant's frame (the fit undone), and marched from there
+   * towards the sun, the sun's direction stretched as the crown is, adding up the extinction crossed (Monsi and
+   * Saeki: exp(-sum)), in its tier's LIGHT_STEPS steps each a share of the way out of the box, put at a place along its share
+   * of its own (`seed`, 0..1, a piece's own number: the same every frame); the sky, read where it is.
+   */
+  const volumeAt = (T: TreeRows, at: Vec3, seed: Float) => {
+    const fit = fitOf(T);
+    const vi = uint(T.r3.w);
+    const lo = lightBoxR.element(vi.mul(2)).xyz;
+    const span = lightBoxR.element(vi.mul(2).add(1)).xyz;
+    // (Into the tree's frame, unleant, unstretched, unmirrored: fitOf's `point` undone.)
+    const l = dirToTree(T, at.sub(T.r0.xyz));
+    const py = select(l.y.lessThan(T.r1.y), l.y.div(max(fit.trunkUp, float(1e-4))), T.vrow0.y.add(l.y.sub(T.r1.y).div(max(fit.crownUp, float(1e-4)))));
+    const p = vec3(l.x.sub(T.r3.x.mul(l.y)).mul(T.r3.z).div(fit.across), py, l.z.sub(T.r3.y.mul(l.y)).div(fit.across));
+    const s = dirToTree(T, uSun);
+    const d = normalize(vec3(s.x.sub(T.r3.x.mul(s.y)).mul(T.r3.z).div(fit.across), s.y.div(fit.crownUp), s.z.sub(T.r3.y.mul(s.y)).div(fit.across)));
+    const [cx, cy, cz] = LIGHT_CELLS;
+    const cell = span.div(vec3(cx, cy, cz));
+    // (Where the ray leaves the box.)
+    const safe = (c: Float): Float => select(c.abs().lessThan(1e-5), float(1e-5), c);
+    const inv = vec3(1).div(vec3(safe(d.x), safe(d.y), safe(d.z)));
+    const ta = lo.sub(p).mul(inv);
+    const tb = lo.add(span).sub(p).mul(inv);
+    const tFar = max(ta, tb);
+    const t1 = min(min(tFar.x, tFar.y), tFar.z);
+    const tNear = min(ta, tb);
+    // (The box's cells are a blur of the leaves about a metre wide: from a shoot on the crown's sunny side, the
+    // first cell and a half towards the sun is mostly its own and its neighbours' blur, which would shade it as
+    // if it were inside. The shoot's own side away from the sun is its facing's to darken.)
+    const reach = min(min(cell.x, cell.y), cell.z).mul(1.5);
+    const t0 = max(max(max(tNear.x, tNear.y), tNear.z), reach);
+    const steps = LIGHT_STEPS[T.tier];
+    const dt = max(t1.sub(t0), float(0)).div(steps);
+    // (Its variant's slot in the texture.)
+    const col = floor(T.r3.w.div(lightPack.perColumn).add(1e-3));
+    const offset = vec3(col.mul(cx), 0, T.r3.w.sub(col.mul(lightPack.perColumn)).mul(cz));
+    const dims = vec3(lightPack.width, lightPack.height, lightPack.depth);
+    const read = (q: Vec3): Vec4 => {
+      const texel = clamp(q.sub(lo).div(span).mul(vec3(cx, cy, cz)), vec3(0.5), vec3(cx - 0.5, cy - 0.5, cz - 0.5)).add(offset);
+      return texture3D(lightTex, texel.div(dims), float(0));
+    };
+    const jitter = seed.mul(12.9898).add(78.233).sin().mul(43758.5453).fract();
+    // (Only where the style asks for it: with `structure` 0 the reads are skipped, the branch the same for all.)
+    const got = Fn(() => {
+      const r = vec2(0, 1).toVar();
+      If(uLight.x.greaterThan(0), () => {
+        let tau: Float = float(0);
+        for (let i = 0; i < steps; i++) {
+          const q = read(p.add(d.mul(t0.add(dt.mul(jitter.add(i)))))).r;
+          tau = tau.add(q.mul(q));
+        }
+        tau = tau.mul(dt).mul(SIGMA_MAX).mul(select(t1.greaterThan(t0), float(1), float(0)));
+        // (The sky: read a cell out from the crown's middle, past the same blur; at the nearest cell where a point
+        // is past the box's sides, whose outermost cells see it all.)
+        const mid = lo.add(span.mul(0.5));
+        const out = normalize(vec3(p.x.sub(mid.x), p.y.sub(mid.y).mul(0.5), p.z.sub(mid.z)).add(vec3(0, 1e-3, 0)));
+        r.assign(vec2(tau, read(p.add(out.mul(cell))).g));
+      });
+      return r;
+    })();
+    return { tau: got.x, sky: got.y };
+  };
+
+  /**
    * The light on a piece of the tree at `at` (the world) facing `n` (its crown's form, left out): the sun, as
    * much of it as gets through the crown between (Monsi and Saeki: it falls off as exp(-k L) over the length L
-   * of crown it crosses, the crown taken as its ellipsoid), and the sky, as much as the crown above lets
-   * through; and both as much as its stand leaves it (`standOn`).
+   * of crown it crosses), and the sky, as much as the crown above lets through; and both as much as its stand
+   * leaves it (`standOn`). The crown is its own leaves and wood (`volumeAt`) as far as the style's `structure`
+   * says, and its ellipsoid for the rest; `seed` is the piece's own number, 0..1.
    */
-  const crownAt = (T: TreeRows, at: Vec3, n?: Vec3) => {
+  const crownAt = (T: TreeRows, at: Vec3, n?: Vec3, seed?: Float) => {
     const k = T.srow(3).x.mul(uStyle3.x);
     const ry = max(T.r1.x.sub(T.r1.y).mul(0.5), float(0.05));
     const rx = max(T.r1.z, float(0.05));
@@ -498,8 +594,12 @@ export function createTrees(options: TreesOptions): Trees {
     // what the ellipsoid counts is air about a narrower crown.)
     const shell = max(T.srow(3).y, float(0.15)).mul(min(rx, ry));
     const leafy = (d: Vec3): Float => min(max(crossing(d).sub(min(rx, ry).mul(0.18)), float(0)), shell.mul(2));
-    const sunIn = exp(k.negate().mul(leafy(uSun)));
-    const sky = mix(float(0.4), float(1), exp(k.negate().mul(0.6).mul(leafy(vec3(0, 1, 0)))));
+    const vol = volumeAt(T, at, seed ?? float(0.5));
+    // (Its own leaves taken as they are, as thick as the style's `density` says: `selfShade` was the ellipsoid's
+    // amends for a crown with no gaps. The sky a piece sees past them: never less than what the leaves pass on
+    // to one another.)
+    const sunIn = mix(exp(k.negate().mul(leafy(uSun))), exp(vol.tau.mul(uLight.y).negate()), uLight.x);
+    const sky = mix(mix(float(0.4), float(1), exp(k.negate().mul(0.6).mul(leafy(vec3(0, 1, 0))))), mix(float(0.3), float(1), pow(vol.sky, uLight.y)), uLight.x);
     const cloud = world.sun ? world.sun(vec2(at.x, at.z)) : float(1);
     // (Which way the crown as a whole faces here: its ellipsoid's normal. The shape a painter lights first.)
     const form = normalize(p.div(scale));
@@ -697,7 +797,10 @@ export function createTrees(options: TreesOptions): Trees {
       // the clump as far as `round` says (the crown's form first, then its clumps'); lit as one stroke of
       // paint, in steps.
       const toEye = normalize(cameraPosition.sub(at));
-      const C = crownAt(T, at);
+      // (A far dab stands for a whole gathered group of clumps, its centre deep among them: lit as the group's
+      // outside is, half its size out along its facing, as the near leaves it hands over to are.)
+      const litAt = t === 2 ? at.add(dirToWorld(T, fit.normal(aNormal.xyz)).mul(aDab.z.mul(fit.size).mul(0.5))) : at;
+      const C = crownAt(T, litAt, undefined, sheet ? own.add(aDab.x.mul(0.37)).add(aDab.y.mul(0.61)) : own);
       // (A card: its own face, turned towards the eye as far as `faceEye` says, and lit from the side the eye
       // sees, as a leaf is: the other side's light is what comes through it.)
       const face0 = dirToWorld(T, fit.normal(aOffset.xyz));
@@ -713,7 +816,8 @@ export function createTrees(options: TreesOptions): Trees {
       const tone = float(1).add(jit.mul(leaf.w).mul(0.6));
       let albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
       // (Deep in the crown the leaves see little sky as well as little sun: the crown's own shade.)
-      const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w));
+      // (Less so where the crown's own leaves say how much sky it sees: `structure`.)
+      const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w.mul(float(1).sub(uLight.x.mul(0.7)))));
       // (The sun through the leaves, to an eye looking towards it: its colour, and how thin the crown is here.
       // The rest is the leaf's, worked out pixel by pixel: `throughView`.)
       const thin = crownThin(C, aNormal.w, own);
@@ -828,7 +932,7 @@ export function createTrees(options: TreesOptions): Trees {
       const side = normalize(cross(vec3(0, 1, 0), toEye).add(vec3(1e-4, 0, 0)));
       position = axis.add(side.mul(aDab.x.mul(aNormal.x).mul(fit.wood)));
       const n = normalize(side.mul(aDab.x).add(normalize(vec3(toEye.x, 0, toEye.z).add(vec3(0, 0, 1e-4))).mul(0.4)));
-      const C = crownAt(T, position, n);
+      const C = crownAt(T, position, n, aDab.y.mul(0.5).add(0.5));
       const bark = T.srow(1);
       colour = intoAir(bark.xyz.mul(barkTone(T)).mul(mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, n, float(0.3)))), position);
     }
@@ -986,7 +1090,7 @@ export function createTrees(options: TreesOptions): Trees {
     const surface = moved.add(radial.mul(r0.mul(keepThin)));
     const at = toWorld(T, surface);
     const nWorld = dirToWorld(T, fit.radial(aNormal));
-    const C = crownAt(T, at, nWorld);
+    const C = crownAt(T, at, nWorld, dot(positionGeometry, vec3(0.731, 1.37, 0.513)).fract());
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)
     const pale = bark.w.mul(smoothstep(float(0.05), float(0.5), surface.y.div(T.r1.x)));
@@ -1114,6 +1218,9 @@ export function createTrees(options: TreesOptions): Trees {
     const trans = new Float32Array(nx * nz).fill(1);
     if (sun.y > 0.02) {
       const ks = species.map((sp) => 0.5 * (0.3 + (1 - sp.openness) * 1.1));
+      const structure = Math.min(1, Math.max(0, style.structure));
+      const density = style.density;
+      const sunArr = [sun.x, sun.y, sun.z];
       for (const p of plan.placements) {
         const s = p.size;
         const ry = Math.max(0.05, (s.height - s.crownBase) / 2);
@@ -1123,31 +1230,54 @@ export function createTrees(options: TreesOptions): Trees {
         const k = ks[plan.variants[p.variant].species];
         const shell = Math.max(sp.foliageDepth, 0.15) * Math.min(rx, ry);
         const air = Math.min(rx, ry) * 0.18;
-        // (Where the crown's shadow falls: its centre carried down the sun's ray to the ground at its foot.)
-        const sx = p.x - (sun.x * cy) / sun.y;
-        const sz = p.z - (sun.z * cy) / sun.y;
-        const reach = Math.max(rx, ry) / Math.max(sun.y, 0.15) + rx;
-        const i0 = Math.max(0, Math.floor((sx - reach - area.x0) / area.cell));
-        const i1 = Math.min(nx - 1, Math.ceil((sx + reach - area.x0) / area.cell));
-        const j0 = Math.max(0, Math.floor((sz - reach - area.z0) / area.cell));
-        const j1 = Math.min(nz - 1, Math.ceil((sz + reach - area.z0) / area.cell));
+        // (Where the crown's shadow may fall: its box of light's corners carried down the sun's ray to the
+        // ground at its foot, and its ellipsoid's.)
+        const vol = volumes[p.variant];
+        const fit = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, leanX: p.leanX, leanZ: p.leanZ, mirror: p.mirror, size: s, grown: grown[p.variant].size };
+        let sx0 = p.x - (sun.x * cy) / sun.y - rx - Math.max(rx, ry) / Math.max(sun.y, 0.15);
+        let sx1 = p.x - (sun.x * cy) / sun.y + rx + Math.max(rx, ry) / Math.max(sun.y, 0.15);
+        let sz0 = p.z - (sun.z * cy) / sun.y - rx - Math.max(rx, ry) / Math.max(sun.y, 0.15);
+        let sz1 = p.z - (sun.z * cy) / sun.y + rx + Math.max(rx, ry) / Math.max(sun.y, 0.15);
+        if (structure > 0) {
+          for (let c = 0; c < 8; c++) {
+            const w = fitToWorld(fit, [vol.min[0] + (c & 1 ? vol.size[0] : 0), vol.min[1] + (c & 2 ? vol.size[1] : 0), vol.min[2] + (c & 4 ? vol.size[2] : 0)]);
+            const down = (w[1] - p.y) / sun.y;
+            sx0 = Math.min(sx0, w[0] - sun.x * down);
+            sx1 = Math.max(sx1, w[0] - sun.x * down);
+            sz0 = Math.min(sz0, w[2] - sun.z * down);
+            sz1 = Math.max(sz1, w[2] - sun.z * down);
+          }
+        }
+        const i0 = Math.max(0, Math.floor((sx0 - area.x0) / area.cell));
+        const i1 = Math.min(nx - 1, Math.ceil((sx1 - area.x0) / area.cell));
+        const j0 = Math.max(0, Math.floor((sz0 - area.z0) / area.cell));
+        const j1 = Math.min(nz - 1, Math.ceil((sz1 - area.z0) / area.cell));
         const dx = sun.x / rx;
         const dy = sun.y / ry;
         const dz = sun.z / rx;
         const a = dx * dx + dy * dy + dz * dz;
+        const ray = dirToFit(fit, sunArr);
         for (let j = j0; j <= j1; j++) {
           for (let i = i0; i <= i1; i++) {
-            // (The ray from this place on the ground towards the sun, in the crown's own unit sphere.)
-            const px = (area.x0 + (i + 0.5) * area.cell - p.x) / rx;
-            const py = -cy / ry;
-            const pz = (area.z0 + (j + 0.5) * area.cell - p.z) / rx;
-            const b = px * dx + py * dy + pz * dz;
-            const c = px * px + py * py + pz * pz - 1;
-            const disc = b * b - a * c;
-            if (disc <= 0) continue;
-            const chord = (2 * Math.sqrt(disc)) / a;
-            const leafy = Math.min(Math.max(chord - air, 0), shell * 2);
-            trans[j * nx + i] *= Math.exp(-k * leafy);
+            const gx = area.x0 + (i + 0.5) * area.cell;
+            const gz = area.z0 + (j + 0.5) * area.cell;
+            let shade = 1;
+            if (structure < 1) {
+              // (The ray from this place on the ground towards the sun, in the crown's own unit sphere.)
+              const px = (gx - p.x) / rx;
+              const py = -cy / ry;
+              const pz = (gz - p.z) / rx;
+              const b = px * dx + py * dy + pz * dz;
+              const c = px * px + py * py + pz * pz - 1;
+              const disc = b * b - a * c;
+              if (disc > 0) {
+                const chord = (2 * Math.sqrt(disc)) / a;
+                shade = Math.exp(-k * Math.min(Math.max(chord - air, 0), shell * 2));
+              }
+            }
+            // (Its own leaves and wood: the same box the shaders march, from the ground up the sun's ray.)
+            const through = structure > 0 ? sunThrough(vol, worldToFit(fit, [gx, p.y, gz]), ray.dir, density) : 1;
+            trans[j * nx + i] *= shade + (through - shade) * structure;
           }
         }
       }
@@ -1209,6 +1339,7 @@ export function createTrees(options: TreesOptions): Trees {
       uStyle5.value.set(style.chroma, style.rim, style.sprigs, style.bright);
       uLeafSize.value = style.leafSize;
       uThrough.value.set(style.throughPower, style.throughWarp, style.throughVary, style.moss);
+      uLight.value.set(style.structure, style.density, 0, 0);
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);
@@ -1233,7 +1364,8 @@ export function createTrees(options: TreesOptions): Trees {
       // apart from any geometry: none of them is freed unless disposed by name.)
       cull.dispose();
       finish.dispose();
-      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
+      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, lightBoxAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
+      lightTex.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       atlas.dispose();

@@ -64,7 +64,8 @@ trees.update(renderer, camera, timeSeconds);
   are made, the pieces being different; `style` starts as the look's
   (`LOOK_STYLES[look]`) and can be changed at any time.
 - **Shade on the ground**: `trees.bakeShade(area)` works out how much sun
-  reaches the ground past the crowns (as their leaves take it), and
+  reaches the ground past the crowns (as their own leaves and limbs take it:
+  see "Light from the crown's own leaves"), and
   `trees.sunAt(xz)` hands it to a host's ground or grass as a TSL node (the
   grass library takes it as `world.sun`).
 - **Light and wind** (`trees.environment`) are the host's to set, as the
@@ -550,10 +551,35 @@ upper crowns to Rautiainen's exponents.
   willow, fir, pine, box, a round-leaved shrub): a species says which kind
   its leaves are (`leafKind`). Mid and far trees are the same sprays turned
   to the eye.
-- **Light from the crown's shape.** Sunlight reaching a leaf falls off as
-  exp(-k L) over the length L of leafy crown it crosses (Monsi and Saeki),
-  the crown taken as its ellipsoid with a hollow heart; a dab faces as the
-  crown's outside does there, turned towards its own clump's face.
+- **Light from the crown's own leaves.** Sunlight reaching a leaf falls off
+  as exp(-sum of k dl) over the leaves it crosses (Monsi and Saeki). Each
+  grown tree has a small box of cells over it (`light.ts`: 18 x 24 x 18, two
+  bytes a cell, some 15 KB a variant, all of them in one 3D texture): how
+  thick its leaves and limbs are to the light in each cell, and how much of
+  the sky each cell sees past them. The leaves are its clumps, each a ball
+  of leaves with leaf area by its cross-section, together the leaf area its
+  species' crown carries (a leaf area index of 1.5 to 6.3 over the crown's
+  ground, by how open it is); the limbs take the light as cylinders do (not
+  the stem, which would shade its own bark). The sky is baked once, swept
+  down the box layer by layer along sixteen directions over the sky. Every
+  fitted tree reads its variant's box: the vertex shaders carry the point
+  back into the variant's frame (the fit undone) and march six steps
+  towards the sun, the sun's direction stretched as the crown is, each at a
+  place of its own along its step (the piece's own number: no noise from
+  frame to frame), from a cell and a half out (the cells blur the leaves a
+  metre wide, and a shoot on the sunny side would be in its own blur); the
+  sky is one read. So a bough shades the one below, the sun comes through
+  the gaps, the outer shoots on the sun's side are lit and the pockets
+  inside are not, and the trunk and limbs under a dense crown are in its
+  shade. The march follows the sun as it moves; nothing is baked for it.
+  A far dab, which stands for a gathered group of clumps, is lit half its
+  size out along its facing, as the near leaves it hands over to are. The
+  style's `structure` says how far a crown's light is its own leaves' and
+  how far its ellipsoid's (a hollow heart, as before; `selfShade` scales
+  that one), `density` how thick the leaves are to the light. A dab faces
+  as the crown's outside does there, turned towards its own clump's face.
+  The ground's shade (`bakeShade`) marches the same boxes, so a crown's
+  shadow has its gaps.
 - **Wind from the place and the time.** The tree leans with gusts as they
   reach it, a tall one later and slower; each limb swings about its foot on
   its own beat. Nothing is kept from frame to frame.
@@ -663,7 +689,12 @@ and leans its own way.
   made: changing its leaves in the lab needs it grown again.
 
 - Trees' shadows on each other and on what stands under them (the ground's
-  shade is baked; see above).
+  shade is baked; see above): a tree's light is its own leaves' and its
+  stand's, not a neighbour's crown's in particular.
+- A tree's light box is its clumps' leaves, blurred about a cell wide: a
+  conifer's sheets and a realistic crown's cards reach past their clumps
+  and are not in it as drawn; the stem is not in it; the sky it sees is
+  baked for the tree as grown, not stretched with its fit.
 - Impostors for the farthest trees.
 - A fan palm's skirt of dead fronds; multi-stemmed trees (a sycamore's, a
   live oak's); leaning trunks.
