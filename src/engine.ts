@@ -969,7 +969,7 @@ export function createTrees(options: TreesOptions): Trees {
       const inFurrow = float(1).sub(smoothstep(float(-0.4), float(0.7), ridge));
       const where = patch.mul(0.6).add(inFurrow.mul(0.4));
       const real = smoothstep(float(1).sub(vMoss.w), float(1.18).sub(vMoss.w), where);
-      const cover = mix(smoothstep(float(0.3), float(0.6), vMoss.w), real, uStyle3.z);
+      const cover = mix(smoothstep(float(0.4), float(0.5), vMoss.w), real, uStyle3.z);
       const moss = vMoss.xyz.mul(mix(float(1), patch.mul(0.5).add(0.75), uStyle3.z));
       return vec4(mix(vCol.mul(furrows), moss, cover), 1);
     })();
