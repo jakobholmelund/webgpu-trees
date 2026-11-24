@@ -5,7 +5,7 @@
 // stranger's project would: what the lab cannot do through that, the package
 // cannot do.
 //
-//   ?scene=one | specimen | grove | course   what stands on the ground (grove by default)
+//   ?scene=one | specimen | grove | woodland | course   what stands on the ground (grove by default)
 //   ?species=2       the species (its row) the inspector opens on, and the one "One tree" grows
 //   ?fill=1          the scene with only that species in it
 //   ?hour=9          the sun's hour, 5 to 19
@@ -43,7 +43,7 @@ import {
   cloneSpecies,
   createTrees,
 } from "../src/index";
-import { course, grove, oneTree, specimenRow, specimens } from "./world";
+import { course, grove, oneTree, specimenRow, specimens, woodland } from "./world";
 import { type Standing, disposeEnvelopes, makeEnvelopes } from "./envelope";
 
 // (v3: the styles: four looks, and the style has lobe, bulge, warm, cool, chroma, rim and sprigs.)
@@ -61,8 +61,8 @@ interface Preset {
   variants: VariantOptions;
 }
 
-type SceneName = "one" | "specimen" | "grove" | "course";
-const SCENES: [string, SceneName][] = [["One tree", "one"], ["Specimen", "specimen"], ["Grove", "grove"], ["Course", "course"]];
+type SceneName = "one" | "specimen" | "grove" | "woodland" | "course";
+const SCENES: [string, SceneName][] = [["One tree", "one"], ["Specimen", "specimen"], ["Grove", "grove"], ["Wood edge", "woodland"], ["Course", "course"]];
 type EyeName = "standing" | "tree" | "overhead" | "course";
 const EYES: [string, EyeName, number][] = [["Standing", "standing", 1.7], ["Up a tree", "tree", 8], ["Overhead", "overhead", 60], ["Course", "course", 30]];
 const HOURS: [string, number][] = [["Dawn", 6], ["Morning", 9], ["Noon", 13], ["Evening", 18]];
@@ -139,7 +139,8 @@ function readPreset(value: unknown): Preset | string {
   if (typeof p.style !== "object" || p.style === null || !Object.entries(p.style).every(([k, v]) => !(k in DEFAULT_STYLE) || Number.isFinite(v))) return "its style has something not a number";
   if (!numbersLike(p.detail, DEFAULT_DETAIL)) return "its detail is missing a number";
   // (Variants came later than the rest: a preset without them takes the package's own.)
-  const variants = p.variants === undefined ? { ...DEFAULT_VARIANT_OPTIONS } : p.variants;
+  // (And each option since: a preset without it takes the package's own.)
+  const variants = { ...DEFAULT_VARIANT_OPTIONS, ...p.variants };
   if (!numbersLike(variants, DEFAULT_VARIANT_OPTIONS)) return "its variants are missing a number";
   const look = p.look === undefined ? "stylized" : p.look;
   if (!TREE_LOOKS.includes(look)) return `its look must be one of ${TREE_LOOKS.join(", ")}`;
@@ -267,6 +268,8 @@ async function start() {
         return state.fill ? specimenRow(species[row], row) : specimens(species);
       case "grove":
         return state.fill ? only(grove([species[row]])) : grove(species);
+      case "woodland":
+        return state.fill ? only(woodland(species)) : woodland(species);
       case "course":
         return state.fill ? only(course([species[row]])) : course(species);
     }
@@ -309,6 +312,14 @@ async function start() {
       if (eye === "tree") return { at: [0, 8, 20], look: [0, 8, -60] };
       if (eye === "overhead") return { at: [0, 60, 120], look: [0, 0, 0] };
       return { at: [0, 30, 260], look: [0, 8, 0] };
+    }
+    if (name === "woodland") {
+      // (Out on the open ground, a fairway's width off the edge, at a golfer's eye; up a tree, inside the
+      // wood looking out to the edge.)
+      if (eye === "standing") return { at: [0, 1.6, 100], look: [0, 9, 0] };
+      if (eye === "tree") return { at: [12, 8, -70], look: [0, 6, 30] };
+      if (eye === "overhead") return { at: [0, 60, 150], look: [0, 0, -20] };
+      return { at: [-40, 30, 230], look: [0, 8, -20] };
     }
     if (eye === "standing") return { at: [180, 1.7, 0], look: [180, 6, -200] };
     if (eye === "tree") return { at: [40, 8, 40], look: [100, 8, 90] };
@@ -722,6 +733,7 @@ async function start() {
   variantPanel.add(variants, "seeds", 1, 6, 1).name("seeds a shape").onChange(variantsChanged);
   variantPanel.add(variants, "lean", 0, 10, 0.5).name("lean up to (°)").onChange(variantsChanged);
   variantPanel.add(variants, "mirror").name("mirrored").onChange(variantsChanged);
+  variantPanel.add(variants, "stands").name("grown where they stand").onChange(variantsChanged);
 
   // ---- Presets: the lab's state as JSON, to keep and to hand to a game. ----
 
@@ -812,7 +824,7 @@ async function start() {
         (ground.material as THREE.Material).dispose();
         ground.material = groundFor(trees);
       }
-      const side = state.scene === "course" ? 2600 : state.scene === "grove" ? 400 : 200;
+      const side = state.scene === "course" ? 2600 : state.scene === "grove" || state.scene === "woodland" ? 400 : 200;
       trees.bakeShade({ x0: -side / 2, z0: -side / 2, width: side, depth: side, cell: state.scene === "course" ? 1.25 : 0.4 });
       shadeFor = { trees, hour: light.hour };
     }
@@ -858,6 +870,11 @@ async function start() {
       ["From outside", [0, 20, 260], [0, 8, 0]],
     ],
     specimen: [["The row", [0, 6, 120], [0, 9, 0]]],
+    woodland: [
+      ["From the fairway, 100 m", [0, 1.6, 100], [0, 9, 0]],
+      ["From the fairway, 60 m", [-30, 1.6, 60], [-10, 7, -10]],
+      ["Inside the wood", [10, 1.6, -60], [10, 5, 40]],
+    ],
   };
   const viewsToMeasure = (): [string, number[], number[]][] =>
     FIXED_VIEWS[state.scene] ??
