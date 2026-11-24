@@ -3,3 +3,6 @@ dist
 .DS_Store
 .claude/
 dist-file
+
+# AI-generated sources (raw); only processed assets are committed
+tools/ai-textures/raw/
