@@ -217,6 +217,27 @@ export interface TreeSpecies {
    * a weeping birch's tresses). 0 or left out: none.
    */
   weep?: number;
+
+  // A palm's (architecture "palm"; palm.ts). All left out, a feather palm's, kept as a palm on a course is.
+  /** Its leaf: a feather palm's (leaflets along a rachis: date palm, queen palm) or a fan palm's (a pleated fan on a long stalk). */
+  palmLeaf?: "feather" | "fan";
+  /**
+   * How its trees are kept unless a host says otherwise of a tree: `natural` (its dead leaves hanging under
+   * its green, a fan palm's skirt), `skirt` (cut back to a short one), `skinned` (dead and drooping leaves cut,
+   * the stem cleaned), `pineapple` (cut back to the leaves above the level, its leaf bases trimmed into a ball
+   * under the crown). Left out: a feather palm pineapple cut, a fan palm skinned.
+   */
+  pruning?: "natural" | "skirt" | "skinned" | "pineapple";
+  /** How far a feather palm's leaflets stand in several planes, 0..1 (a queen palm's plumose leaf); 0, two flat rows in a V. */
+  plumose?: number;
+  /** A dead leaf's colour (hex): straw to grey-brown. */
+  deadColor?: string;
+  /** How far down its stem a palm's skirt of dead leaves hangs when it is kept natural, 0..1 of the way to the ground. */
+  skirt?: number;
+  /** How wide its leaves are beside its kind's (1): a feather palm's leaflets' reach, a fan palm's blade. */
+  frondWidth?: number;
+  /** How far a fan palm's split segment tips droop, beside its kind's (1). */
+  fanDroop?: number;
 }
 
 /** The members of a type that may be left out. */
@@ -251,6 +272,13 @@ export const OPTIONAL_SPECIES_FIELDS = {
   buttress: "number",
   leafColors: "strings",
   weep: "number",
+  palmLeaf: ["feather", "fan"],
+  pruning: ["natural", "skirt", "skinned", "pineapple"],
+  plumose: "number",
+  deadColor: "string",
+  skirt: "number",
+  frondWidth: "number",
+  fanDroop: "number",
 } as const satisfies Record<OptionalKeys<TreeSpecies>, SpeciesFieldKind>;
 
 /** Whether `value` is of `kind` (`SpeciesFieldKind`). */
@@ -1134,7 +1162,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // UF/IFAS, Gilman and Watson's fact sheet (Phoenix canariensis): 40–60 ft tall, 20–40 ft spread, a trunk
   // to 3 ft across. California's grand avenue palm: a thick trunk patterned with old leaf bases, a big round
-  // head of 40–50 arching pinnate fronds 5–6 m long, the old ones hanging.
+  // head of arching pinnate fronds 3–6 m long (UF: 130–150 on a healthy palm; a course's are cut back), the
+  // old ones hanging. On courses mostly pineapple cut (MORPHOLOGY.md).
   canaryDatePalm: {
     name: "Canary date palm",
     latin: "Phoenix canariensis",
@@ -1150,12 +1179,13 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stems: 1,
     branchAngle: 60,
     branchAngleSpread: 20,
-    bend: -0.6,
+    bend: -0.3,
     crooked: 0.2,
     leader: 1,
-    whorl: 45,
+    whorl: 80,
     whorlsPerMetre: 0,
     branchiness: 1,
+    buttress: 0.15,
     leafKind: "frond",
     clumpSize: 0.8,
     clumpSpread: 0.2,
@@ -1163,13 +1193,17 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     leafVariation: 0.2,
     treeVariation: 0.15,
     throughTint: [0.85, 1.0, 0.45],
-    barkColor: "#7a6a52",
+    barkColor: "#8a7b66",
     barkPale: 0,
-    stiffness: 0.6,
+    stiffness: 0.55,
+    palmLeaf: "feather",
+    pruning: "pineapple",
+    deadColor: "#9c8664",
+    skirt: 0.35,
   },
   // UF/IFAS, Gilman and Watson's fact sheet (Washingtonia robusta): 80–100 ft tall, 10–15 ft spread, a trunk
-  // about 1 ft across. The tall thin palm of Los Angeles' streets and courses: a pole with a small tight
-  // head of about 25 fan leaves on long stalks (the skirt of dead leaves under it is not grown).
+  // about 1 ft across. The tall thin palm of Los Angeles' streets and courses: a pole flared at its foot with a
+  // small tight head of 30 or so fan leaves on long stalks; skinned on courses, a straw skirt in the wild.
   mexicanFanPalm: {
     name: "Mexican fan palm",
     latin: "Washingtonia robusta",
@@ -1188,9 +1222,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     bend: -0.2,
     crooked: 0.35,
     leader: 1,
-    whorl: 25,
+    whorl: 30,
     whorlsPerMetre: 0,
     branchiness: 1,
+    buttress: 0.6,
     leafKind: "frond",
     clumpSize: 1,
     clumpSpread: 0.2,
@@ -1200,7 +1235,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     throughTint: [0.9, 1.0, 0.45],
     barkColor: "#857866",
     barkPale: 0.1,
-    stiffness: 0.45,
+    stiffness: 0.35,
+    palmLeaf: "fan",
+    pruning: "skinned",
+    deadColor: "#a88f68",
+    skirt: 0.55,
   },
   // University of Redlands tree species accounts (Quercus agrifolia): 25–80 ft tall in cultivation; UC Davis
   // Arboretum: 20–50 ft tall and wide. A broad spreading evergreen oak, low on crooked limbs, small dark
@@ -1396,6 +1435,90 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkPale: 0,
     stiffness: 0.75,
   },
+  // Hodel 2014 (UC Cooperative Extension), UF/IFAS and Virginia Tech (Washingtonia filifera): 12–18 m in
+  // cultivation, a stout grey trunk 50–90 cm through, only slightly flared; 20–30 grey-green fans 1–1.8 m
+  // across on stalks as long, their segments split with white threads. In the wild its dead leaves hang in a
+  // skirt to the ground; on courses it is skinned (MORPHOLOGY.md 31).
+  californiaFanPalm: {
+    name: "California fan palm",
+    latin: "Washingtonia filifera",
+    regions: ["california"],
+    architecture: "palm",
+    height: 12,
+    crownRadius: 2.8,
+    crownBase: 9,
+    trunkRadius: 0.35,
+    shape: "spherical",
+    foliageDepth: 0.5,
+    openness: 0.25,
+    stems: 1,
+    branchAngle: 50,
+    branchAngleSpread: 20,
+    bend: -0.15,
+    crooked: 0.15,
+    leader: 1,
+    whorl: 30,
+    whorlsPerMetre: 0,
+    branchiness: 1,
+    buttress: 0.25,
+    leafKind: "frond",
+    clumpSize: 1.2,
+    clumpSpread: 0.2,
+    leafColor: "#6f7f5e",
+    leafVariation: 0.15,
+    treeVariation: 0.12,
+    throughTint: [0.9, 1.0, 0.55],
+    barkColor: "#857a6a",
+    barkPale: 0.05,
+    stiffness: 0.5,
+    palmLeaf: "fan",
+    pruning: "skinned",
+    deadColor: "#a39373",
+    skirt: 0.92,
+    frondWidth: 1.15,
+    fanDroop: 0.8,
+  },
+  // UF/IFAS (Syagrus romanzoffiana) and Noblick 2017: 8–15 m, a smooth grey ringed trunk 20–40 cm through;
+  // 7–25 soft feather leaves 3–5 m long, their leaflets in several planes (plumose), drooping. Not
+  // self-cleaning: courses cut its dead leaves, leaving the clean trunk (MORPHOLOGY.md 32).
+  queenPalm: {
+    name: "Queen palm",
+    latin: "Syagrus romanzoffiana",
+    regions: ["california"],
+    architecture: "palm",
+    height: 10,
+    crownRadius: 3.2,
+    crownBase: 5.5,
+    trunkRadius: 0.15,
+    shape: "spherical",
+    foliageDepth: 0.5,
+    openness: 0.4,
+    stems: 1,
+    branchAngle: 50,
+    branchAngleSpread: 20,
+    bend: -0.55,
+    crooked: 0.25,
+    leader: 1,
+    whorl: 18,
+    whorlsPerMetre: 0,
+    branchiness: 1,
+    buttress: 0.1,
+    leafKind: "frond",
+    clumpSize: 0.8,
+    clumpSpread: 0.2,
+    leafColor: "#4a6b32",
+    leafVariation: 0.2,
+    treeVariation: 0.15,
+    throughTint: [0.85, 1.0, 0.45],
+    barkColor: "#a29d92",
+    barkPale: 0,
+    stiffness: 0.4,
+    palmLeaf: "feather",
+    pruning: "skinned",
+    plumose: 1,
+    deadColor: "#8c7352",
+    frondWidth: 1.25,
+  },
   // UF/IFAS (Picea glauca): 40–60 ft tall, 15–20 ft spread. Narrow and conical, to the ground, blue-green.
   whiteSpruce: {
     name: "White spruce",
@@ -1460,6 +1583,11 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (s.architecture === "conifer" && !(s.whorl >= 1 && s.whorlsPerMetre > 0)) out.push("a conifer needs whorl and whorlsPerMetre");
   if (s.architecture === "palm" && !(s.whorl >= 3)) out.push("a palm needs whorl (its fronds) of 3 or more");
   if (s.weep !== undefined && !(s.weep >= 0 && s.weep <= 1)) out.push("weep must be 0..1");
+  if (s.palmLeaf !== undefined && !["feather", "fan"].includes(s.palmLeaf)) out.push("palmLeaf must be feather or fan");
+  if (s.pruning !== undefined && !["natural", "skirt", "skinned", "pineapple"].includes(s.pruning)) out.push("pruning must be natural, skirt, skinned or pineapple");
+  for (const k of ["plumose", "skirt"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0 && (s[k] as number) <= 1)) out.push(`${k} must be 0..1`);
+  for (const k of ["frondWidth", "fanDroop"] as const) if (s[k] !== undefined && !((s[k] as number) >= 0.3 && (s[k] as number) <= 2)) out.push(`${k} must be 0.3..2`);
+  if (s.deadColor !== undefined && !/^#[0-9a-f]{6}$/i.test(s.deadColor)) out.push("deadColor must be a hex colour like #a88f68");
   if (s.crownPeak !== undefined && !(s.crownPeak >= 0 && s.crownPeak <= 0.95)) out.push("crownPeak must be 0..0.95");
   if (s.crownRound !== undefined && !(s.crownRound >= 0.8 && s.crownRound <= 8)) out.push("crownRound must be 0.8..8");
   if (s.lobes !== undefined && !(s.lobes >= 0 && s.lobes <= 1)) out.push("lobes must be 0..1");

@@ -5,6 +5,7 @@
 // reads them and knows nothing of how they were made. They are plain arrays
 // in metres, the tree's foot at the origin, +Y up.
 
+import { type PalmCrown } from "./palm.ts";
 import { type CrownShape } from "./species.ts";
 
 /** How big one tree is (m): what a survey measures of it, and what a ball hitting it meets. */
@@ -152,4 +153,8 @@ export interface GrownTree {
   clumps: Clumps;
   /** How much its trunk's foot spreads into buttresses, 0..1 (its species' `buttress`; left out, 0). */
   buttress?: number;
+  /** A palm's crown (palm.ts): its fronds, its stem and how it is kept, which its drawing reads in place of its clumps. */
+  palm?: PalmCrown;
+  /** Its leaves' area, one side (m²), where it is known (a palm's, frond by frond); else its species' leaf area index makes it. */
+  leafArea?: number;
 }

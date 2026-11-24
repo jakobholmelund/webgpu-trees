@@ -133,20 +133,33 @@ function prepareGenerated(key) {
     const rgb = new Img(w, h, 3);
     const alpha = new Img(w, h, 1);
     const L = new Img(w, h, 1);
+    // (The magenta this picture lies on, as sampled from its border: generated pictures' backgrounds run from
+    // #FF00FF to a lighter pink-magenta. How magenta a texel is: red and blue both over green, against the key's.)
+    const border = [];
+    for (let x = 0; x < w; x += 4) for (const y of [2, h - 3]) border.push(x, y);
+    for (let y = 0; y < h; y += 4) for (const x of [2, w - 3]) border.push(x, y);
+    const key = [0, 1, 2].map((k) => {
+      const v = [];
+      for (let i = 0; i < border.length; i += 2) v.push(img.get(border[i], border[i + 1], k));
+      return quantile(v, 0.5);
+    });
+    const keyM = Math.max(0.3, Math.min(key[0], key[2]) - key[1]);
     for (let i = 0; i < w * h; i++) {
       const r = img.data[i * 3];
       const g = img.data[i * 3 + 1];
       const b = img.data[i * 3 + 2];
-      // (How magenta: red and blue both well over green.)
       const m = Math.min(r, b) - g;
-      const a = Math.min(1, Math.max(0, (0.3 - m) / 0.25));
+      // (Opaque under a third of the key's magenta-ness, clear over four fifths of it; and as near the key's
+      // own colour as a texel is, clear too.)
+      const near = Math.hypot(r - key[0], g - key[1], b - key[2]);
+      const a = Math.min(Math.min(1, Math.max(0, (0.8 * keyM - m) / (0.45 * keyM))), Math.min(1, Math.max(0, (near - 0.06) / 0.18)));
       alpha.data[i] = a;
       // (An edge texel is part leaf, part magenta: the magenta's share taken out of its colour, as it was mixed
       // in, and any magenta left (red and blue both over green) taken off both, so no pink rim is left.)
       const un = (o, bg) => Math.min(1, Math.max(0, (o - (1 - a) * bg) / Math.max(a, 0.05)));
-      let rr = a < 1 ? un(r, KEY[0]) : r;
-      const gg = a < 1 ? un(g, KEY[1]) : g;
-      let bb = a < 1 ? un(b, KEY[2]) : b;
+      let rr = a < 1 ? un(r, key[0]) : r;
+      const gg = a < 1 ? un(g, key[1]) : g;
+      let bb = a < 1 ? un(b, key[2]) : b;
       const spill = Math.max(0, Math.min(rr, bb) - gg);
       rr -= spill;
       bb -= spill;
@@ -196,6 +209,7 @@ function buildBark(set, layer) {
   const nor = read(mapFile(set.source, "nor_gl"), { channels: 3, ...opt });
   const rough = read(mapFile(set.source, "rough"), { channels: 1, ...opt });
   const disp = read(mapFile(set.source, "disp"), { channels: 1, ...opt });
+  for (const r of set.heal ?? []) for (const img of [albedo, nor, rough, disp]) heal(img, r);
   const seams = { albedo: r3(seamRatio(albedo)), normal: r3(seamRatio(nor)) };
 
   // Into linear light.
@@ -259,6 +273,30 @@ function buildBark(set, layer) {
     for: set.for,
     source: set.source,
   };
+}
+
+/**
+ * Paint over a mark that would show at every repeat of a tile: the rectangle `r` (shares of the tile, may run
+ * past its edges, wrapping) taken from the tile moved by (dx, dy), feathered into what is round it.
+ */
+function heal(img, r) {
+  const { w, h, c } = img;
+  const src = Float32Array.from(img.data);
+  const F = 0.04;
+  for (let y = Math.floor((r.y0 - F) * h); y < Math.ceil((r.y1 + F) * h); y++)
+    for (let x = Math.floor((r.x0 - F) * w); x < Math.ceil((r.x1 + F) * w); x++) {
+      const u = x / w;
+      const v = y / h;
+      const inside = Math.min(u - r.x0, r.x1 - u, v - r.y0, r.y1 - v);
+      const t = Math.min(1, Math.max(0, (inside + F) / F));
+      const k = t * t * (3 - 2 * t);
+      if (k <= 0) continue;
+      const xi = ((x % w) + w) % w;
+      const yi = ((y % h) + h) % h;
+      const xs = (((x + Math.round(r.dx * w)) % w) + w) % w;
+      const ys = (((y + Math.round(r.dy * h)) % h) + h) % h;
+      for (let q = 0; q < c; q++) img.data[(yi * w + xi) * c + q] = src[(yi * w + xi) * c + q] * (1 - k) + src[(ys * w + xs) * c + q] * k;
+    }
 }
 
 /** A preview of a bark set: its colour tiled two by two, and its surface lit from the upper left. */
@@ -391,7 +429,24 @@ function buildLeaves(set) {
     for (let y = Math.floor(r.y0 * h); y < Math.ceil(r.y1 * h); y++) for (let x = Math.floor(r.x0 * w); x < Math.ceil(r.x1 * w); x++) inRect[y * w + x] = k;
   });
   const a = new Img(w, h, 1, alpha.data.map((v, i) => (inRect[i] >= 0 ? v : 0)));
-  const { lab, comps } = components(a);
+  const found = components(a);
+  let { lab, comps } = found;
+  if (set.whole) {
+    // (A whole leaf whose parts the picture shows apart (a fan's split tips, its threads, dead leaves side by
+    // side): every patch but specks, one leaf.)
+    const keep = comps.filter((c) => c.n >= 40);
+    const one = { id: 0, n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, y0: h, x1: 0, y1: 0 };
+    for (const c of keep) {
+      for (const k of ["n", "sx", "sy", "sxx", "syy", "sxy"]) one[k] += c[k];
+      one.x0 = Math.min(one.x0, c.x0);
+      one.y0 = Math.min(one.y0, c.y0);
+      one.x1 = Math.max(one.x1, c.x1);
+      one.y1 = Math.max(one.y1, c.y1);
+    }
+    const ids = new Set(keep.map((c) => c.id));
+    lab = lab.map((l) => (ids.has(l) ? 0 : -1));
+    comps = [one];
+  }
 
   // The leaves: patches at least a tenth the size of the biggest in their rectangle (not specks, not bits).
   let leaves = [];

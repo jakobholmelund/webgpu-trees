@@ -88,7 +88,8 @@ function ends(t: GrownTree): number[] {
   return out;
 }
 
-for (const sp of ALL_SPECIES) {
+// (A palm's leaves are drawn along its fronds themselves (palmGeometry.ts), not as dabs or cards on twigs.)
+for (const sp of ALL_SPECIES.filter((s) => s.architecture !== "palm")) {
   for (const [label, size] of sizes(sp)) {
     const trees = SEEDS.map((seed) => growTree(sp, size, seed));
     const name = `${sp.name}, ${label}`;

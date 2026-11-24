@@ -39,6 +39,9 @@ import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheet
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase } from "./scans.ts";
 import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow } from "./sprays.ts";
 import { growTree } from "./grow.ts";
+import { PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture } from "./palmAtlas.ts";
+import { palmPieces } from "./palmGeometry.ts";
+import { type Pruning } from "./palm.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
 import { type Stand, standingOf } from "./stand.ts";
 import { type GrownTree, type TreeSize } from "./tree.ts";
@@ -56,7 +59,7 @@ const STAND_SKY = 0.22;
 /** Rows (vec4) a tree has in the shaders' list of trees. */
 const TREE_ROWS = 5;
 /** Rows (vec4) a species has in the shaders' list of species. */
-const SPECIES_ROWS = 7;
+const SPECIES_ROWS = 8;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -93,6 +96,12 @@ export interface TreesOptions {
    * neighbours (stand.ts): any part of it, or nothing. A list of trees may say it of each tree instead.
    */
   stands?: readonly (Partial<Stand> | null | undefined)[];
+  /**
+   * How each palm is kept (palm.ts `Pruning`), by tree, as in `trees`, over its species' `pruning`: a list of
+   * trees may say it of each tree instead. Left out, its species' (a feather palm pineapple cut, a fan palm
+   * skinned, unless the species says otherwise).
+   */
+  prunings?: readonly (Pruning | null | undefined)[];
   /** Grow trees some other way than this library's (see `growTree`; `stand` left out, a tree alone). */
   grow?: (species: TreeSpecies, size: TreeSize, seed: number, stand?: Stand) => GrownTree;
   /** The look (`stylized` unless given). `style` starts as the look's (`LOOK_STYLES`). */
@@ -124,7 +133,7 @@ export interface Trees {
   /** The trees as grown, by variant. */
   readonly grown: readonly GrownTree[];
   /** Each tier's pieces for one tree of each variant, all told: dabs, pieces of wood, and the triangles of conifers' sheets. */
-  readonly pieces: { dabs: number; wood: number; sheets: number }[];
+  readonly pieces: { dabs: number; wood: number; sheets: number; fronds: number }[];
   /** Once a frame, before rendering. */
   update(renderer: THREE.WebGPURenderer, camera: THREE.PerspectiveCamera, timeS: number): void;
   /** How many trees each tier drew last frame (none for a tier `show` hides, or with no trees): read back from the graphics card, so not every frame. */
@@ -202,9 +211,11 @@ export function createTrees(options: TreesOptions): Trees {
   let species = options.species;
   const packed = options.trees instanceof Float32Array ? options.trees : packTrees(options.trees);
   const stands = options.stands ?? (options.trees instanceof Float32Array ? undefined : options.trees.map((t) => t.stand));
-  const plan = planVariants(packed, species, { ...DEFAULT_VARIANT_OPTIONS, ...options.variants }, stands);
+  const prunings = options.prunings ?? (options.trees instanceof Float32Array ? undefined : options.trees.map((t) => t.pruning));
+  const plan = planVariants(packed, species, { ...DEFAULT_VARIANT_OPTIONS, ...options.variants }, stands, prunings);
   const grow = options.grow ?? growTree;
-  const grown = plan.variants.map((v) => grow(species[v.species], v.size, v.seed, v.standing === "open" ? undefined : v.stand));
+  // (A palm kept otherwise than its species is grown as its species with that word.)
+  const grown = plan.variants.map((v) => grow(v.pruning ? { ...species[v.species], pruning: v.pruning } : species[v.species], v.size, v.seed, v.standing === "open" ? undefined : v.stand));
   const N = plan.placements.length;
   const V = plan.variants.length;
   const world = options.world ?? {};
@@ -232,6 +243,10 @@ export function createTrees(options: TreesOptions): Trees {
     layerOf(looks[s].bark);
     layerOf(looks[s].upper?.set);
   }
+  // (A palm's stem also wears its old leaf bases, and a pineapple cut's trimmed ones: palm.ts.)
+  const palms = grown.some((g) => g.palm);
+  const ballLayer = scanned && palms ? layerOf("palmPineapple") : 0;
+  const bootsLayer = scanned && palms ? layerOf("palmLattice") : 0;
   // (Every look but the realistic one lays its leaves as dabs lit over the crown's lobes, as far as its style's
   // `lobe` says: the painted look's says not at all.)
   const lobed = !real && look !== "stylized";
@@ -291,6 +306,10 @@ export function createTrees(options: TreesOptions): Trees {
       // (Leaf area per cubic metre of crown, about 0.3 in an open crown to 1.4 in a dense one, half of it
       // facing any one way: Monsi and Saeki's extinction through a crown, with G = 0.5.)
       const k = 0.5 * (0.3 + (1 - s.openness) * 1.1);
+      // (A palm's: its dead leaves' colour, and that it is a palm, whose stem bends further and later in the wind.)
+      const dead = linear(s.deadColor ?? "#9c8664");
+      // (1 a palm whose stem is a lattice of old leaf bases, 2 one ringed with their scars.)
+      speciesData.set([dead.r, dead.g, dead.b, s.architecture === "palm" ? (sl.bark === "palmLattice" ? 1 : 2) : 0], (i * SPECIES_ROWS + 7) * 4);
       speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
@@ -362,7 +381,11 @@ export function createTrees(options: TreesOptions): Trees {
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
   });
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, sheeted, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, sheeted) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? sheeted : undefined), lobes) : dabPieces(grown, s)));
+  // (A palm's leaves are its fronds, drawn as they are: `frondSets`. Its clumps are only for its light.)
+  const isPalm = grown.map((g) => !!g.palm);
+  const noDabs = sheeted.map((k, v) => k || isPalm[v]);
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
+  const frondSets: Pieces[] = TIER_SHAPES.map((_, t) => palmPieces(grown, t));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
   // from boughs to blots, pixel by pixel, a speckle over the whole hand-over.)
   const sheetSets: Pieces[] = TIER_SHAPES.map((_, t) => {
@@ -384,10 +407,12 @@ export function createTrees(options: TreesOptions): Trees {
   const woodArgs = makeArgs(woodSets);
   const strokeArgs = makeArgs(strokeSets);
   const sheetArgs = makeArgs(sheetSets);
+  const frondArgs = makeArgs(frondSets);
   const dabArgsStore = storage(dabArgs, "uint", dabArgs.array.length);
   const woodArgsStore = storage(woodArgs, "uint", woodArgs.array.length);
   const strokeArgsStore = storage(strokeArgs, "uint", strokeArgs.array.length);
   const sheetArgsStore = storage(sheetArgs, "uint", sheetArgs.array.length);
+  const frondArgsStore = storage(frondArgs, "uint", frondArgs.array.length);
 
   // ---- Uniforms. ----
 
@@ -471,6 +496,7 @@ export function createTrees(options: TreesOptions): Trees {
       woodArgsStore.element(k.mul(5).add(1)).assign(c);
       strokeArgsStore.element(k.mul(5).add(1)).assign(c);
       sheetArgsStore.element(k.mul(5).add(1)).assign(c);
+      frondArgsStore.element(k.mul(5).add(1)).assign(c);
       atomicStore(countStore.element(k), uint(0));
     });
   })().compute(Math.max(1, TIERS * V));
@@ -553,9 +579,12 @@ export function createTrees(options: TreesOptions): Trees {
     const gust = float(0.55).add(sin(wave.mul(0.11)).mul(0.3)).add(sin(wave.mul(0.047).add(across.mul(0.021))).mul(0.25));
     const push = min(speed.mul(speed).div(100), float(4)).mul(float(1).sub(stiff.mul(0.85)));
     // (Its own sway: about half a cycle a second for a tree of 15 m, slower for a taller one.)
-    const beat = float(2.6).div(sqrt(max(h, float(1)))).mul(uTime).add(T.r2.w.mul(6.283));
-    const lean = push.mul(gust).add(sin(beat).mul(push.mul(0.25).add(0.02))).mul(h).mul(0.03);
+    // (A palm's tall unbranched stem bends far further than a tree's trunk, and its crown follows its foot a
+    // moment late, the bend running up it.)
+    const palm = min(T.srow(7).w, float(1));
     const up = clamp(p.y.div(h), 0, 1);
+    const beat = float(2.6).div(sqrt(max(h, float(1)))).mul(uTime).add(T.r2.w.mul(6.283)).sub(up.mul(palm).mul(0.9));
+    const lean = push.mul(gust).add(sin(beat).mul(push.mul(0.25).add(0.02))).mul(h).mul(0.03).mul(float(1).add(palm.mul(1.6)));
     const trunk = vec3(dirTree.x, 0, dirTree.z).mul(lean.mul(up.mul(up)));
     // (A limb: its own beat, from where it leaves the trunk.)
     const arm = length(p.sub(limb));
@@ -1186,6 +1215,123 @@ export function createTrees(options: TreesOptions): Trees {
     return m;
   };
 
+  // ---- A palm's fronds. ----
+
+  // (The palms' pictures (palmAtlas.ts): drawn by arithmetic until the look's pictures come, then theirs.
+  // Each cell's mean colour goes with it, so each frond is brought to its own colour and keeps the picture's
+  // light and shade.)
+  const drawnPalms = palms ? drawnPalmAtlas() : null;
+  let palmTex: THREE.DataTexture | null = drawnPalms ? atlasTexture(coverageMips(drawnPalms.px, PALM_ATLAS_CELL, ALPHA_CUT, 0), 4) : null;
+  const palmNodes: ReturnType<typeof texture>[] = [];
+  const uPalmMeans = uniformArray((drawnPalms?.means ?? [[0.2, 0.3, 0.1]]).map((m) => new THREE.Vector3(...m)), "vec3");
+
+  /**
+   * A palm's fronds, fans and skirt at a tier (palmGeometry.ts): each vertex where its leaf is, carried by the
+   * stem's sway (the crown tilting as the stem's top bends) and by its own frond's: streaming downwind in the
+   * gusts, flapping and twisting on its own beat as its age lets it (a dead frond swinging freely, a spear
+   * hardly), its leaflets shimmering. Lit as a leaf is, from the side the eye sees, the sun through it from
+   * behind; its picture's light and shade over its own colour.
+   */
+  const frondMaterial = (t: number) => {
+    const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, fog: true });
+    m.alphaToCoverage = true;
+    const aNormal = attribute<"vec4">("aNormal", "vec4");
+    const aUv = attribute<"vec4">("aUv", "vec4");
+    const aLimb = attribute<"vec4">("aLimb", "vec4");
+    const aFrond = attribute<"vec4">("aFrond", "vec4");
+    const aAxis = attribute<"vec4">("aAxis", "vec4");
+    const T = treeOf(t, aLimb.w);
+    const fit = fitOf(T);
+    const own = aFrond.x;
+    const flex = aFrond.w;
+    const s = aNormal.w;
+    const p0 = fit.point(positionGeometry);
+    const foot = fit.point(aLimb.xyz);
+    // The crown on the stem: moved as the stem's top is, and tilted as it bends there.
+    const atFoot = windAt(T, foot, vec3(0), float(0));
+    const tilt = windAt(T, foot.add(vec3(0, 1, 0)), vec3(0), float(0)).sub(atFoot);
+    const rel = p0.sub(foot);
+    const crown = atFoot.add(vec3(tilt.x, 0, tilt.z).mul(rel.y)).sub(vec3(0, dot(vec3(tilt.x, 0, tilt.z), vec3(rel.x, 0, rel.z)), 0));
+    // Its own frond: how hard the wind is on it, by gusts as they roll through.
+    const speed = uWind.z;
+    const dirTree = dirToTree(T, vec3(uWind.x, 0, uWind.y));
+    const L = aAxis.w.mul(fit.size);
+    const axis = normalize(fit.normal(aAxis.xyz));
+    const n0 = fit.normal(aNormal.xyz);
+    const side = normalize(cross(axis, n0).add(vec3(1e-4, 0, 0)));
+    const along = dot(vec2(T.r0.x, T.r0.z), vec2(uWind.x, uWind.y));
+    const wave = along.sub(speed.mul(uTime));
+    const gust = float(0.55).add(sin(wave.mul(0.11)).mul(0.3)).add(sin(wave.mul(0.047).add(own.mul(3))).mul(0.25));
+    const push = min(speed.mul(speed).div(100), float(3)).mul(gust).mul(flex);
+    const amp = clamp(speed.div(7), 0.04, 1.6).mul(flex);
+    const k = s.mul(s);
+    // (Streaming: pushed downwind, the more the further out; a frond into the wind is folded back over the crown.)
+    const stream = dirTree.mul(L.mul(0.32).mul(push).mul(k));
+    // (Flapping: up and down across its leaf, on a beat of its own, slower for a long frond; and sideways.)
+    const beat = uTime.mul(float(1.3).add(own.mul(0.9)).mul(float(5).div(L.add(2)).sqrt())).add(own.mul(23)).sub(s.mul(1.3));
+    const flap = n0.mul(sin(beat).mul(L).mul(0.055).mul(amp).mul(k)).add(side.mul(sin(beat.mul(0.73).add(1.7)).mul(L).mul(0.035).mul(amp).mul(k)));
+    // (Twisting about its rachis: its leaflets either side rising and falling against each other.)
+    const twist = sin(uTime.mul(2.2).add(own.mul(17))).mul(0.16).mul(amp).mul(s);
+    const turned = n0.mul(aUv.w.mul(fit.across).mul(twist));
+    const blown = crown.add(stream).add(flap).add(turned);
+    const at = toWorld(T, p0.add(blown));
+    // (Its leaflets shimmer: each turning a little on its own, fast, as the light catches them.)
+    const shimmer = sin(uTime.mul(7.3).add(s.mul(19)).add(own.mul(41)).add(aUv.w.mul(9))).mul(0.22).mul(amp).mul(step(float(0.01), abs(aUv.w)));
+    const n = normalize(dirToWorld(T, normalize(n0.add(axis.mul(shimmer)))));
+    // Its light.
+    const C = crownAt(T, at, n, own.add(s.mul(0.37)));
+    const toEye = normalize(cameraPosition.sub(at));
+    const seen = n.mul(select(dot(n, toEye).lessThan(0), float(-1), float(1)));
+    const leaf = T.srow(0);
+    const deadCol = T.srow(7).xyz;
+    // (Its own colour: its species' green (its tree's tint, its own tone) going to straw as it dies, the young
+    // ones paler.)
+    const green = leaf.xyz.mul(T.r2.xyz).mul(float(1).add(own.sub(0.5).mul(leaf.w).mul(0.5)));
+    let albedo = mix(green, deadCol.mul(float(0.9).add(own.mul(0.2))), aFrond.y).mul(aFrond.z);
+    const grey = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
+    albedo = max(mix(vec3(grey), albedo, uStyle5.x), vec3(0));
+    const lum = (c: Vec3): Float => dot(c, vec3(0.2126, 0.7152, 0.0722));
+    const hueOf = (hue: Vec3, by: Float): Vec3 => mix(albedo, hue.mul(lum(albedo).div(lum(hue))), by);
+    const jit = own.sub(0.5).mul(uStyle.w);
+    const raw = clamp(sunOn(C, seen, uStyle2.z).add(jit.mul(0.25)), 0, 1);
+    const bands = max(uStyle.y, float(1));
+    const litK = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
+    // (The painterly looks' light warm and shade cool; the realistic look's as the sun and sky give them.)
+    const sky = C.sky.mul(mix(float(1), float(0.8), aFrond.y.oneMinus().mul(0.3)));
+    const shadeCol = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8)).mul(uShadeTint).mul(sky);
+    const litCol = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7)).mul(uSunTint).mul(uStyle5.w);
+    let colour: Vec3 = mix(shadeCol, litCol, litK);
+    // (The sun through it, to an eye looking towards it through the leaf, and on its side away from the sun.)
+    const thin = crownThin(C, float(0.3), own);
+    const behind = max(dot(seen, uSun).negate(), float(0)).mul(C.sunIn);
+    const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(uStyle2.y).mul(C.cloud).mul(behind.mul(0.55).add(throughBent(seen, toEye).mul(thin)));
+    colour = colour.add(through.mul(float(1).sub(aFrond.y.mul(0.6))));
+    m.positionNode = at;
+    // (Into the air as a scale and an offset, so the pixel's picture can scale the colour first.)
+    const airAdd = intoAir(vec3(0), at);
+    const vCol = varying(intoAir(colour, at).sub(airAdd), "vPalmCol");
+    const vAir = varying(airAdd, "vPalmAir");
+    const vUv = varying(aUv.xy, "vPalmUv");
+    const vCell = varying(aUv.z, "vPalmCell");
+    const vShares = varying(sharesFor(t, T), "vPalmShares");
+    m.colorNode = Fn(() => {
+      handOver(vShares);
+      const tex = texture(palmTex!, vUv);
+      palmNodes.push(tex);
+      const a = clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
+      Discard(a.lessThan(uAlphaCut));
+      // (The picture's colour over its cell's mean: its light and shade, its rachis paler, its tips browner.)
+      const lin = pow(max(tex.rgb, vec3(0)), vec3(2.2));
+      const mean = uPalmMeans.element(int(vCell.add(0.5))) as unknown as Vec3;
+      const ratio = clamp(lin.div(max(mean, vec3(0.004))), vec3(0), vec3(3));
+      // (The painted look keeps less of it: its marks are flat.)
+      const kept = mix(vec3(1), ratio, mix(float(1), float(0.6), uStyle.x));
+      return vec4(vCol.mul(kept).add(vAir), a);
+    })();
+    m.name = `trees-fronds-${t}`;
+    return m;
+  };
+
   // ---- The wood. ----
 
   // (The photographs' bark: every set the trees here wear, one layer each, colour and relief; a texel each
@@ -1236,7 +1382,12 @@ export function createTrees(options: TreesOptions): Trees {
     // limbs, and white sticks out of its crown read as bones.)
     const thick = aRadial.w.mul(fit.wood);
     const twig = float(1).sub(smoothstep(float(0.03), float(0.11), thick));
-    const albedo = mix(mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)), vec3(0.055, 0.047, 0.038), twig.mul(0.85)).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
+    // (A palm's stem in places wears not its bark but leaf bases: a pineapple cut's trimmed ones, or old boots.)
+    const special = step(float(1.5), aWood.w);
+    const boots = step(float(2.5), aWood.w);
+    // (Fresh trimmed bases #b8a27a, old boots #8a6f52: MORPHOLOGY.md.)
+    const basesCol = mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), boots);
+    const albedo = mix(mix(mix(bark.xyz, vec3(0.42, 0.4, 0.35), pale.mul(0.7)), vec3(0.055, 0.047, 0.038), twig.mul(0.85)), basesCol, special).mul(barkTone(T)).mul(float(0.9).add(aWood.z.mul(0.2)));
     // (Darker at its foot, in the grass and its own shade.)
     const foot = mix(float(0.6), float(1), smoothstep(float(0), float(1.2), surface.y));
     const light = mix(uShadeTint.mul(C.sky), uSunTint, sunOn(C, nWorld, float(0.2))).mul(foot);
@@ -1271,7 +1422,7 @@ export function createTrees(options: TreesOptions): Trees {
       const vGeo = varying(vec4(r0.mul(keepThin), aWood.x.mul(fit.trunkUp), upper, twig), "vWoodGeo");
       // (Its light: the sky's, darker at its foot; the sun's share past the crown; its foot's dark; how pale.)
       const vLight = varying(vec4(C.sky.mul(foot), C.sunIn.mul(C.cloud), foot, pale), "vWoodLight");
-      const vInfo = varying(vec2(T.vrow1.z, barkTone(T).mul(float(0.9).add(aWood.z.mul(0.2)))), "vWoodInfo");
+      const vInfo = varying(vec4(T.vrow1.z, barkTone(T).mul(float(0.9).add(aWood.z.mul(0.2))), special, boots), "vWoodInfo");
       // (The air between it and the eye, as a scale and an offset: only if the host has any.)
       const airAdd = world.air ? intoAir(vec3(0), at) : null;
       const vAirAdd = airAdd ? varying(airAdd, "vWoodAirAdd") : null;
@@ -1300,10 +1451,10 @@ export function createTrees(options: TreesOptions): Trees {
         const S4f = speciesR.element(sp.add(4));
         const S5 = speciesR.element(sp.add(5));
         const S6 = speciesR.element(sp.add(6));
-        const layer = mix(S4f.x, S4f.y, up);
+        const layer = mix(mix(S4f.x, S4f.y, up), mix(float(ballLayer), float(bootsLayer), vInfo.w), vInfo.z);
         const L0 = layersR.element(uint(layer).mul(2));
         const L1 = layersR.element(uint(layer).mul(2).add(1));
-        const tile = vec2(L0.w, L1.x).mul(mix(S5.y, S5.z, up));
+        const tile = vec2(L0.w, L1.x).mul(mix(mix(S5.y, S5.z, up), float(1), vInfo.z));
         const uvA = vec2(r.mul(cw).mul(sa), alongW.negate()).div(tile);
         const uvB = vec2(r.mul(cu).mul(sb).negate(), alongW.negate()).div(tile);
         const li = int(layer);
@@ -1320,7 +1471,7 @@ export function createTrees(options: TreesOptions): Trees {
         const albedo = pow(max(colA.rgb.mul(kA).add(colB.rgb.mul(kB)), vec3(0)), vec3(2.2));
         const bark = speciesR.element(sp.add(1)).xyz;
         const paled = mix(bark, vec3(0.42, 0.4, 0.35), vLight.w.mul(0.7));
-        const target = mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), paled, up);
+        const target = mix(mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), paled, up), mix(vec3(0.48, 0.37, 0.2), vec3(0.25, 0.16, 0.085), vInfo.w), vInfo.z);
         const tinted = mix(albedo.mul(target).div(max(L0.xyz, vec3(0.005))), target, float(1).sub(uBarkOn)).mul(vInfo.y);
         // (Its relief: each side's normal from its picture, round the wood (across the picture) and along it
         // (up the picture), as far as the style's `bark` takes it.)
@@ -1352,11 +1503,20 @@ export function createTrees(options: TreesOptions): Trees {
       // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go; round
       // by the way its surface faces, so where a limb leaves its parent, lit as its parent, they run on from its.)
       const vBark = varying(vec3(aNormal.x, aNormal.z, aWood.x), "vWoodBark");
+      // (A palm's stem: how it is patterned (lattice or rings), and its trunk's girth for the pattern's size.)
+      const vPalm = varying(vec4(T.srow(7).w, special, boots, T.r1.w.mul(fit.trunkUp.add(1)).mul(0.5)), "vWoodPalm");
       m.colorNode = Fn(() => {
         handOver(vShares);
         const round = atan(vBark.y, vBark.x);
         const ridge = sin(round.mul(9).add(sin(vBark.z.mul(1.7).add(round.mul(2))).mul(1.4)));
-        const furrows = mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z);
+        // (A palm's stem drawn with the record of its leaves even where bark is painted flat: a Canary palm's
+        // diamond lattice of leaf bases, a fan palm's rings of scars a hand apart, a pineapple's stubs.)
+        const lattice = sin(round.mul(11).add(vBark.z.mul(9))).mul(sin(round.mul(11).sub(vBark.z.mul(9))));
+        const stubs = sin(round.mul(16).add(vBark.z.mul(15))).mul(sin(round.mul(16).sub(vBark.z.mul(15))));
+        const rings = sin(vBark.z.mul(48).add(sin(round.mul(3)).mul(0.6)));
+        const latticeK = mix(lattice, stubs, vPalm.y);
+        const palmPattern = select(vPalm.x.greaterThan(1.5).and(vPalm.y.lessThan(0.5)), float(0.86).add(smoothstep(float(-0.6), float(0.9), rings).mul(0.16)), float(0.7).add(smoothstep(float(-0.2), float(0.5), latticeK).mul(0.38)));
+        const furrows = select(vPalm.x.greaterThan(0.5), mix(float(1), palmPattern, max(uStyle3.z, float(0.55))), mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z));
         // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
         // in patches, a cheap wobble of the furrows' own coordinates.)
         const patch = sin(round.mul(7).add(vBark.z.mul(4.3))).mul(sin(round.mul(4).sub(vBark.z.mul(6.1)))).mul(0.22).add(sin(vBark.z.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(vBark.z.mul(27.1)))).mul(0.16)).add(0.5);
@@ -1405,6 +1565,17 @@ export function createTrees(options: TreesOptions): Trees {
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
       mesh.name = `trees-sheets-${t}`;
+      group.add(mesh);
+      geometries.push(g);
+      materials.push(m);
+      meshes.push({ mesh, tier: t, wood: false });
+    }
+    if (frondSets[t].index.length > 0) {
+      const g = geometryOf(frondSets[t], frondArgs, t);
+      const m = frondMaterial(t);
+      const mesh = new THREE.Mesh(g, m);
+      mesh.frustumCulled = false;
+      mesh.name = m.name;
       group.add(mesh);
       geometries.push(g);
       materials.push(m);
@@ -1537,7 +1708,36 @@ export function createTrees(options: TreesOptions): Trees {
   // ---- The photographs: fetched, then put in place of the drawn bark and cards. ----
 
   let disposed = false;
-  const ready: Promise<boolean> = !scanned
+  // (The palms' pictures, in any look but with none asked for: the photographs for the realistic look, the
+  // painted ones for the others.)
+  const palmsReady: Promise<boolean> = !palms || scanOpts === null
+    ? Promise.resolve(false)
+    : (async () => {
+        try {
+          const pics = PALM_PICTURES[real ? "real" : "painted"];
+          const out = emptyPalmAtlas();
+          const means: [number, number, number][] = [];
+          for (const [cell, pic] of pics.entries()) {
+            const set = leafSet(pic.set);
+            if (!set) throw new Error(`no leaf set ${pic.set}`);
+            const sheet = await loadLeaves(set.id);
+            if (disposed) return false;
+            means.push(layPicture(out, cell, { set, albedo: sheet.albedo }, pic.fan, pic.mirror));
+            await new Promise((done) => setTimeout(done, 0));
+          }
+          if (disposed) return false;
+          const tex = atlasTexture(coverageMips(out, PALM_ATLAS_CELL, ALPHA_CUT, 0), 4);
+          for (const n of palmNodes) n.value = tex;
+          means.forEach((m, k) => (uPalmMeans.array[k] as THREE.Vector3).set(...m));
+          palmTex?.dispose();
+          palmTex = tex;
+          return true;
+        } catch (err) {
+          console.warn("webgpu-trees: the palms' pictures could not be had; drawing them without.", err);
+          return false;
+        }
+      })();
+  const cardsReady: Promise<boolean> = !scanned
     ? Promise.resolve(false)
     : (async () => {
         try {
@@ -1595,12 +1795,13 @@ export function createTrees(options: TreesOptions): Trees {
           return false;
         }
       })();
+  const ready: Promise<boolean> = Promise.all([cardsReady, palmsReady]).then(([cards, palmsIn]) => (scanned ? cards : palmsIn));
 
   const frustum = new THREE.Frustum();
   const pv = new THREE.Matrix4();
   const size = new THREE.Vector2();
 
-  const pieces = TIER_SHAPES.map((_, t) => ({ dabs: dabSets[t].index.length / 6, wood: woodSets[t].index.length / 3, sheets: sheetSets[t].index.length / 3 }));
+  const pieces = TIER_SHAPES.map((_, t) => ({ dabs: dabSets[t].index.length / 6, wood: woodSets[t].index.length / 3, sheets: sheetSets[t].index.length / 3, fronds: frondSets[t].index.length / 3 }));
 
   return {
     object: group,
@@ -1664,7 +1865,8 @@ export function createTrees(options: TreesOptions): Trees {
       disposed = true;
       cull.dispose();
       finish.dispose();
-      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, layerAttr, lightBoxAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
+      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, layerAttr, lightBoxAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs, frondArgs]) a.dispose();
+      palmTex?.dispose();
       lightTex.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());

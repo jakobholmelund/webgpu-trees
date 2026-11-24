@@ -129,6 +129,8 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Stone pine": { bark: "pine", barkScale: 1.4, leaves: "pine", leafCm: 32, spray: "tufts" },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
+  "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },
+  "Queen palm": { bark: "palmRings", barkScale: 0.75, leaves: "frond", leafCm: 400, spray: "whole" },
   "Coast live oak": { bark: "oak", barkScale: 0.9, leaves: "elliptic", leafCm: 5, spray: "alternate", perSpray: 12 },
   "California sycamore": { bark: "ridged", barkScale: 0.6, barkFoot: "#5e5348", upper: { set: "plane", from: 0.04, to: 0.16 }, leaves: "maple", leafCm: 20, spray: "alternate" },
   "Sugar maple": { bark: "ridged", barkScale: 0.8, leaves: "maple", leafCm: 12, spray: "opposite" },
