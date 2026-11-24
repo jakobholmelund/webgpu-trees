@@ -52,6 +52,23 @@ test("the optional fields' kinds are what the species carry", () => {
   assert.ok(seen.size >= Object.keys(fields).length - 3, `${[...seen].join(", ")}`);
 });
 
+test("the documented crown proportions go out and come back with a preset, and a copy is its own", () => {
+  const ranged = ALL_SPECIES.filter((s) => s.crownRatio && s.baseRatio);
+  assert.ok(ranged.length > 0);
+  for (const s of ranged) {
+    const i = ALL_SPECIES.indexOf(s);
+    const back = JSON.parse(JSON.stringify(s));
+    assert.equal(speciesProblem(back, i), null, s.name);
+    assert.deepEqual([back.crownRatio, back.baseRatio], [s.crownRatio, s.baseRatio], s.name);
+    assert.equal(speciesProblem({ ...back, crownRatio: [0.4] }, i)?.includes("crownRatio"), true, `${s.name}: one number is not a range`);
+    const copy = cloneSpecies(s);
+    assert.ok(copy.crownRatio !== s.crownRatio && copy.baseRatio !== s.baseRatio, `${s.name}: its ranges copied, not shared`);
+  }
+  const read = readPreset(resetPreset("stylized"));
+  assert.notEqual(typeof read, "string", `${read}`);
+  if (typeof read !== "string") for (const [i, s] of ALL_SPECIES.entries()) assert.deepEqual([read.species[i].crownRatio, read.species[i].baseRatio], [s.crownRatio, s.baseRatio], s.name);
+});
+
 test("a preset kept before fields and species were added is brought up to date, its own settings kept", () => {
   const fan = ALL_SPECIES.find((s) => s.palmLeaf === "fan");
   assert.ok(fan, "a fan palm among the species");

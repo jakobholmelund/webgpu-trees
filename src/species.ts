@@ -53,6 +53,18 @@ export interface TreeSpecies {
   latin?: string;
   /** Where it is commonly found on courses (`REGION_ROWS`). Read by no grower or shader: for a host choosing a region's trees. */
   regions?: Region[];
+  /**
+   * The crown proportions its real trees are documented to take, from drawn up in a stand to open-grown,
+   * [least, most]: `crownRatio` its crown's radius over its height (a beech in a wood, 0.14, to a parkland
+   * beech's dome, 0.5), `baseRatio` its crown's base over its height (branches to the ground in the open to
+   * a wood's long clean bole). Read by no grower or shader: for a host telling which species a measured tree
+   * is, by the range of its kind and not by the one specimen the row grows when nothing gives a tree's size
+   * (`height`, `crownRadius`, `crownBase`), which is set to a showpiece and may be retuned. From
+   * docs/MORPHOLOGY.md and its sources, noted on each species. Left out: no source gives them, and a host
+   * has only the specimen's.
+   */
+  crownRatio?: [number, number];
+  baseRatio?: [number, number];
   architecture: Architecture;
 
   // A tree of this kind, when nothing gives its own size (the lab's specimen, a host with no survey).
@@ -317,6 +329,8 @@ export type SpeciesFieldKind = "number" | "string" | "strings" | "pair" | readon
 export const OPTIONAL_SPECIES_FIELDS = {
   latin: "string",
   regions: "strings",
+  crownRatio: "pair",
+  baseRatio: "pair",
   crownPeak: "number",
   crownRound: "number",
   lobes: "number",
@@ -381,6 +395,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Oak",
     latin: "Quercus robur",
     regions: ["great-britain", "france", "netherlands", "denmark"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; TSO's
+    // open-grown 20–30 m across on 18–24 m, wider than high (the photographed one in test/outlines.json,
+    // 0.66). Base: live crown 0.75–0.90 open-grown, 0.30–0.45 in a wood [est.].
+    crownRatio: [0.18, 0.8],
+    baseRatio: [0.1, 0.7],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 13.5,
@@ -427,6 +446,10 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Plane",
     latin: "Platanus × hispanica",
     regions: ["france", "great-britain", "netherlands", "california"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): open-grown r/H 0.30–0.45; street and stand trees to
+    // 0.2 [est.]. Base: low in parks, raised on streets [est.].
+    crownRatio: [0.2, 0.45],
+    baseRatio: [0.1, 0.6],
     architecture: "broadleaf",
     height: 22,
     crownRadius: 10,
@@ -467,6 +490,10 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Eucalyptus",
     latin: "Eucalyptus globulus",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.20–0.35 [est.]. Base: live crown 0.6–0.8 open-grown, 0.25–0.40 in groves [est.].
+    crownRatio: [0.08, 0.35],
+    baseRatio: [0.2, 0.75],
     architecture: "broadleaf",
     height: 26,
     crownRadius: 10,
@@ -514,6 +541,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Spruce",
     latin: "Picea abies",
     regions: ["denmark", "netherlands", "ontario"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; the
+    // photographed open-grown one (test/outlines.json), 0.31. Base: to the ground open-grown (photographed,
+    // 0), live crown 0.35–0.55 in plantations [est.].
+    crownRatio: [0.09, 0.31],
+    baseRatio: [0, 0.65],
     architecture: "conifer",
     height: 20,
     crownRadius: 5.8,
@@ -555,6 +587,11 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     name: "Scots pine",
     latin: "Pinus sylvestris",
     regions: ["great-britain", "denmark", "netherlands"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; the
+    // photographed open-grown one (test/outlines.json), 0.43. Base: live crown 0.5–0.8 open-grown
+    // (photographed, base 0.46), 0.25–0.40 in plantations [est.].
+    crownRatio: [0.1, 0.43],
+    baseRatio: [0.2, 0.75],
     architecture: "broadleaf",
     height: 19,
     crownRadius: 8,
@@ -649,6 +686,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Beech",
     latin: "Fagus sylvatica",
     regions: ["denmark", "great-britain", "netherlands", "france"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.35–0.50 [est.] (TSO: spreading, low-branched). Base: live crown 0.85–0.95 open-grown,
+    // 0.35–0.50 in a wood [est.].
+    crownRatio: [0.14, 0.5],
+    baseRatio: [0.05, 0.65],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 12,
@@ -697,6 +739,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Silver birch",
     latin: "Betula pendula",
     regions: ["great-britain", "denmark", "netherlands"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.20–0.30 [est.]. Base: live crown 0.6–0.8 open-grown, 0.3–0.5 in a stand [est.].
+    crownRatio: [0.1, 0.3],
+    baseRatio: [0.2, 0.7],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 6,
@@ -739,6 +785,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Black alder",
     latin: "Alnus glutinosa",
     regions: ["denmark", "netherlands", "france"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.15–0.25 [est.]. Base: live crown 0.6–0.8 open-grown, 0.35–0.55 in a stand [est.].
+    crownRatio: [0.09, 0.25],
+    baseRatio: [0.2, 0.65],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 4,
@@ -781,6 +831,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Lombardy poplar",
     latin: "Populus nigra 'Italica'",
     regions: ["france", "netherlands"],
+    // Real crowns (docs/MORPHOLOGY.md): the clone's column, r/H 0.06–0.10; TALLO's species (not split by
+    // clone) 0.10–0.21, so up to 0.16 [est.]. Base: branched from low on the stem [est.].
+    crownRatio: [0.05, 0.16],
+    baseRatio: [0.03, 0.5],
     architecture: "broadleaf",
     height: 22,
     crownRadius: 2.5,
@@ -819,6 +873,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Weeping willow",
     latin: "Salix × sepulcralis",
     regions: ["france", "denmark", "netherlands"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): open-grown r/H 0.45–0.60; crowded by water 0.3 [est.].
+    // Base: its curtains hang near the ground [est.].
+    crownRatio: [0.3, 0.6],
+    baseRatio: [0, 0.4],
     architecture: "broadleaf",
     height: 11,
     crownRadius: 7.5,
@@ -863,6 +921,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Hawthorn",
     latin: "Crataegus monogyna",
     regions: ["great-britain", "denmark", "netherlands", "france"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 3–10 m lower quartile (its
+    // height); open-grown 0.40–0.60 [est.]. Base: live crown 0.7–0.9 [est.].
+    crownRatio: [0.17, 0.6],
+    baseRatio: [0.1, 0.3],
     architecture: "broadleaf",
     height: 6,
     crownRadius: 3,
@@ -937,6 +999,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Sitka spruce",
     latin: "Picea sitchensis",
     regions: ["denmark", "pacific-northwest"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's only 10 records (14–33 m tall),
+    // their quartiles 0.13–0.21; open-grown 0.15–0.22 [est.]. Base: long trunks with no lower limbs in the
+    // forest (FEIS), live crown 0.30–0.50 in plantations, 0.85–1.0 open-grown [est.].
+    crownRatio: [0.13, 0.22],
+    baseRatio: [0, 0.7],
     architecture: "conifer",
     height: 28,
     crownRadius: 4.5,
@@ -977,6 +1044,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Corsican pine",
     latin: "Pinus nigra",
     regions: ["netherlands", "denmark", "france", "great-britain"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m quartiles, wider than
+    // the open-grown 0.15–0.22 [est.]. Base: live crown 0.6–0.8 open-grown, 0.25–0.40 in plantations
+    // [est.].
+    crownRatio: [0.16, 0.26],
+    baseRatio: [0.2, 0.75],
     architecture: "conifer",
     height: 18,
     crownRadius: 4.5,
@@ -1017,6 +1089,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Douglas fir",
     latin: "Pseudotsuga menziesii",
     regions: ["pacific-northwest", "denmark"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.15–0.22 [est.]. Base: branches near the ground when young and open-grown (FEIS), live
+    // crown 0.30–0.50 in managed stands [est.].
+    crownRatio: [0.08, 0.22],
+    baseRatio: [0, 0.7],
     architecture: "conifer",
     height: 30,
     crownRadius: 5,
@@ -1056,6 +1133,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Western red cedar",
     latin: "Thuja plicata",
     regions: ["pacific-northwest"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's lower quartile over 25 m and
+    // upper quartile at 3–10 m (no 10–18 m band). Base: live crown 0.85–1.0 open-grown, 0.4–0.6 in a stand
+    // [est.].
+    crownRatio: [0.1, 0.27],
+    baseRatio: [0, 0.6],
     architecture: "conifer",
     height: 20,
     crownRadius: 4.5,
@@ -1101,6 +1183,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Monterey cypress",
     latin: "Hesperocyparis macrocarpa",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): GDB: broad-spreading, wider than tall on
+    // headlands, more upright where sheltered; 0.50–1.00 exposed, 0.25 sheltered [est.]. Base: GDB's few
+    // major limbs near the trunk's foot, live crown 0.6–1.0 [est.].
+    crownRatio: [0.25, 1],
+    baseRatio: [0, 0.4],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 12,
@@ -1152,6 +1239,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Monterey pine",
     latin: "Pinus radiata",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.30–0.45 [est.]. Base: GDB's stands' crowns 10–20 % of height, open-grown live crown
+    // 0.6–0.9 [est.].
+    crownRatio: [0.12, 0.45],
+    baseRatio: [0.1, 0.9],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 7.5,
@@ -1203,6 +1295,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Torrey pine",
     latin: "Pinus torreyana",
     regions: ["california"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): open-grown r/H 0.40–0.70 from the species notes; the
+    // stand-grown end at 0.25 [est.]. Base: crowns from low on the bluffs to high in a stand [est.].
+    crownRatio: [0.25, 0.7],
+    baseRatio: [0.1, 0.55],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 8,
@@ -1249,6 +1345,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Aleppo pine",
     latin: "Pinus halepensis",
     regions: ["california", "france"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; the
+    // photographed open-grown one (test/outlines.json), 0.48. Base: live crown 0.4–0.7 (EUAT), the
+    // photographed one's base 0.125.
+    crownRatio: [0.18, 0.48],
+    baseRatio: [0.12, 0.6],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 6.5,
@@ -1296,6 +1397,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Stone pine",
     latin: "Pinus pinea",
     regions: ["california", "france"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; the
+    // photographed open-grown one (test/outlines.json), 0.74. Base: no low branches (EUAT), live crown
+    // 0.25–0.45 when mature [est.], the photographed one's base 0.25.
+    crownRatio: [0.22, 0.74],
+    baseRatio: [0.25, 0.75],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 11.5,
@@ -1348,6 +1454,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Canary date palm",
     latin: "Phoenix canariensis",
     regions: ["california"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): r/H 0.30–0.60, falling with age as the trunk grows;
+    // tall old palms to 0.2 [est.]. Base: the head's lowest fronds, half to most of the height [est.].
+    crownRatio: [0.2, 0.6],
+    baseRatio: [0.2, 0.85],
     architecture: "palm",
     height: 12,
     crownRadius: 6,
@@ -1392,6 +1502,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Mexican fan palm",
     latin: "Washingtonia robusta",
     regions: ["california"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): r/H 0.05–0.12; young palms wider, to 0.2 [est.]. Base:
+    // a small head at the top of a tall trunk [est.].
+    crownRatio: [0.05, 0.2],
+    baseRatio: [0.4, 0.92],
     architecture: "palm",
     height: 18,
     crownRadius: 3,
@@ -1438,6 +1552,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Coast live oak",
     latin: "Quercus agrifolia",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): VT: spread often more than height
+    // (0.50–0.80 open-grown); in dense stands irregular crowns (FEIS), 0.25 [est.]. Base: open-grown trunks
+    // 1.2–2.4 m and foliage to the ground, branchless to about 6 m in dense stands (FEIS).
+    crownRatio: [0.25, 0.8],
+    baseRatio: [0, 0.5],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 11,
@@ -1491,6 +1610,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "California sycamore",
     latin: "Platanus racemosa",
     regions: ["california"],
+    // Real crowns (docs/MORPHOLOGY.md, not in TALLO): open-grown r/H 0.30–0.50; stand-grown end 0.2 [est.].
+    // Base: forked low or leaning by creeks, higher in a riparian stand [est.].
+    crownRatio: [0.2, 0.5],
+    baseRatio: [0.1, 0.5],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 10,
@@ -1541,6 +1664,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Sugar maple",
     latin: "Acer saccharum",
     regions: ["ontario"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile; Silvics'
+    // champion 20.1 m across on 23.8 m (0.42), open-grown 0.30–0.45. Base: two-thirds clear bole in the
+    // forest (NRCAN), live crown 0.75–0.90 open-grown [est.].
+    crownRatio: [0.13, 0.45],
+    baseRatio: [0.1, 0.7],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 6.5,
@@ -1576,6 +1704,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Red oak",
     latin: "Quercus rubra",
     regions: ["ontario", "denmark", "netherlands"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.35–0.50 [est.] (Silvics: short boles and spreading crowns in the open). Base: live crown
+    // 0.70–0.85 open-grown, 0.35–0.45 in the forest [est.].
+    crownRatio: [0.16, 0.5],
+    baseRatio: [0.15, 0.65],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 8,
@@ -1615,6 +1748,11 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Eastern white pine",
     latin: "Pinus strobus",
     regions: ["ontario"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.25–0.35 [est.]. Base: branch-free for the lower two-thirds in the forest (NRCAN, FEIS),
+    // live crown 0.6–0.9 open-grown [est.].
+    crownRatio: [0.14, 0.35],
+    baseRatio: [0.1, 0.7],
     architecture: "conifer",
     height: 22,
     crownRadius: 5.5,
@@ -1656,6 +1794,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "California fan palm",
     latin: "Washingtonia filifera",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): UF/IFAS: 3–4.5 m across on 12–18 m; a
+    // healthy planted palm 5–7 m across on 12 m [est.].
+    crownRatio: [0.08, 0.28],
     architecture: "palm",
     height: 12,
     crownRadius: 3,
@@ -1698,6 +1839,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Queen palm",
     latin: "Syagrus romanzoffiana",
     regions: ["california"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): UF/IFAS: 6–7.5 m across, up to 15 m
+    // tall; 8–12 m tall on a course [est.].
+    crownRatio: [0.2, 0.47],
     architecture: "palm",
     height: 10,
     crownRadius: 3.2,
@@ -1737,6 +1881,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "White spruce",
     latin: "Picea glauca",
     regions: ["ontario"],
+    // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): TALLO's 10–18 m lower quartile;
+    // open-grown 0.12–0.18 [est.]. Base: live crown close to the ground (FEIS), 0.5–0.7 in a stand [est.].
+    crownRatio: [0.08, 0.18],
+    baseRatio: [0, 0.5],
     architecture: "conifer",
     height: 16,
     crownRadius: 2.8,
@@ -1783,6 +1931,8 @@ export function cloneSpecies(s: TreeSpecies): TreeSpecies {
     ...(s.stemRange ? { stemRange: [s.stemRange[0], s.stemRange[1]] as [number, number] } : {}),
     ...(s.leafColors ? { leafColors: [...s.leafColors] } : {}),
     ...(s.regions ? { regions: [...s.regions] } : {}),
+    ...(s.crownRatio ? { crownRatio: [s.crownRatio[0], s.crownRatio[1]] as [number, number] } : {}),
+    ...(s.baseRatio ? { baseRatio: [s.baseRatio[0], s.baseRatio[1]] as [number, number] } : {}),
   };
 }
 
@@ -1827,6 +1977,8 @@ export function checkSpecies(s: TreeSpecies): string[] {
     if (!(s[k] >= 0 && s[k] <= 1)) out.push(`${k} must be 0..1`);
   }
   if (!(s.bend >= -1 && s.bend <= 1)) out.push("bend must be -1..1");
+  if (s.crownRatio !== undefined && !(s.crownRatio.length === 2 && s.crownRatio[0] > 0 && s.crownRatio[0] < s.crownRatio[1] && s.crownRatio[1] <= 1.5)) out.push("crownRatio must be [least, most], above 0 and to 1.5, the least under the most");
+  if (s.baseRatio !== undefined && !(s.baseRatio.length === 2 && s.baseRatio[0] >= 0 && s.baseRatio[0] < s.baseRatio[1] && s.baseRatio[1] < 1)) out.push("baseRatio must be [least, most], from 0 to under 1, the least under the most");
   if (s.regions && !s.regions.every((r) => REGION_ROWS.includes(r))) out.push(`regions must be from ${REGION_ROWS.join(", ")}`);
   if (s.leafColors && !s.leafColors.every((c) => /^#[0-9a-f]{6}$/i.test(c))) out.push("leafColors must be hex colours like #5b7f3a");
   return out;
