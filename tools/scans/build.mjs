@@ -1136,8 +1136,8 @@ const manifest = {
 };
 writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
 // (Keeping the painted marks' section, which tools/marks/build.mjs writes.)
-const kept = existsSync(join(OUT, "SOURCES.md")) ? readFileSync(join(OUT, "SOURCES.md"), "utf8").match(/<!-- painted marks: [\s\S]*<!-- end of painted marks -->/)?.[0] : null;
-writeFileSync(join(OUT, "SOURCES.md"), kept ? `${sourcesMd().trimEnd()}\n\n${kept}\n` : sourcesMd());
+const painted = existsSync(join(OUT, "SOURCES.md")) ? readFileSync(join(OUT, "SOURCES.md"), "utf8").match(/<!-- painted marks: [\s\S]*<!-- end of painted marks -->/)?.[0] : null;
+writeFileSync(join(OUT, "SOURCES.md"), painted ? `${sourcesMd().trimEnd()}\n\n${painted}\n` : sourcesMd());
 console.log("done");
 
 function sourcesMd() {

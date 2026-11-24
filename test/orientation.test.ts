@@ -13,7 +13,7 @@ import { growTree } from "../src/grow.ts";
 import { SPRAY_FOOT, cardPieces } from "../src/geometry.ts";
 import { type LeafSet, SCAN_LOOKS, nearCardHalf } from "../src/scans.ts";
 import { ALL_SPECIES } from "../src/species.ts";
-import { CARD_V, FOOT, type Sheet, drawCushionCard, drawSprayCard, drawnCushionCard } from "../src/sprays.ts";
+import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, FOOT, SPRAY_COLS, type Sheet, drawCushionCard, drawSprayCard, drawSprayRow, drawnCushionCard } from "../src/sprays.ts";
 
 /** A sheet of one leaf, 40 texels wide and 200 long, its stalk at the bottom (as the sheets stand them). */
 function leafSheet(): Sheet {
@@ -202,4 +202,70 @@ test("a pine's drawn cushion is a dome on a flat base at the card's foot, lit on
   // (An open pine's (an Aleppo pine's) is looser: less of its card covered.)
   const open = cover("Aleppo pine", 0.4);
   assert.ok(open.total < 0.8 * dense.total, `${open.total} texels against a dense one's ${dense.total}`);
+});
+
+/** The cushion sheet, its top half yellow-green and its lower half a cool dark green (a sunlit cushion's). */
+function warmSheet(): Sheet {
+  const s = cushionSheet();
+  const { data, width: W, height: H } = s.albedo;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const o = (y * W + x) * 4;
+      if (data[o + 3] === 0) continue;
+      data.set(y < 128 - 60 ? [190, 200, 60] : [40, 70, 60], o);
+    }
+  s.set.meanLinear = [0.2, 0.3, 0.1];
+  return s;
+}
+
+test("a photographed cushion keeps its warmth: its sunlit top warmer than its underside", () => {
+  const n = 128;
+  const out = { data: new Uint8Array(n * n * 4), width: n, height: n };
+  drawCushionCard(out, 0, 0, n, warmSheet(), 0);
+  const warm = (y0: number, y1: number) => {
+    let s = 0;
+    let c = 0;
+    for (let y = y0; y < y1; y++)
+      for (let x = 0; x < n; x++) {
+        const o = (y * n + x) * 4;
+        if (out.data[o + 3] < 200) continue;
+        s += out.data[o + 2];
+        c++;
+      }
+    return s / Math.max(1, c);
+  };
+  const r = rows(out, n);
+  const covered = r.map((c, y) => (c > 0 ? y : -1)).filter((y) => y >= 0);
+  const top = covered[covered.length - 1];
+  // (Blue holds its warmth, 128 its sheet's mean: the far rows (its top) over, its foot under.)
+  assert.ok(warm(top - 12, top) > 150, `its top ${warm(top - 12, top).toFixed(0)}`);
+  assert.ok(warm(covered[0], covered[0] + 20) < 110, `its foot ${warm(covered[0], covered[0] + 20).toFixed(0)}`);
+});
+
+test("a stone pine's far cards are its canopy pictures; a pine without them has its big cards there again", () => {
+  const n = 64;
+  const look = SCAN_LOOKS["Stone pine"];
+  const cushions = cushionSheet();
+  // (Its canopy: a strip four times as wide as high.)
+  const W = 256;
+  const H = 72;
+  const data = new Uint8Array(W * H * 4);
+  for (let y = 8; y < 64; y++) for (let x = 4; x < 252; x++) data.set([120, 140, 60, 255], (y * W + x) * 4);
+  const normal = new Uint8Array(W * H * 4).fill(128);
+  const far: Sheet = { set: { id: "strip", size: [W, H], lengthCm: 150, tone: false, meanLinear: [0.2, 0.25, 0.05], sprites: [{ x: 0, y: 0, w: W, h: H, base: [128, 64], tip: [128, 8], size: 1 }] }, albedo: { data, width: W, height: H }, normal: { data: normal, width: W, height: H } };
+  const out = { data: new Uint8Array(SPRAY_COLS * n * n * 4), width: SPRAY_COLS * n, height: n };
+  drawSprayRow(out, 0, n, leafSheet(), look, 3, 7, 0.75, cushions, far);
+  const cell = (c: number) => {
+    let h = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (out.data[(y * out.width + c * n + x) * 4 + 3] >= 128) h = Math.max(h, y);
+    return h;
+  };
+  // (The strip lower than the cushion: four times as wide as high against two.)
+  for (let c = FAR_CARD; c < FAR_CARD + FAR_CARDS; c++) assert.ok(cell(c) < 0.75 * cell(BIG_CARD), `far card ${c} ${cell(c)} high, a cushion ${cell(BIG_CARD)}`);
+  const plain = { data: new Uint8Array(SPRAY_COLS * n * n * 4), width: SPRAY_COLS * n, height: n };
+  drawSprayRow(plain, 0, n, leafSheet(), SCAN_LOOKS["Monterey pine"], 3, 7, 0.75, cushions);
+  for (let c = FAR_CARD; c < FAR_CARD + FAR_CARDS; c++)
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++)
+        for (let k = 0; k < 4; k++) assert.equal(plain.data[(y * plain.width + c * n + x) * 4 + k], plain.data[(y * plain.width + (BIG_CARD + ((c - FAR_CARD) % BIG_CARDS)) * n + x) * 4 + k]);
 });

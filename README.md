@@ -908,9 +908,10 @@ spoil).
 - **Leaves** are a sheet of single leaves a species wears, cut from a scan
   and stood upright, laid on the species' own twigs at their real size
   (`sprays.ts`): a row of cards for each species in the trees: three near
-  cards (a twig's end of a few shoots, 0.4 to 0.9 m across) and two big cards
-  (a branch's end, a clump wide, for the mid tier, a conifer's sheets and the
-  far dabs; each big card one of the two by a number of its own). A card is
+  cards (a twig's end of a few shoots, 0.4 to 0.9 m across), two big cards
+  (a branch's end, a clump wide: a near clump's mass and a conifer's sheets)
+  and two far cards (the mid tier's and the far dabs': the big cards again, or a
+  pine's canopy pictures, `cushionFar`), each one of its two by a number of its own. A card is
   drawn from its foot: its first row is where its twig comes in, and the
   shaders lay its first row at its twig's foot (`CARD_V`). An oak's leaves one to a node with a cluster at the tip, a
   maple's in pairs, a blue gum's few long sickles hanging from the twig's end
@@ -1004,8 +1005,35 @@ spoil).
   A far dab of such a pine stands upright too. Its tuft cards are fewer (three tenths
   of a pine's) and drawn only close to, whole to 9 m and gone by 15 m: a tuft a few
   pixels across was a broad leaf's blot on the cushions. Its wood thinner than 2 cm
-  is not drawn (it crossed over the cushions as sticks); its limbs are. The stone,
-  Monterey and Aleppo pines have them.
+  is not drawn (it crossed over the cushions as sticks); its limbs are.
+- **Cushions from photographs.** The owner's pictures (AI-generated, not CC0; `assets/SOURCES.md`),
+  keyed off magenta and kept whole (`tools/scans`): a stone pine's single cushions on its big
+  cards and strips of its canopy, several cushions side by side over crooked branches, on its
+  far cards, its mid cards 2.6 of a clump's radius from their middle so a strip's cushions are
+  a cushion's size; a Monterey pine's dense dark clumps; an Aleppo pine's open grey-green
+  ones, twigs showing; a Scots pine's blue-green ones; a Monterey cypress's flat-topped pads
+  (its whole sprays fewer over them). Each card keeps its picture's own light and shade as
+  its tone, and its warmth (red over blue beside its sheet's mean) in the channel the drawn
+  cards spend on tone again: the shader warms its sunlit top and cools its underside by it
+  (`CUSHION_WARMTH`), and lays only a little of a pine's clump shading over it
+  (`CUSHION_PHOTO_SHADE`), lit from the light box half a card up, at its top, and not its
+  middle, deep in the clump, which darkened a picture already dark beneath. How many to a
+  clump and how big go with how closed the crown is (`closedOf`, openness 0.25 to 0.6,
+  squared): four 2 clump radii from their middle on a stone pine, a Monterey pine or a
+  cypress, about two of 1.4 on a Scots pine, one of 1.1 on an Aleppo pine. Their sizes vary
+  by a third either way and they stand up to half a clump's radius up or down their twigs,
+  so the crown seen from beneath is not rings of plates at one height; tipped over to an eye
+  below, from 20 degrees up, they are drawn up to 1.6 times bigger, closing into a ceiling,
+  and darkened to their undersides. The stone pine wears its own bark too, thick reddish
+  plates between deep fissures (`stonePine`, a tile 1.2 m square). The drawn cushions
+  (`"drawn"`) remain for a pine with no pictures.
+- **Cost** of the photographed cushions: in the lab's grove of stone pines only, 3456 x 2006,
+  the frame took 3.48 and 3.28 ms in the clearing and 2.51 and 2.53 from outside before, 4.01
+  and 4.02 and 3.40 and 4.21 after (runs interleaved against the drawn cushions, on a shared,
+  busy Mac): more and bigger cushion cards near to, and mid cards a strip of canopy each, more
+  overdraw. The mixed grove (a Scots pine's clumps in it) 3.36 and 2.89 ms before, 3.40 and
+  2.42 after. On the graphics card the cards' atlas is seven cards a row (from five); the
+  pictures added to the package are 2.7 MB of AVIF (six leaf sets and a bark set).
 - **Cost** of the cushion cards (and two big cards a species row): in the lab's grove
   of stone pines only (`?scene=grove&fill=1`, 400 trees), 3456 x 1892, the frame took
   6.24 and 4.51 ms in the clearing and 5.19 and 2.62 from outside before, 3.96 and 3.01

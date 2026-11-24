@@ -89,6 +89,8 @@ const generated = (id, file, title, prompt, extra = {}) => ({
 });
 /** The tool the realistic look's later pictures (tools/ai-textures/PROMPTS.md) were made with. */
 const ANTIGRAVITY = { tool: "Antigravity / gemini-3.8-flash image", date: "2026-11-24" };
+/** The pines' cushions and clumps were made by the owner in the Antigravity app with Nano Banana. */
+const NANO_ANTIGRAVITY = { tool: "Nano Banana via Antigravity", date: "2026-11-24" };
 
 export const SOURCES = {
   // Barks.
@@ -122,8 +124,18 @@ export const SOURCES = {
   ai_scotspine_upper: generated("real-scotspine-upper-bark-1", "real-scotspine-upper-bark-1.jpg", "Scots pine upper-stem bark", "Scots pine (Pinus sylvestris) bark from high on the stem, photographed straight-on as a flat seamless tileable texture, square. Thin flaking papery plates of bright orange to copper-red bark peeling in small curls, filling the whole frame edge to edge. Even diffuse light, no cast shadows, no perspective, no trunk edges visible. Photographic scan quality.", { ...ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16 }, grade: { saturation: 0.6, toward: [0.71, 0.39, 0.24] } }),
   ai_torrey_shoot: generated("real-torrey-shoot", ["real-torrey-shoot-3.jpg", "real-torrey-shoot-1.jpg"], "Torrey pine shoots", "One Torrey pine (Pinus torreyana) shoot laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. A stout grey-brown twig ending in a dense tuft of long stiff grey-green needles in bundles of five, 20–30 cm long, spreading forward like a brush. The whole shoot inside the frame with a margin, no shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
   ai_liveoak_leaves: generated("real-liveoak-leaves-2", "real-liveoak-leaves-2.jpg", "Coast live oak leaves", "Ten coast live oak (Quercus agrifolia) leaves laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. Each leaf small, 3–6 cm, oval, cupped and holly-like with spiny toothed edges, dark glossy green; arranged in rows, upright, not touching, each fully inside the frame with a margin. No shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
-  ai_plane_leaves: generated("real-plane-leaves", ["real-plane-leaves-1.jpg", "real-plane-leaves-2.jpg"], "London plane leaves", "Six London plane (Platanus × hispanica) leaves laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, square. Each leaf palmate with five pointed lobes and toothed edges, 12–20 cm, mid green with paler veins, a long stalk at the bottom; side by side, upright, not touching, each fully inside the frame with a margin. No shadows on the background, sharp edges.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
+  // (Checked by the owner against a photograph of real plane leaves: broad pointed lobes, sparse coarse teeth, the swollen stalk base.)
+  ai_plane_leaves: generated("real-plane-leaves", ["real-plane-leaves-5.png", "real-plane-leaves-6.png"], "London plane leaves", "Six real London plane tree leaves (Platanus x hispanica) photographed flat from directly above like a botanical herbarium scan, on a pure flat magenta #FF00FF background with no gradient and no shadow, square, arranged in two rows of three, upright, not touching, each fully inside the frame with a margin, no text. Leaf shape: a broad leaf wider than long, thick and leathery, three big broad triangular lobes at the top and two small low ones at the sides, notches between lobes with wide open V-shaped bottoms, lobe edges with only one or two large teeth each, a broad base, three strong pale veins fanning from the base, matte olive green, a thick stalk with a swollen base.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
   ai_cypress_spray: generated("real-cypress-spray", ["real-cypress-spray-1.jpg", "real-cypress-spray-2.jpg"], "Monterey cypress sprays", "One Monterey cypress (Hesperocyparis macrocarpa) branchlet laid flat on a pure flat magenta #FF00FF background, top-down orthographic photograph like a botanical scan, tall 1:2. Dense rope-like cord sprays of tiny scale leaves branching in three dimensions, dark bright green, a thin brown axis; the whole spray inside the frame with a margin, no shadows on the background.", { ...ANTIGRAVITY, key: "magenta", unmix: true }),
+  // The pines' cushions and clumps, each picture one whole (generated 2026-11-24 in the Antigravity app; the
+  // prompts as given in tools/ai-textures/PROMPTS.md).
+  ai_stonepine_cushion: generated("real-stonepine-cushion", ["real-stonepine-cushion-1.png", "real-stonepine-cushion-2.png"], "Stone pine foliage cushion", "One single dense rounded cushion of Italian stone pine (Pinus pinea) foliage, photographed from the side at eye level like a botanical studio photograph, on a pure flat magenta #FF00FF background, wide 2:1. A wide puffy pad about 2 m across, flat underneath and domed on top, made of thousands of long paired grey-green needles in brush-like tufts at the ends of many short upturned shoots; the sunlit top is bright yellow-green, the underside deep dark green almost black, a few thin brown twigs visible under its flat base. Needle-textured ragged edge all round. The whole cushion inside the frame with a clear margin, no other plants, no shadows on the background.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_stonepine_canopy: generated("real-stonepine-canopy", ["real-stonepine-canopy-1.png", "real-stonepine-canopy-2.png"], "Stone pine canopy strip", "A section of the flat-topped canopy of an Italian stone pine (Pinus pinea) seen from the side, made of several overlapping rounded cushions of pine needle foliage side by side, each cushion lit yellow-green on top and dark green beneath, deep shadowed creases between the cushions, a few dark crooked branches visible beneath the flat underside, on a pure flat magenta #FF00FF background, wide 3:1, photographic, even daylight from above, the whole canopy section inside the frame with a margin, no trunk, no shadows on the background.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_pine_clump_dark: generated("real-pine-clump-dark", ["real-pine-clump-dark-1.png", "real-pine-clump-dark-2.png"], "Monterey pine foliage clump", "One dense rounded clump of Monterey pine (Pinus radiata) foliage photographed from the side, on a pure flat magenta #FF00FF background, square. Many stout shoots ending in thick brushes of long dark green needles in bundles of three, packed into a lumpy rounded mass about 1.5 m across, sunlit needle tips lighter green on top, very dark underneath, spiky needle-textured outline. The whole clump inside the frame with a margin, no shadows on the background, photographic.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_pine_clump_light: generated("real-pine-clump-light", ["real-pine-clump-light-1.png", "real-pine-clump-light-2.png"], "Aleppo pine foliage clump", "One loose irregular clump of Aleppo pine (Pinus halepensis) foliage photographed from the side, on a pure flat magenta #FF00FF background, square. Several thin grey-brown twigs ending in soft tufts of fine light grey-green needles, an open airy lumpy mass with small sky gaps, sunlit tips paler, darker beneath, spiky needle outline. The whole clump inside the frame with a margin, no shadows on the background, photographic.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_scotspine_clump: generated("real-scotspine-clump", ["real-scotspine-clump-1.png", "real-scotspine-clump-2.png"], "Scots pine foliage clump", "One dense rounded clump of mature Scots pine (Pinus sylvestris) foliage seen from the side: short twisted blue-green needles in pairs, packed in brushes at the ends of many short upturned shoots on a thin orange-brown branch, forming a lumpy rounded mass about 1.5 m across with small gaps, sunlit tops lighter blue-green, dark underneath, a spiky needle outline. Square. Pure flat magenta #FF00FF background with no gradient and no shadow, the whole subject inside the frame with a clear margin, nothing else in frame, no text, photographic quality, even daylight from above.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_cypress_pad: generated("real-cypress-pad", ["real-cypress-pad-1.png", "real-cypress-pad-2.png"], "Monterey cypress foliage pad", "One flat-topped pad of Monterey cypress (Hesperocyparis macrocarpa) foliage seen from the side, like a wind-shaped shelf on a coastal tree: very dense rope-like cords of tiny scale leaves branching in all directions (not flat fern-like sprays), packed into a lumpy shelf flat on top and flat underneath, bright dark green on the sunlit top, near-black green beneath, a few crooked grey-brown twigs under its base. Wide 2:1. Pure flat magenta #FF00FF background with no gradient and no shadow, the whole subject inside the frame with a clear margin, nothing else in frame, no text, photographic quality, even daylight from above.", { ...NANO_ANTIGRAVITY, key: "magenta", unmix: true }),
+  ai_stonepine_bark: generated("real-stonepine-bark-1", "real-stonepine-bark-1.png", "Stone pine bark", "Mature Italian stone pine (Pinus pinea) trunk bark: thick flat reddish-brown to orange-brown plates separated by deep dark grey-brown vertical fissures, the plate faces paler and flaking at their edges. Fill the whole frame edge to edge, straight-on, even diffuse light, no shadows, no perspective, no trunk edges visible, photographic scan quality.", { ...NANO_ANTIGRAVITY, crop: { x: 0.5, size: 1, overlap: 0.16 } }),
   // Leaves.
   LeafSet016: acg("LeafSet016", "2K", { title: "Leaf Set 016" }),
   LeafSet030: acg("LeafSet030", "2K", { title: "Leaf Set 030" }),
@@ -224,7 +236,7 @@ export const BARK = [
     id: "pine",
     source: "pine_bark",
     look: "red-brown plates between dark fissures",
-    for: ["Scots pine", "Corsican pine", "Monterey pine", "Torrey pine", "Aleppo pine", "Stone pine", "Eastern white pine"],
+    for: ["Scots pine", "Corsican pine", "Monterey pine", "Torrey pine", "Aleppo pine", "Eastern white pine"],
     delight: 0.6,
   },
   {
@@ -291,6 +303,16 @@ export const BARK = [
     tileFrom: "estimated: ~12 cut bases across, a Canary palm's trimmed bases 8–12 cm",
     delight: 0.6,
   },
+  {
+    id: "stonePine",
+    source: "ai_stonepine_bark",
+    look: "thick flat reddish-brown plates between deep grey-brown fissures (an old stone pine's)",
+    for: ["Stone pine"],
+    // (An old stone pine's plates 10–25 cm wide and longer than wide: some seven across the 860 texels here.)
+    tileCm: [120, 120],
+    tileFrom: "estimated: plates ~12–20 cm wide, an old stone pine's 10–25 cm",
+    delight: 0.6,
+  },
 ];
 
 /**
@@ -312,7 +334,7 @@ export const LEAVES = [
   { id: "redOak", source: "LeafSet030", look: "bristle-lobed red oak leaves (autumn colours, kept as lightness only)", for: ["Red oak"], base: "right", px: 288, lengthCm: 17, tone: true },
   { id: "maple", source: "LeafSet010", look: "palmate maple leaves", for: ["California sycamore", "Sugar maple"], base: "down", px: 352, lengthCm: 16 },
   // (Six leaves to each of two pictures: the first row of each and two more, as the sheet holds eight.)
-  { id: "londonPlane", source: "ai_plane_leaves", look: "palmate London plane leaves, five-lobed, on long stalks", for: ["Plane"], base: "down", px: 288, lengthCm: 30 },
+  { id: "londonPlane", source: "ai_plane_leaves", look: "broad London plane leaves, three big pointed lobes and two small, sparse coarse teeth, stalks swollen at the base", for: ["Plane"], base: "down", px: 288, lengthCm: 30 },
   { id: "round", source: "LeafSet009", look: "round leaves, toothed", for: ["Black alder"], base: "down", px: 288, lengthCm: 9 },
   { id: "deltoid", source: "LeafSet004", look: "triangular leaves on long stalks", for: ["Lombardy poplar", "Silver birch"], base: "down", px: 320, lengthCm: 10 },
   { id: "serrate", source: "LeafSet014", look: "ovate leaves, finely toothed, straight veins", for: ["Silver birch"], base: "down", px: 320, lengthCm: 9 },
@@ -361,6 +383,14 @@ export const LEAVES = [
     lengthCm: 24,
   },
   // (Each picture one shoot, its needles apart: one to a sprite. Needles 20–30 cm, about half the shoot.)
+  // (A pine's cushions and clumps, each picture one whole, seen from the side, its flat base down: laid one to a
+  // big card, sprays.ts `drawCushionCard`. Its length the picture's height; sized to fill the sheet's width.)
+  { id: "stonePineCushion", source: "ai_stonepine_cushion", look: "one dense stone pine cushion seen from the side, flat beneath, domed above, lit on top", for: ["Stone pine"], base: "down", px: 440, lengthCm: 100, deskew: false, whole: true },
+  { id: "stonePineCanopy", source: "ai_stonepine_canopy", look: "a strip of stone pine canopy: several cushions side by side, crooked branches beneath", for: ["Stone pine"], base: "down", px: 210, lengthCm: 150, deskew: false, whole: true },
+  { id: "pineClumpDark", source: "ai_pine_clump_dark", look: "a dense dark Monterey pine clump of stout needle brushes", for: ["Monterey pine"], base: "down", px: 512, lengthCm: 150, deskew: false, whole: true },
+  { id: "pineClumpLight", source: "ai_pine_clump_light", look: "an open grey-green Aleppo pine clump, its twigs showing", for: ["Aleppo pine"], base: "down", px: 512, lengthCm: 150, deskew: false, whole: true },
+  { id: "scotsPineClump", source: "ai_scotspine_clump", look: "a dense blue-green Scots pine clump of short paired needles on a thin orange-brown branch", for: ["Scots pine"], base: "down", px: 512, lengthCm: 150, deskew: false, whole: true },
+  { id: "cypressPad", source: "ai_cypress_pad", look: "a flat-topped Monterey cypress shelf of dense scale-leaf cords, flat beneath", for: ["Monterey cypress"], base: "down", px: 220, lengthCm: 90, deskew: false, whole: true },
   { id: "torreyPine", source: "ai_torrey_shoot", look: "Torrey pine shoots: a stout twig ending in a brush of long grey-green needles", for: ["Torrey pine", "Corsican pine"], base: "down", px: 512, lengthCm: 50, deskew: false, whole: true },
   { id: "frond", source: "ai_canary_frond", look: "a whole feather-shaped palm frond", for: ["Canary date palm"], base: "down", px: 640, lengthCm: 450, deskew: false },
   { id: "blade", source: "Foliage001", look: "long narrow blades (a palm's leaflets)", for: ["Mexican fan palm"], base: "down", px: 512, lengthCm: 40, skip: [8] },
