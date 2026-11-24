@@ -214,6 +214,11 @@ export function setScanBase(base: string | null): void {
   assetBase = base;
 }
 
+/** A file of assets/ at `path` there: from where `setScanBase` says, if it was set, else `here` (its URL beside the package). */
+export function assetUrl(path: string, here: string): string {
+  return assetBase !== null ? `${assetBase.replace(/\/?$/, "/")}${path}` : here;
+}
+
 function urlOf(kind: "bark" | "leaves", id: string, map: "albedo" | "normal"): string {
   if (assetBase !== null) return `${assetBase.replace(/\/?$/, "/")}${kind}/${id}.${map}.avif`;
   // (Written out whole, so a bundler sees each folder and copies its pictures.)
@@ -223,7 +228,7 @@ function urlOf(kind: "bark" | "leaves", id: string, map: "albedo" | "normal"): s
 const loaded = new Map<string, Promise<Pixels>>();
 
 /** A picture's texels, as they are in the file: RGBA8, no colour conversion, alpha not multiplied in. */
-async function decode(url: string, size?: number): Promise<Pixels> {
+export async function decode(url: string, size?: number): Promise<Pixels> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   const blob = await res.blob();

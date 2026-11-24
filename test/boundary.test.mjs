@@ -40,7 +40,8 @@ test("the package imports only three and itself", () => {
       if (isThree(spec)) continue;
       assert.ok(spec.startsWith("."), `${relative(ROOT, file)} imports ${spec}`);
       const to = resolve(dirname(file), spec);
-      if (to === join(ASSETS, "scans.json")) continue;
+      // (What the photographs and the painted marks hold: shipped with the package, in assets/.)
+      if (to === join(ASSETS, "scans.json") || to === join(ASSETS, "marks/marks.json")) continue;
       assert.ok(to.startsWith(SRC + "/"), `${relative(ROOT, file)} imports ${spec}, outside src`);
     }
   }
