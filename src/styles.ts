@@ -79,6 +79,14 @@ export interface TreeStyle {
    * palm's fronds far longer). A dab whose leaves would be longer carries smaller ones, more of them.
    */
   leafSize: number;
+  /**
+   * How far a crown's light comes from its own leaves and wood (light.ts: each grown tree's box of cells, the sun
+   * marched through it), 0..1, and the rest from its ellipsoid: 1, each bough shades the one below and the
+   * sun comes through the gaps between; 0, every leaf at one depth in the crown lit alike.
+   */
+  structure: number;
+  /** How thick the leaves are to the light in that box, beside what the species' crown carries: 1 as grown. */
+  density: number;
 }
 
 /**
@@ -95,22 +103,22 @@ export type TreeLook = "stylized" | "painterly" | "sculpted" | "real";
 export const TREE_LOOKS: readonly TreeLook[] = ["stylized", "painterly", "sculpted", "real"];
 
 /** The painted look's style (and every look's, for the numbers it does not use). */
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, throughPower: 4, throughWarp: 0.1, throughVary: 0.4, moss: 0.25, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1, leafSize: 0.22 };
+export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, throughPower: 4, throughWarp: 0.1, throughVary: 0.4, moss: 0.25, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35, lobe: 0, bulge: 0, warm: 0, cool: 0, chroma: 1, rim: 0, sprigs: 0, bright: 1, leafSize: 0.22, structure: 0.8, density: 0.8 };
 
 /** The realistic look's style: light as the sun gives it, the crown's shade, light through the leaves, furrowed bark. */
 // (selfShade a half, as the painted look's: the crown's own shade taken in full, through a whole leafy
 // shell, leaves out the light the leaves scatter to one another, and a sunlit crown comes out dark.)
-export const REAL_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.9, throughPower: 3.5, throughWarp: 0.2, throughVary: 0.8, moss: 0.55, wrap: 0.3, strokes: 1, selfShade: 0.45, fullLight: 0.9, bark: 1, faceEye: 0.35 };
+export const REAL_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.9, throughPower: 3.5, throughWarp: 0.2, throughVary: 0.8, moss: 0.55, wrap: 0.3, strokes: 1, selfShade: 0.45, fullLight: 0.9, bark: 1, faceEye: 0.35, structure: 1, density: 1.5 };
 
 /**
  * The painterly look's style, after the painted crowns of stylized games: smooth light laid over big lobes
  * (no bands), wrapping well round them, a cluster's leaves each a little their own tone, the lit side warm
  * and the shade cool, the colour a step richer than the species', a bright rim against the sun.
  */
-export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.4, dabScale: 1.4, through: 0.7, throughPower: 3, throughWarp: 0.12, throughVary: 0.65, moss: 0.45, wrap: 0.5, strokes: 0.55, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.6, sprigs: 0, bright: 1.7 };
+export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.4, dabScale: 1.4, through: 0.7, throughPower: 3, throughWarp: 0.12, throughVary: 0.65, moss: 0.45, wrap: 0.5, strokes: 0.55, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.6, sprigs: 0, bright: 1.7, structure: 0.8, density: 0.8 };
 
 /** The sculpted look's style: clay lobes, lit smooth and soft, each dab a little ball on its lobe, a few sprigs. */
-export const SCULPTED_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0, jitter: 0.08, dabScale: 1.5, through: 0.3, throughPower: 3, throughWarp: 0.2, throughVary: 0.4, moss: 0.35, wrap: 0.35, strokes: 0.25, selfShade: 0.25, fullLight: 0.8, bark: 0, lobe: 0.85, bulge: 0.45, warm: 0.45, cool: 0.5, chroma: 1.25, rim: 0.25, sprigs: 0.14, bright: 1.5 };
+export const SCULPTED_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0, jitter: 0.08, dabScale: 1.5, through: 0.3, throughPower: 3, throughWarp: 0.2, throughVary: 0.4, moss: 0.35, wrap: 0.35, strokes: 0.25, selfShade: 0.25, fullLight: 0.8, bark: 0, lobe: 0.85, bulge: 0.45, warm: 0.45, cool: 0.5, chroma: 1.25, rim: 0.25, sprigs: 0.14, bright: 1.5, structure: 0.6, density: 0.6 };
 
 /** Each look's own style, which `trees.style` starts as. */
 export const LOOK_STYLES: Readonly<Record<TreeLook, TreeStyle>> = { stylized: DEFAULT_STYLE, painterly: PAINTERLY_STYLE, sculpted: SCULPTED_STYLE, real: REAL_STYLE };
@@ -142,6 +150,8 @@ export const STYLE_RANGES: Readonly<Record<keyof TreeStyle, { min: number; max: 
   sprigs: { min: 0, max: 0.5, step: 0.01 },
   bright: { min: 0.5, max: 2.5, step: 0.01 },
   leafSize: { min: 0.05, max: 1.5, step: 0.01 },
+  structure: { min: 0, max: 1, step: 0.01 },
+  density: { min: 0.25, max: 3, step: 0.01 },
 };
 
 /** What is wrong with a style: every number there, finite, and in its range. Empty if nothing. */

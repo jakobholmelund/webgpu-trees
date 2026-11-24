@@ -12,7 +12,8 @@
 //   ?species=0,3,Oak          only these species (rows or names); else ?region= and ?kind= choose them
 //   ?region=france ?kind=conifer
 //   ?views=tee,far            only these views (tee, fairway, far, under, trunk)
-//   ?hour=9 ?wind=4           the sun's hour and the wind (m/s), for every cell
+//   ?hour=9 ?wind=4           the sun's hour and the wind (m/s), for every cell (scripts may also give
+//                             `style`: numbers of the style over the look's own)
 //   ?cell=400                 a cell's width in pixels (its height is 1.25 times it)
 //   ?screen=1080              the lines of the screen a cell is a piece of: the trees choose their tier as on it
 //   ?thumbs=0                 no reference photographs' thumbnails (the links stay)
@@ -24,7 +25,7 @@
 // folder the dev server was started with (GALLERY_OUT=<folder> pnpm dev).
 
 import * as THREE from "three/webgpu";
-import { ALL_SPECIES, type Architecture, DEFAULT_DETAIL, LOOK_STYLES, REGION_ROWS, type Region, TREE_LOOKS, type TreeInstance, type TreeLook, type TreeSpecies, type Trees, cloneSpecies, createTrees } from "../src/index";
+import { ALL_SPECIES, type Architecture, DEFAULT_DETAIL, LOOK_STYLES, REGION_ROWS, type Region, TREE_LOOKS, type TreeInstance, type TreeLook, type TreeSpecies, type TreeStyle, type Trees, cloneSpecies, createTrees } from "../src/index";
 import referenceText from "./REFERENCE.md?raw";
 import { type Reference, readReferences } from "./references";
 import { SKY, makeGround, makeSky, sunAt, tintsFor } from "./stage";
@@ -63,6 +64,8 @@ interface Settings {
   views: ViewName[];
   hour: number;
   wind: number;
+  /** Numbers of the style over the look's own (for scripts: one style beside another). */
+  style?: Partial<TreeStyle>;
 }
 
 /** One picture: a species in a look from a view. */
@@ -89,6 +92,8 @@ interface RenderAsk {
   wind?: number;
   region?: Region | "all";
   kind?: Architecture | "all";
+  /** Numbers of the style over the look's own. */
+  style?: Partial<TreeStyle>;
 }
 
 const query = new URLSearchParams(location.search);
@@ -221,12 +226,12 @@ async function start() {
     shadeHour: number;
     shadeSide: number;
   }
-  const standOf = (row: number, look: TreeLook, group: boolean): Stand => {
+  const standOf = (row: number, look: TreeLook, group: boolean, over?: Partial<TreeStyle>): Stand => {
     const sp = species[row];
     const step = groupSpacing(sp.crownRadius);
     const list: TreeInstance[] = group ? GROUP.map(([x, z], k) => measured(sp, row, x * step, z * step, k + 1)) : [{ x: 0, y: 0, z: 0, species: row }];
     const trees = createTrees({ trees: list, species, look });
-    Object.assign(trees.style, LOOK_STYLES[look]);
+    Object.assign(trees.style, LOOK_STYLES[look], over);
     const standing = trees.plan.placements.map((p) => ({ x: p.x, z: p.z, ...p.size }));
     // (Where the trunk first forks: the lowest limb of a fair size leaving the stem, in the tree as grown, at
     // the size it stands at. A tree of many stems forks at its foot.)
@@ -293,7 +298,7 @@ async function start() {
     return { key: cellKey(row, look, view, s), row, look, view, blob, url: URL.createObjectURL(blob), tiers, shot };
   };
 
-  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}|${s.wind}`;
+  const cellKey = (row: number, look: TreeLook, view: ViewName, s: Settings) => `${row}|${look}|${view}|${s.hour}|${s.wind}${s.style ? `|${JSON.stringify(s.style)}` : ""}`;
   const cells = new Map<string, Cell>();
 
   /** One thing at a time on the renderer: what asks next waits for what asked before. */
@@ -323,7 +328,7 @@ async function start() {
             if (!stillWanted()) return out;
             let c = cells.get(cellKey(row, look, view, s));
             if (!c && wanted.includes(view)) {
-              const stand = view === "far" ? (group ??= standOf(row, look, true)) : (one ??= standOf(row, look, false));
+              const stand = view === "far" ? (group ??= standOf(row, look, true, s.style)) : (one ??= standOf(row, look, false, s.style));
               c = await drawCell(stand, row, look, view, s);
               cells.set(c.key, c);
               // (A moment for the page between cells: a pane out of view draws no frames, so not a frame.)
@@ -754,6 +759,7 @@ async function start() {
     if (ask.kind) ((s.kind = ask.kind), ask.species || (s.only = null));
     if (ask.hour !== undefined) s.hour = ask.hour;
     if (ask.wind !== undefined) s.wind = ask.wind;
+    if (ask.style) s.style = ask.style;
     return s;
   };
   const dataUrl = (blob: Blob) =>
