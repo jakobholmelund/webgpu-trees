@@ -67,6 +67,10 @@ const TUFT_BUNDLE_SPREAD = 0.1;
 const TUFT_LOOSE = 0.45;
 /** A pine's shoot picture laid at a tuft (`ScanLook.tuftPicture`): how long, in its needles' lengths (a white pine's 30 cm shoot, its needles 8–12 cm). */
 const TUFT_SHOOT = 3;
+/** How far apart the pictures of a fan of shoot pictures laid at one tuft are turned (rad; `ScanLook.tuftFan`). */
+const TUFT_FAN = 0.55;
+/** How long a fan's pictures are beside the needles drawn under them: shorter, so the brush's edge is the drawn needles' tips. */
+const TUFT_FAN_LEN = 0.62;
 /** The shortest a pine's shoot that puts out more, in its needles' lengths. */
 const PINE_SHOOT = 2.2;
 /** A pine's big card: how many branches' shoots it carries side by side, and as many more for a dense one; the fan they spread over (rad). */
@@ -272,6 +276,8 @@ interface Lay {
   own: number;
   /** A pine's tuft's brush, in its needles' lengths. */
   brush?: number;
+  /** Drawn only from its sprite's base on (a shoot picture cut at its brush: `ScanLook.tuftFrom`), not behind it. */
+  clip?: boolean;
 }
 
 /** Bilinear sample of a sheet's channel k at (x, y) texels; 0 off the sheet. */
@@ -354,6 +360,7 @@ function leaf(L: Layer, sh: Sheet, l: Lay, shadow: number): void {
     const u = a / l.len;
     const c = px * dc[0] + py * dc[1] - l.bend * l.len * u * u;
     const along = a / k;
+    if (l.clip && along < 0) return null;
     const across = c / (k * l.width);
     const sx = s.base[0] + ux * along + rx * across;
     const sy = s.base[1] + uy * along + ry * across;
@@ -787,16 +794,35 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     // (A pine whose pictures are its whole shoots (`ScanLook.tuftPicture`) lays one at each tuft: its brush reaching as
     // far past the shoot's end as a drawn tuft's needles would, its twig back along the shoot.)
     const shootPicture = !!l.needles && !!look.tuftPicture;
+    // (Its picture cut where its brush begins (`tuftFrom`), the wood behind left to the card's own twigs, and laid as
+    // a fan of a few (`tuftFan`), turned about the brush's foot: a long-needled pine's brush stands out all round its
+    // shoot's end, a starburst, where one flat-laid picture was a narrow tassel, a leaf's blot from the tee.)
+    const fan = shootPicture ? Math.max(1, look.tuftFan ?? 1) : 1;
+    // (Where the tuft is, and its needles' length, before the picture is laid back from it.)
+    const x0 = lay.x;
+    const y0 = lay.y;
+    const needle = lay.len;
+    let tipBack = 0;
+    let len0 = lay.len;
     if (shootPicture) {
-      const shoot = lay.len * TUFT_SHOOT;
-      const back = shoot - lay.len * TUFT_STRETCH;
+      const from = Math.min(0.9, Math.max(0, look.tuftFrom ?? 0));
+      const shoot = lay.len * (look.tuftShoot ?? TUFT_SHOOT) * (1 - from);
+      if (from > 0) {
+        const s0 = lay.sprite;
+        lay.sprite = { ...s0, base: [s0.base[0] + (s0.tip[0] - s0.base[0]) * from, s0.base[1] + (s0.tip[1] - s0.base[1]) * from] };
+        lay.clip = true;
+      }
+      const back = Math.max(0, shoot - lay.len * TUFT_STRETCH);
       lay.x -= Math.cos(lay.ang) * back;
       lay.y -= Math.sin(lay.ang) * back;
       lay.len = shoot;
+      len0 = shoot;
+      tipBack = 0;
     }
+    const fanned = (c: number): Lay => (fan > 1 ? { ...lay, ang: lay.ang + (c / (fan - 1) - 0.5) * TUFT_FAN * (fan - 1), flip: c % 2 === 1 ? !lay.flip : lay.flip } : lay);
     // (A leaf that would reach past the card's edge is made smaller, or left off: cut by the edge, it shows a
     // straight line.)
-    const inside = () => (l.needles && !shootPicture ? tuftInside(L, lay) : footprint(L, lay).inside);
+    const inside = () => (l.needles && !shootPicture ? tuftInside(L, lay) : Array.from({ length: fan }, (_, c) => footprint(L, fanned(c)).inside).every(Boolean));
     let fits = whole || inside();
     for (let t = 0; t < 3 && !fits; t++) {
       lay.len *= 0.85;
@@ -804,6 +830,13 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
     }
     if (!fits) continue;
     if (l.needles && !shootPicture) needleTuft(L, lay.x, lay.y, lay.ang, lay.len, rnd, lay.tone, lay.own, l.brush);
+    // (A fan's middle picture last, over its sides; each a little longer or shorter than the next, and the pine's own
+    // needles drawn under them, longer, so the brush's edge is needle tips at their own lengths and not one smooth arc,
+    // which a few dozen metres off was a broad leaf's outline.)
+    else if (fan > 1) {
+      needleTuft(L, x0 + Math.cos(lay.ang) * tipBack, y0 + Math.sin(lay.ang) * tipBack, lay.ang, needle * (lay.len / len0), rnd, lay.tone, lay.own, l.brush);
+      for (const c of Array.from({ length: fan }, (_, c) => c).sort((a, b) => Math.abs(b - (fan - 1) / 2) - Math.abs(a - (fan - 1) / 2))) leaf(L, sheet, { ...fanned(c), len: lay.len * (TUFT_FAN_LEN + 0.1 * ((c * 7) % 3)) }, shadow);
+    }
     else leaf(L, sheet, lay, palm ? shadow * 0.5 : shadow);
   }
   // (Where nothing is drawn, the card's mean tone, so its mips' edges do not darken.)

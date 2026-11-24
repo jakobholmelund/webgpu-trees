@@ -149,6 +149,12 @@ const CUSHION_BELOW = 0.45;
 /** A crown of thick pads (`ScanLook.padThick`): how far its sprays hang, and its mid cards' size beside its near pads' (two a clump, not four: as big again). */
 const PAD_SPRAY_HANG = 0.35;
 const PAD_MID = 0.95;
+/** ... and how much longer up its picture a pad's card is drawn tipped over to an eye under it, so its shelf seen from beneath is round, not a band. */
+const PAD_BELOW_ROUND = 0.8;
+/** How far a cushion card is tipped over to the eye (0..1) where it begins to be turned its own way about it, and where it is turned all the way. */
+const PAD_BENEATH = [0.6, 0.95] as const;
+/** ... and how many short sprays clothe the wood leading up into each of its shelves (geometry.ts `FixedCards.clothe`). */
+const PAD_CLOTHE = 5;
 /**
  * How a photographed card's tone (sprays.ts: a leaf's lightness over its sheet's mean, 0.6 on average) is brought
  * to the species' colour: a card's mean to the species' own. A species' colour is its crown's as it is seen from
@@ -468,6 +474,8 @@ export function createTrees(options: TreesOptions): Trees {
       // (How far in flower it is: the share of its sprays in flower, for the day the host gives, or the style's;
       // written again by `update` when either changes.)
       speciesData[(i * SPECIES_ROWS + 9) * 4] = bloomShare(sl, bloomAt.day, bloomAt.bloom);
+      // (Whether its cushions are thin pads laid in layers (`padThick`): seen from beneath, laid round, `PAD_BELOW_ROUND`.)
+      speciesData[(i * SPECIES_ROWS + 9) * 4 + 1] = scanned && sl.cushion && sl.padThick ? 1 : 0;
       speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
@@ -559,7 +567,8 @@ export function createTrees(options: TreesOptions): Trees {
           l.cushion
           ? // (A pad thickened in layers (`padThick`, a coastal cypress's) has as many sprays as a crown without pads, some
             // hanging from its underside: the wood leading into a shelf clothed near it, not bare sticks up to a disc.)
-            { half, fill: 0.5 * (l.padThick ? 1 : CUSHION_SPRAYS), most: 24, big: cushionCardsOf(v.species), bigSize: cushionSizeOf(v.species), hang: l.padThick ? PAD_SPRAY_HANG : 0 }
+            // (And its limbs clothed in short sprays below each shelf, `clothe`.)
+            { half, fill: 0.5 * (l.padThick ? 1 : CUSHION_SPRAYS), most: 24, big: cushionCardsOf(v.species), bigSize: cushionSizeOf(v.species), hang: l.padThick ? PAD_SPRAY_HANG : 0, clothe: l.padThick ? PAD_CLOTHE : 0 }
           : { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : // (A weeping tree's sprays hang less over its crown's top, over the arches of its limbs.)
           { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0, lift: clothed(species[v.species]) };
@@ -1402,10 +1411,22 @@ export function createTrees(options: TreesOptions): Trees {
         // (Its twig runs along `aTangent`, fitted and turned as the tree is, and kept square to its face.)
         const aTangent = attribute<"vec4">("aTangent", "vec4");
         const twig0 = dirToWorld(T, normalize(fit.radial(aTangent.xyz).mul(vec3(fit.across, fit.crownUp, fit.across))));
-        const twig = select(cushionBig.greaterThan(0.5), normalize(vec3(0, 1, 0).sub(face.mul(face.y)).add(vec3(face.x, 0, face.z).mul(-1e-3))), normalize(twig0.sub(face.mul(dot(twig0, face))).add(vec3(0, 1e-4, 0))));
+        // (A cushion stands upright, turned to the eye about the vertical. Tipped over to an eye under it, its up was
+        // the way out from under the eye, the same for every cushion overhead: their pictures, wide and low, lay in
+        // rings round the eye, a thin pad's (`padThick`) as stretched bands. So, tipped, each is turned its own way
+        // about the eye, and a thin pad's picture drawn longer up it, so its shelf seen from beneath is about as
+        // deep as it is wide, as a shelf is from under it.)
+        const upright = normalize(vec3(0, 1, 0).sub(face.mul(face.y)).add(vec3(face.x, 0, face.z).mul(-1e-3)));
+        const ownWay = vec3(cos(own.mul(40.84)), 0, sin(own.mul(40.84)));
+        const turnedWay = normalize(ownWay.sub(face.mul(dot(ownWay, face))).add(vec3(0, 1e-4, 0)));
+        // (Only well under it: from the tee, looking up at a crown's top, its shelves stay level bands.)
+        const beneath = smoothstep(float(PAD_BENEATH[0]), float(PAD_BENEATH[1]), cushionTipped);
+        const cushionUp = normalize(mix(upright, turnedWay, beneath));
+        const twig = select(cushionBig.greaterThan(0.5), cushionUp, normalize(twig0.sub(face.mul(dot(twig0, face))).add(vec3(0, 1e-4, 0))));
         const across = cross(face, twig);
         const sway = vec2(aDab.x, aDab.y).add(vec2(flutter.mul(0.5), flutter));
-        position = at.add(across.mul(sway.x.mul(size))).add(twig.mul(sway.y.mul(size)));
+        const padRound = float(1).add(beneath.mul(T.srow(9).y).mul(PAD_BELOW_ROUND));
+        position = at.add(across.mul(sway.x.mul(size))).add(twig.mul(sway.y.mul(size).mul(padRound)));
       } else {
         const cornerW = right.mul(corner.x).add(upCam.mul(corner.y));
         position = at.add(cornerW.mul(size));

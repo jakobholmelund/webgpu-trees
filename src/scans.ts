@@ -136,6 +136,19 @@ export interface ScanLook {
    */
   tuftPicture?: boolean;
   /**
+   * How long a shoot picture laid at a tuft is, in the pine's needles' lengths (`tuftPicture`; else `sprays.ts`
+   * `TUFT_SHOOT`, 3: a white pine's 30 cm shoot of 8–12 cm needles). A Torrey pine's picture is mostly its brush, its
+   * needles some two thirds of it.
+   */
+  tuftShoot?: number;
+  /**
+   * Where along a shoot picture its brush begins, a share of the way from its stalk's end (`tuftPicture`): the picture
+   * laid from there on, its bare twig left to the card's own wood. And how many of it to lay at a tuft, fanned about the
+   * brush's foot (`tuftFan`; else one): a long-needled pine's brush stands out all round its shoot's end.
+   */
+  tuftFrom?: number;
+  tuftFan?: number;
+  /**
    * How many cushion cards to a clump near to, and how big (half width over the clump's radius), where not as closed
    * as its crown is (engine.ts `closedOf`: four of two radii on a closed crown, one of 1.1 on an open one).
    */
@@ -205,7 +218,7 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   Oak: { bark: "oak", leaves: "oak", leafCm: 10, spray: "alternate" },
   // (The plane's leaf on its long stalk: some 16 cm of blade.)
   Plane: { bark: "plane", leaves: "londonPlane", leafCm: 30, spray: "alternate" },
-  // (Its rough stocking, a few metres, giving way to the smooth streaked stem.)
+  // (Its rough stocking, a few metres, giving way to the smooth mottled stem.)
   // (Its adult leaves 12–30 by 1.7–3 cm (EUCLID): narrower than the picture's.)
   Eucalyptus: { bark: "eucalyptus", upper: { set: "eucalyptusUpper", from: 0.04, to: 0.12 }, leaves: "eucalyptus", leafCm: 22, spray: "hanging", leafWidth: 0.6, leafBend: 0.03, hang: 0.85, perSpray: 8 },
   Spruce: { bark: "spruce", leaves: "fir", leafCm: 30, spray: "sprays" },
@@ -227,16 +240,23 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   // (Its own sprigs, spines and yellow flowers, whole: a twig's end of a few of them, the flowers kept yellow.)
   // (In flower mainly from January to June, a few flowers most of the year: `GORSE_FLOWERING`, for the host's day.)
   Gorse: { bark: "ridged", barkScale: 0.35, leaves: "gorse", leafCm: 22, spray: "sprays", flowers: "#f2c230", flowering: GORSE_FLOWERING },
-  "Sitka spruce": { bark: "spruce", barkScale: 1.6, leaves: "fir", leafCm: 30, spray: "sprays" },
-  // (Its long dark needles, 8–16 cm, in brushes at its shoots' ends: the Torrey pine's shoots, tinted dark.)
-  "Corsican pine": { bark: "pine", barkScale: 1.2, leaves: "torreyPine", leafCm: 30, spray: "tufts", needleCm: 12 },
-  "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "fir", leafCm: 30, spray: "sprays" },
+  // (Its own bark of loose round scales, its own branch tips of stiff sharp blue-green needles.)
+  "Sitka spruce": { bark: "sitkaSpruce", leaves: "sitkaShoot", leafCm: 28, spray: "sprays" },
+  // (Its own bark of long scaly plates; its own shoots, a stout twig in a brush of long stiff needles in pairs, 10–15
+  // cm: its tufts laid from them, `tuftPicture`, the picture some two needles long.)
+  "Corsican pine": { bark: "corsicanPine", leaves: "corsicanShoot", leafCm: 32, spray: "tufts", needleCm: 12, tuftPicture: true, tuftShoot: 2.2 },
+  // (Its own branch tips, soft flat needles all round the twig, a pointed bud.)
+  "Douglas fir": { bark: "douglas", barkScale: 1.4, leaves: "douglasShoot", leafCm: 25, spray: "sprays" },
   "Western red cedar": { bark: "fibrous", leaves: "scale", leafCm: 30, spray: "sprays", hang: 0.4 },
-  "Monterey cypress": { bark: "fibrous", barkScale: 0.8, leaves: "cypress", leafCm: 28, spray: "sprays", cushion: "cypressPad", padThick: 0.45, cushionSize: 2.8 },
-  "Monterey pine": { bark: "pine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 1, cushionSize: 2.1 },
-  // (Its shoot: a stout twig and a brush of needles 20–30 cm long.)
-  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25 },
-  "Aleppo pine": { bark: "pine", barkScale: 0.9, leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
+  // (Its own bark of long fibrous strips, lichened.)
+  "Monterey cypress": { bark: "cypress", leaves: "cypress", leafCm: 28, spray: "sprays", cushion: "cypressPad", padThick: 0.45, cushionSize: 2.8 },
+  // (Its own very thick dark ridged bark, reddish in the furrows.)
+  "Monterey pine": { bark: "montereyPine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 1, cushionSize: 1.2 },
+  // (Its shoot: a stout twig and a brush of needles 20–30 cm long, grey-green and stiff: its tufts laid from its own
+  // shoot pictures, `tuftPicture`, the brush two thirds of the picture.)
+  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25, tuftPicture: true, tuftShoot: 1.6, tuftFrom: 0.3, tuftFan: 3 },
+  // (Its own bark of broad flat plates.)
+  "Aleppo pine": { bark: "aleppoPine", leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
   "Stone pine": { bark: "stonePine", barkScale: 1, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "stonePineCushion", cushionFar: "stonePineCanopy" },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
@@ -247,8 +267,9 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Sugar maple": { bark: "maple", leaves: "maple", leafCm: 12, spray: "opposite" },
   "Red oak": { bark: "redOak", leaves: "redOak", leafCm: 17, spray: "alternate" },
   // (Its own shoots, soft feathery brushes of fine needles 8–12 cm in fives: its tufts laid from them, `tuftPicture`.)
-  "Eastern white pine": { bark: "pine", barkScale: 0.8, leaves: "whitePine", leafCm: 26, spray: "tufts", needleCm: 10, tuftPicture: true },
-  "White spruce": { bark: "spruce", barkScale: 0.9, leaves: "fir", leafCm: 26, spray: "sprays" },
+  "Eastern white pine": { bark: "whitePine", leaves: "whitePine", leafCm: 26, spray: "tufts", needleCm: 10, tuftPicture: true },
+  // (Its own pale flaky scales; its own branch tips, short stiff needles crowded on the twig's upper side.)
+  "White spruce": { bark: "whiteSpruce", leaves: "whiteSpruceShoot", leafCm: 22, spray: "sprays" },
 };
 
 /**

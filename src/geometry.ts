@@ -1369,6 +1369,11 @@ const PAD_WIDE = 0.5;
 const PAD_FLAT = 0.75;
 const PAD_LEVEL = 0.8;
 const PAD_FACE_UP = 1.2;
+/** How far back along the wood under a clump its clothing sprays reach (m, `FixedCards.clothe`), and how big they are beside its own. */
+const CLOTHE_REACH = 3.5;
+/** A crown this far in pads is shelves (a coastal cypress's), each laid on its wood and not hung below it. */
+const PAD_SHELF = 0.8;
+const CLOTHE_SIZE = 0.8;
 
 /** Near cards of a size of their own (m, half across), as many to a clump as cover it, hanging as much as `hang` (0..1). */
 export interface FixedCards {
@@ -1390,6 +1395,12 @@ export interface FixedCards {
   lift?: boolean;
   /** How far its sprays turn up along their twigs, 0..1 (a pine's shoots turn up to the light, their tufts like brushes held up). */
   rise?: number;
+  /**
+   * How many short sprays to lay along the wood leading up into each clump, under it (`CLOTHE_REACH` metres of it, past
+   * the clump's own): a coastal cypress's limbs are clothed in sprays below its shelves, not bare wavy sticks up to a
+   * floating disc.
+   */
+  clothe?: number;
 }
 
 export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[], upright?: readonly boolean[], sizes?: readonly number[]): Pieces {
@@ -1421,10 +1432,14 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
       // (With small cards, a few big ones too, a clump wide, set a little into it: the mass of its leaves, which
       // the small ones at its surface lay their detail over.)
       const big = fix ? (cl.depth[c] > 0.65 ? Math.min(1, fix.big) : fix.big) : 0;
-      for (let d = 0; d < count + big; d++) {
-        const filler = d >= count;
+      // (Sprays clothing the wood under it (`clothe`): along its first twig's wood, back past its own reach.)
+      const clothes = fix?.clothe && cl.depth[c] <= 0.65 ? fix.clothe : 0;
+      const unders = clothes > 0 ? twigs[c].slice(0, 2).map((t) => shootOf(sk, lines, t, r * SHOOT + CLOTHE_REACH)) : [];
+      for (let d = 0; d < count + big + clothes; d++) {
+        const clothing = d >= count + big;
+        const filler = d >= count && !clothing;
         const twig = twigs[c][d % shoots.length];
-        const shoot = shoots[d % shoots.length];
+        const shoot = clothing && unders.length > 0 ? unders[d % unders.length] : shoots[d % shoots.length];
         const reach = shoot.length;
         const l = sk.limb[twig];
         const limb = sk.order[twig] === 0 ? [0, -1, 0] : [sk.x[l], sk.y[l], sk.z[l]];
@@ -1437,11 +1452,12 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // (Its foot is on the wood: on its twig, or on the last of the wood leading to it, more of them near
         // its end, and each twig's first card at its very end. A spray grows from a shoot; set about the
         // clump's centre, the cards hang in the air beside the twig, and past its end.)
-        const at0 = shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
+        const near0 = Math.min(reach, r * SHOOT);
+        const at0 = clothing ? shoot.at(near0 + (reach - near0) * ((d - count - big + hash01(k, 25)) / clothes)) : shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
         // (Small cards spread through the clump about their shoots, as its side twigs carry them: else they
         // would crowd along a line or two.)
         // (In a tree whose leaves lie in pads, `habit.pads`, flattened into a shelf: wider, and thin.)
-        const spread = fix && !filler ? r * 0.55 * Math.sqrt(hash01(k, 26)) : 0;
+        const spread = fix && !filler ? r * (clothing ? 0.2 : 0.55) * Math.sqrt(hash01(k, 26)) : 0;
         const wide = 1 + PAD_WIDE * pads;
         // (A weeping tree's sprays, `lift`, spring from as high as their clump is hung over its wood: a
         // whip's arch, its crown's clothed top. Hung from the wood, they left it bare over them.)
@@ -1487,10 +1503,13 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // (Upright cushions vary more, and stand at heights of their own about their twigs, a half of the
         // clump's radius up or down: at one height, a crown of them seen from beneath was rings of plates.)
         const vary = stands ? CUSHION_VARY : 0.4;
-        const half = (fix && !filler ? fix.half : fix ? r * fix.bigSize : r * (sizes?.[v] ?? size)) * (1 - vary / 2 + hash01(k, 24) * vary);
+        const half = (fix && !filler ? fix.half * (clothing ? CLOTHE_SIZE : 1) : fix ? r * fix.bigSize : r * (sizes?.[v] ?? size)) * (1 - vary / 2 + hash01(k, 24) * vary);
         // (The spray's own twig enters its picture near the bottom edge (leaves.ts): its centre is that far
         // on from its foot.)
-        const on = half * SPRAY_FOOT + (stands ? (hash01(k, 28) - 0.5) * r * CUSHION_RISE : 0);
+        // (A shelf (a crown in pads, `pads` 0.8 or more) only up from its wood: dropped under it, it hung below its own
+        // limb, the limb running on bare above it.)
+        const upDown = pads >= PAD_SHELF ? 0.5 * hash01(k, 28) : hash01(k, 28) - 0.5;
+        const on = half * SPRAY_FOOT + (stands ? upDown * r * CUSHION_RISE : 0);
         const at = [from.p[0] + tangent[0] * on, from.p[1] + tangent[1] * on, from.p[2] + tangent[2] * on];
         let f = -1;
         for (const [cx, cy] of CORNERS) {
