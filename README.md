@@ -81,7 +81,8 @@ trees.update(renderer, camera, timeSeconds);
 - **Light and wind** (`trees.environment`) are the host's to set, as the
   grass takes them: the sun's direction, the colour of sunlight and of
   shade, the wind's heading and speed. `world.sun(xz)` and `world.air(colour,
-  at)` let a host's clouds and haze reach the trees.
+  at)` let a host's clouds and haze reach the trees. Without `world.air` the
+  trees take the scene's fog; with it, only the host's air.
 
 ## Styles
 
@@ -257,7 +258,7 @@ pacific-northwest, great-britain, france, ontario, netherlands, denmark.
 | Stone pine | *Pinus pinea* | an umbrella on a tall clear trunk | california, france | 15 | 10.5 | 5 |
 | Canary date palm | *Phoenix canariensis* | a big round head of arching fronds on a thick trunk | california | 15 | 5 | 7 |
 | Mexican fan palm | *Washingtonia robusta* | a tall thin pole flared at its foot, a small tight head of fan leaves | california | 22 | 2.2 | 18 |
-| California fan palm | *Washingtonia filifera* | a stout grey column, a head of grey-green fans; in the wild a skirt of dead leaves to the ground | california | 12 | 2.8 | 9 |
+| California fan palm | *Washingtonia filifera* | a stout grey column, a head of grey-green fans; in the wild a skirt of dead leaves to the ground | california | 12 | 3 | 7.5 |
 | Queen palm | *Syagrus romanzoffiana* | a smooth grey ringed pole, a few soft plumose fronds arching over | california | 10 | 3.2 | 5.5 |
 | Coast live oak | *Quercus agrifolia* | a low, broad, dark evergreen dome | california | 11 | 8.5 | 1.8 |
 | California sycamore | *Platanus racemosa* | open and crooked, pale bark | california | 18 | 7 | 3.5 |
@@ -332,22 +333,38 @@ deep narrow one lets them hang.
   than their species are their own variants.
 - **Drawn**: near, every frond in twelve pieces and every fan in nineteen
   rays; mid, five and nine; far, two and five, a star of fronds round the
-  stem. A skirt is shingles of dead leaves round the stem, each row half over
-  the one below. The stem wears its bark (a Canary palm's lattice, a fan
+  stem. A fan's blade is turned on its own about its line, so across the crown
+  and from below many stand edge-on, its stalk a spoke from the stem. Further
+  off (mid, far, and a near fan under about 40 pixels across) a fan is drawn as
+  a starburst of a few broad segments in its photograph's colours: its
+  photograph mipped down to a few pixels was a disc, and a crown of discs a
+  lettuce. A skirt, near, is shingles of dead leaves round the stem, each row
+  half over the one below; mid and far, one continuous thatch from under the
+  crown to its ragged foot. It is carrot-shaped: its shoulder, tucked under
+  the hanging green leaves, flares about as wide as they reach, then it tapers
+  steadily to a narrow foot. Its top metre or two is freshly dead, tan to
+  ochre; below, weathered pale silvery grey-beige. A skirt cut back short is
+  all fresh, a brown tuft under the green. A fan palm's leaves are glossy. The stem wears its bark (a Canary palm's lattice, a fan
   palm's rings), its boots and a pineapple's trimmed bases; where the look
   paints bark flat, their pattern is still drawn faintly. Its leaves' area is
   its fronds' own, which its box of light takes (`GrownTree.leafArea`).
+- **Tiers**: a palm's tier goes by its crown (twice the larger of its width
+  and depth), not its height: a 22 m fan palm's stem is a line, and by its
+  height it drew its near crown from 200 m off.
 - **Wind**: the stem bends further than a tree's trunk and its crown follows a
   moment late, the bend running up it; the crown tilts as the stem's top does.
   Each frond streams downwind in the gusts, flaps and twists on its own beat
   as its age lets it (a dead one swings freely, a spear hardly moves), and its
   leaflets shimmer.
-- **Cost**, a grove of 400 palms of one kind at 1104 x 1868 (graphics card's
-  time for the frame, before and after): Canary palms, realistic, 0.83 to
-  0.61 ms in the clearing and 1.15 to 0.97 from outside; painterly 0.98 to
-  0.63 and 0.92 to 0.99; Mexican fan palms, realistic, 0.45 to 0.45-0.58 and
-  0.56 to 0.78-0.83 (a tall palm is drawn near from far off: its tier goes by
-  its height in the picture, its crown a small part of it).
+- **Cost**, a grove of 400 palms of one kind (graphics card's time for the
+  frame, before the palm grower and after): at 1104 x 1868, Canary palms,
+  realistic, 0.83 to 0.61 ms in the clearing and 1.15 to 0.97 from outside;
+  painterly 0.98 to 0.63 and 0.92 to 0.99. At 3456 x 1894, Mexican fan palms,
+  realistic, 1.18-1.37 to 1.23-1.38 ms in the clearing and 1.43-1.60 to
+  1.53-1.60 from outside, with 38 leaves where it had 25, its trees drawn near
+  from outside 113 to 13.
+- **The lab** keeps every palm one way (*Palms as kept*, *Natural*, *Skirt*,
+  *Skinned*, *Pineapple*; `?prune=`), to judge them by eye.
 
 ## Species morphology
 

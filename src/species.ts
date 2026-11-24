@@ -1230,17 +1230,17 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     stems: 1,
     branchAngle: 50,
     branchAngleSpread: 20,
-    bend: -0.2,
+    bend: 0,
     crooked: 0.35,
     leader: 1,
-    whorl: 30,
+    whorl: 38,
     whorlsPerMetre: 0,
     branchiness: 1,
     buttress: 0.6,
     leafKind: "frond",
     clumpSize: 1,
     clumpSpread: 0.2,
-    leafColor: "#5f7d36",
+    leafColor: "#466229",
     leafVariation: 0.2,
     treeVariation: 0.15,
     throughTint: [0.9, 1.0, 0.45],
@@ -1448,7 +1448,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   },
   // Hodel 2014 (UC Cooperative Extension), UF/IFAS and Virginia Tech (Washingtonia filifera): 12–18 m in
   // cultivation, a stout grey trunk 50–90 cm through, only slightly flared; 20–30 grey-green fans 1–1.8 m
-  // across on stalks as long, their segments split with white threads. In the wild its dead leaves hang in a
+  // across on stalks as long, their segments split with white threads, the old green ones hanging 30–60
+  // degrees below the level (so its crown's base 4–5 m under its top). In the wild its dead leaves hang in a
   // skirt to the ground; on courses it is skinned (MORPHOLOGY.md 31).
   californiaFanPalm: {
     name: "California fan palm",
@@ -1456,8 +1457,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     regions: ["california"],
     architecture: "palm",
     height: 12,
-    crownRadius: 2.8,
-    crownBase: 9,
+    crownRadius: 3,
+    crownBase: 7.5,
     trunkRadius: 0.35,
     shape: "spherical",
     foliageDepth: 0.5,
@@ -1468,14 +1469,14 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     bend: -0.15,
     crooked: 0.15,
     leader: 1,
-    whorl: 30,
+    whorl: 32,
     whorlsPerMetre: 0,
     branchiness: 1,
     buttress: 0.25,
     leafKind: "frond",
     clumpSize: 1.2,
     clumpSpread: 0.2,
-    leafColor: "#6f7f5e",
+    leafColor: "#5f6f52",
     leafVariation: 0.15,
     treeVariation: 0.12,
     throughTint: [0.9, 1.0, 0.55],
@@ -1486,7 +1487,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     pruning: "skinned",
     deadColor: "#a39373",
     skirt: 0.92,
-    frondWidth: 1.15,
+    frondWidth: 1.1,
     fanDroop: 0.8,
   },
   // UF/IFAS (Syagrus romanzoffiana) and Noblick 2017: 8–15 m, a smooth grey ringed trunk 20–40 cm through;

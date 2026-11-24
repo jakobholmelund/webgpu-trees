@@ -48,7 +48,7 @@ export type FrondClass = "spear" | "young" | "mature" | "old" | "dead";
 export const FROND_CLASSES: readonly FrondClass[] = ["spear", "young", "mature", "old", "dead"];
 
 /** Which picture a frond, a fan or a skirt is drawn with (palmAtlas.ts lays them out). */
-export const PALM_CELL = { feather: 0, queen: 1, skirt: 2, fan: 3, fanB: 4 } as const;
+export const PALM_CELL = { feather: 0, queen: 1, skirt: 2, fan: 3, fanB: 4, fanFar: 5 } as const;
 
 /** One frond: its rachis from its foot on the stem, the frame of its leaf along it, and what it is. */
 export interface Frond {
@@ -103,6 +103,26 @@ export const STEM_BARK = 0;
 export const STEM_PINEAPPLE = 2;
 export const STEM_BOOTS = 3;
 
+/**
+ * How far a skirt stands out from its stem's surface at a share `k` of the way down it (0 its top, 1 its foot):
+ * a rounded shoulder tucked in under the crown, widest a tenth of the way down, then tapering steadily, a
+ * carrot's, to its narrow foot.
+ */
+export function skirtOut(sk: Skirt, k: number): number {
+  const shoulder = 0.35 + 0.65 * Math.min(1, k / 0.1) * (2 - Math.min(1, k / 0.1));
+  const taper = Math.max(0, (k - 0.1) / 0.9);
+  return shoulder * (sk.outTop + (sk.outBottom - sk.outTop) * Math.pow(taper, 1.15));
+}
+
+/**
+ * How weathered a skirt's dead leaves are at a share `k` of the way down it, `tall` metres long: 0 freshly dead
+ * tan (its top metre or two: all of a skirt cut back short, the top tenth or so of a wild one), 1 old silver-grey.
+ */
+export function skirtWeathered(k: number, tall: number): number {
+  const t = Math.min(1, Math.max(0, (k * tall - 0.6) / 1.5));
+  return t * t * (3 - 2 * t);
+}
+
 /** A skirt of dead leaves hanging against the stem: from under the green crown down. */
 export interface Skirt {
   top: number;
@@ -151,7 +171,10 @@ const FORMS: Readonly<Record<PalmLeaf, LeafForm>> = {
   feather: { reach: 1.02, width: 0.14, bare: 0.16, fold: 30 * DEG, arch: 62 * DEG, rise: [80, 58, 18, -32], knob: 0.22 },
   // (A fan palm's: a long stalk, a blade at its end; held up and out, 20–60° from upright, old ones
   // drooping, the dead hanging straight down.)
-  fan: { reach: 1.0, width: 0.36, bare: 0.6, fold: 16 * DEG, arch: 22 * DEG, rise: [82, 66, 30, -22], knob: 0.12 },
+  // (A blade 0.6–1.35 m across on a leaf 2–2.5 m long, its stalk about half of it (W. robusta; W. filifera's
+  // twice as long, its blade 1–1.8 m): MORPHOLOGY.md 23 and 31. The old green leaves hang 30–60 degrees below
+  // the level before they die.)
+  fan: { reach: 1.0, width: 0.31, bare: 0.55, fold: 9 * DEG, arch: 18 * DEG, rise: [84, 62, 22, -48], knob: 0.12 },
 };
 
 /** A species' palm leaf (feather unless it says fan). */
@@ -213,6 +236,8 @@ interface FrondPlan {
   own: number;
   cell: number;
   wander: number;
+  /** A fan's blade turned about its own line (radians). */
+  roll: number;
 }
 
 /** Points along a frond's rachis: POINTS pieces, the last ones shorter (a frond bends most towards its tip). */
@@ -289,7 +314,9 @@ function layFrond(p: FrondPlan, foot: number[], L: number, form: LeafForm, sp: T
     const tilt = p.cls === "dead" ? -55 * DEG : p.cls === "spear" ? 5 * DEG : 12 * DEG - 26 * DEG * Math.max(0, p.age - 0.5);
     fr.hastula = h;
     fr.bladeDir = rotate(t, a, -tilt);
-    fr.bladeUp = rotate(n, a, -tilt);
+    // (Each blade turned on its own about its line, held stiffly at whatever angle it opened: seen from below
+    // or across the crown, many stand edge-on.)
+    fr.bladeUp = rotate(rotate(n, a, -tilt), fr.bladeDir, p.roll);
   }
   return fr;
 }
@@ -336,7 +363,7 @@ export function leafletProfile(s: number): number {
 /** A fan's blade spreads this far either side of its stalk's line (radians): the rest of the round is where the stalk comes in. */
 export const FAN_SPREAD = 150 * DEG;
 /** Where a fan's segments split, as a share of its radius: they droop beyond. */
-export const FAN_SPLIT = 0.55;
+export const FAN_SPLIT = 0.5;
 
 /**
  * A point of a fan's blade: `th` round from its stalk's line, `r` out (0..1 of its radius), pleated by `pleat`
@@ -353,7 +380,7 @@ export function fanPoint(f: Frond, th: number, r: number, across: number[], plea
   // (Folded up either side of the costa, and pleated: each segment a shallow V.)
   const lift = R * r * (Math.sin(f.fold) * Math.abs(sn) + 0.045 * pleat);
   const past = Math.max(0, (r - FAN_SPLIT) / (1 - FAN_SPLIT));
-  const droop = R * 0.62 * f.droop * past ** 1.6;
+  const droop = R * 0.85 * f.droop * past ** 1.5;
   return [h[0] + dir[0] * R * r + n[0] * lift, h[1] + dir[1] * R * r + n[1] * lift - droop, h[2] + dir[2] * R * r + n[2] * lift];
 }
 
@@ -406,18 +433,21 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
       fold: cls === "spear" ? 72 * DEG : dead ? (leaf === "fan" ? 60 * DEG : -55 * DEG) : form.fold * (cls === "young" ? 1.35 : 1) * (0.9 + 0.2 * rng.next()),
       plumose: dead || cls === "spear" ? 0 : plumose,
       droop: leaf === "fan" ? (cls === "young" ? 0.3 : cls === "spear" ? 0 : dead ? 1.4 : 0.8 + 0.5 * Math.max(0, age - 0.5)) * (sp.fanDroop ?? 1) : 0,
-      dead: dead ? 0.85 + 0.15 * rng.next() : cls === "old" ? Math.max(0, (age - 0.82) * 1.4) : 0,
+      // (A fan palm's freshly dead leaves, a brown tuft under its green: past 1, as a skirt's fresh top is.)
+      dead: dead ? (leaf === "fan" ? 1 + 0.06 * rng.next() : 0.85 + 0.15 * rng.next()) : cls === "old" ? Math.max(0, (age - 0.82) * 1.4) : 0,
       tone: cls === "spear" ? 1.3 : cls === "young" ? 1.12 : cls === "old" ? 0.95 : 1,
       flex: cls === "spear" ? 0.12 : cls === "young" ? 0.55 : cls === "mature" ? 1 : dead ? 1.5 : 1.2,
       own,
       cell: leaf === "fan" ? (rng.next() < 0.5 ? PALM_CELL.fan : PALM_CELL.fanB) : plumose > 0 ? PALM_CELL.queen : PALM_CELL.feather,
       wander: 0.04 * sp.crooked,
+      roll: leaf === "fan" && !dead && cls !== "spear" ? (rng.next() - 0.5) * 110 * DEG : 0,
     });
   }
   // (Pruned: a skinned palm loses its dead leaves and those hanging well below the level; a pineapple cut
   // leaves only those above about the level, the classic cut back to "ten and two".)
   const kept = plans.filter((p) => {
-    if (pruning === "skinned") return p.cls !== "dead" && p.rise > -40 * DEG;
+    // (A fan palm skinned keeps all its green leaves, the old hanging ones too: only its dead skirt is cut.)
+    if (pruning === "skinned") return p.cls !== "dead" && (leaf === "fan" || p.rise > -40 * DEG);
     if (pruning === "pineapple") return p.cls !== "dead" && p.rise > -6 * DEG;
     return true;
   });
@@ -479,7 +509,7 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
     let lo = 0.05;
     let hi = R * form.reach * 1.6;
     if (fits(hi)) return hi;
-    for (let k = 0; k < 18; k++) {
+    for (let k = 0; k < (leaf === "fan" ? 13 : 18); k++) {
       const mid = 0.5 * (lo + hi);
       if (fits(mid)) lo = mid;
       else hi = mid;
@@ -488,7 +518,7 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   };
   let best = { score: Infinity, L: 0, plans: kept };
   const depthBox = Math.max(0.01, H - base);
-  for (const k of pruning === "pineapple" ? [0.5, 0.7, 0.85, 1, 1.15, 1.3] : [0.45, 0.65, 0.85, 1, 1.2, 1.45, 1.8]) {
+  for (const k of leaf === "fan" ? [0.5, 0.75, 1, 1.3, 1.75] : pruning === "pineapple" ? [0.5, 0.7, 0.85, 1, 1.15, 1.3] : [0.45, 0.65, 0.85, 1, 1.2, 1.45, 1.8]) {
     const plans = kept.map((p) => drooped(p, k));
     const L = longest(plans);
     const e = extent(plans, L);
@@ -537,9 +567,13 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   }
   if (leaf === "fan" && (pruning === "natural" || pruning === "skirt")) {
     // (A fan palm's dead leaves hang in a skirt from under its green ones: in the wild to near the ground; cut back, a few metres.)
-    const top = knobLow - 0.05 * L;
+    // (From a little into the crown, under its hanging green leaves, so they overlap its fresh brown top.)
+    const top = knobLow + 0.04 * L;
     const longest = pruning === "natural" ? Math.max(0.15, sp.skirt ?? 0.6) * top : Math.min(0.3 * top, 0.9 * L);
-    skirt = { top, bottom: Math.max(0.4, top - longest), outTop: 0.55 * L * form.width + 0.1, outBottom: 0.12 + 0.1 * L * form.width };
+    // (Carrot-shaped: its shoulder flared about as wide as its lowest green leaves reach, the dead leaves hanging
+    // from their whole length, then tapering steadily to a narrow ragged foot: `skirtOut`.)
+    const outTop = Math.min(0.6 * L + 0.1, 0.48 * R);
+    skirt = { top, bottom: Math.max(0.4, top - longest), outTop, outBottom: Math.min(0.3 * outTop, 0.15 + 0.03 * L) };
   }
 
   // ---- The stem, ring by ring, to the top of the crown shaft. ----

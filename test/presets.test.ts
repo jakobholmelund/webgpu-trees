@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ALL_SPECIES, DEFAULT_DETAIL, DEFAULT_VARIANT_OPTIONS, LOOK_STYLES, OPTIONAL_SPECIES_FIELDS, STARTER_SPECIES, TREE_LOOKS, cloneSpecies, isSpeciesFieldKind } from "../src/index.ts";
-import { readPreset, speciesProblem } from "../lab/presets.ts";
+import { readPreset, speciesProblem, upToDate } from "../lab/presets.ts";
 
 const resetPreset = (look: (typeof TREE_LOOKS)[number]) => ({ version: 1, look, species: ALL_SPECIES.map((s) => cloneSpecies(s)), style: LOOK_STYLES[look], detail: DEFAULT_DETAIL, variants: DEFAULT_VARIANT_OPTIONS });
 
@@ -50,4 +50,25 @@ test("the optional fields' kinds are what the species carry", () => {
   }
   // (Most of them are set by some species: a list that had drifted from the species would show here.)
   assert.ok(seen.size >= Object.keys(fields).length - 3, `${[...seen].join(", ")}`);
+});
+
+test("a preset kept before fields and species were added is brought up to date, its own settings kept", () => {
+  const fan = ALL_SPECIES.find((s) => s.palmLeaf === "fan");
+  assert.ok(fan, "a fan palm among the species");
+  // (As kept before palms had leaves of their own: no palmLeaf, no pruning, and its height changed by hand.)
+  const old = JSON.parse(JSON.stringify(fan)) as Record<string, unknown>;
+  delete old.palmLeaf;
+  delete old.pruning;
+  old.height = 19;
+  const kept = [JSON.parse(JSON.stringify(ALL_SPECIES[0])), old as unknown as typeof fan];
+  const now = upToDate(kept, ALL_SPECIES);
+  const back = now.find((s) => s.name === fan.name);
+  assert.equal(back?.palmLeaf, "fan", "the field it left out comes from the package");
+  assert.equal(back?.pruning, fan.pruning);
+  assert.equal(back?.height, 19, "what it set stays");
+  assert.equal(now.length, ALL_SPECIES.length, "the species it had not heard of are added");
+  assert.deepEqual(now.slice(0, 2).map((s) => s.name), [ALL_SPECIES[0].name, fan.name], "its own come first, in its order");
+  // (A species of its own making stays, and takes nothing.)
+  const mine = { ...JSON.parse(JSON.stringify(ALL_SPECIES[0])), name: "My oak" };
+  assert.equal(upToDate([mine], ALL_SPECIES)[0].name, "My oak");
 });
