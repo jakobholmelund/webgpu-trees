@@ -38,7 +38,7 @@ import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
-import { BIG_CARD, BIG_CARDS, CARD_V, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
+import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
 import { clothed, growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
 import { palmPieces } from "./palmGeometry.ts";
@@ -120,12 +120,30 @@ const PINE_CLUMPING = 0.55;
 const PINE_CLUMP_TOP = 1.75;
 /** How much of that a cushion picture's big card takes, its own light and shade being in the picture. */
 const CUSHION_CLUMP_SHADE = 0.55;
+/** ... and a photographed one, whose picture's light carries it. */
+const CUSHION_PHOTO_SHADE = 0.12;
+/** How high up a cushion card it is lit, in its half widths from its middle. */
+const CUSHION_LIGHT_UP = 0.5;
+/** How far a photographed cushion's warmth tints it (red up and blue down by this times its warmth's offset). */
+const CUSHION_WARMTH = 1.4;
 /** A pine with cushion pictures: its big cards to a clump near to, their size (half width over the clump's radius), and its tufts over them (a share of a pine's). */
-const CUSHION_CARDS = 3;
-const CUSHION_SIZE = 1.6;
+const CUSHION_CARDS = 4;
+const CUSHION_SIZE = 2;
+/** ... for the openest crown (`closedOf` 0): one card a clump, this size; and its mid cards this much smaller than 1.45. */
+const CUSHION_SIZE_OPEN = 1.1;
+const CUSHION_MID_OPEN = 0.45;
+/** The openness at which a cushioned crown is as closed as it goes, and as open. */
+const CUSHION_CLOSED = 0.25;
+const CUSHION_OPEN = 0.6;
 const CUSHION_TUFTS = 0.3;
+/** ... and a padded crown's whole sprays over its pad pictures, a share of its kind's. */
+const CUSHION_SPRAYS = 0.5;
 /** How steeply the eye looks at a cushion card (the sine) where it starts to tip over to the eye, and where it faces it. */
-const CUSHION_TIP = [0.55, 0.95] as const;
+const CUSHION_TIP = [0.35, 0.9] as const;
+/** A pine with pictures of its canopy: its mid cards' half width, in its clumps' radii. */
+const CANOPY_SIZE = 2.6;
+/** How much bigger a cushion card is drawn once tipped right over to the eye. */
+const CUSHION_TIP_GROW = 0.6;
 /** How dark a cushion card is seen from beneath it (its underside, beside its picture's tone). */
 const CUSHION_BELOW = 0.45;
 /** How far off a cushioned pine's tuft cards are whole, and where they are gone (m). */
@@ -397,7 +415,8 @@ export function createTrees(options: TreesOptions): Trees {
       // (1 a palm whose stem is a lattice of old leaf bases, 2 one ringed with their scars.)
       speciesData.set([dead.r, dead.g, dead.b, s.architecture === "palm" ? (sl.bark === "palmLattice" ? 1 : 2) : 0], (i * SPECIES_ROWS + 7) * 4);
       // (Whether its big cards are pictures of its cushions (`ScanLook.cushion`), stood upright and turned to the eye.)
-      speciesData.set([scanned && sl.cushion ? 1 : 0, 0, 0, 0], (i * SPECIES_ROWS + 8) * 4);
+      // (And whether they are photographs, whose warmth the cards keep: sprays.ts `Layer.warm`.)
+      speciesData.set([scanned && sl.cushion ? 1 : 0, scanned && sl.cushion && sl.cushion !== "drawn" ? 1 : 0, 0, 0], (i * SPECIES_ROWS + 8) * 4);
       speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
@@ -459,6 +478,9 @@ export function createTrees(options: TreesOptions): Trees {
   const sheeted = sheetKinds.map((k) => k >= 0);
   // (With the photographs, the near cards are a species' own sprays at their size, a third of a metre or so,
   // many to a clump; a palm's, its whole leaves, as before.)
+  /** How closed a pine's crown is, for its cushions: 1 a stone pine's or a Monterey pine's (openness 0.25), 0 an Aleppo pine's (0.6). */
+  // (Squared: a crown half way (a Scots pine's, 0.4) is more open than half way, its heavy limbs showing between its clumps.)
+  const closedOf = (sp: number) => Math.min(1, Math.max(0, (CUSHION_OPEN - species[sp].openness) / (CUSHION_OPEN - CUSHION_CLOSED))) ** 2;
   const fixedCards: (FixedCards | null)[] = plan.variants.map((v) => {
     const l = looks[v.species];
     const half = scanned ? nearCardHalf(l) : 0;
@@ -472,11 +494,15 @@ export function createTrees(options: TreesOptions): Trees {
           // (One with pictures of its cushions: those on its big cards, a few a clump, and fewer tufts over them,
           // at its rim and close to.)
           l.cushion
-          ? { half, fill: (PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness)) * CUSHION_TUFTS, most: 24, big: species[v.species].openness < PINE_CUSHION_OPEN ? CUSHION_CARDS : 1, bigSize: CUSHION_SIZE, hang: 0, rise: 0.8 }
+          ? { half, fill: (PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness)) * CUSHION_TUFTS, most: 24, big: Math.round(1 + (CUSHION_CARDS - 1) * closedOf(v.species)), bigSize: CUSHION_SIZE_OPEN + (CUSHION_SIZE - CUSHION_SIZE_OPEN) * closedOf(v.species), hang: 0, rise: 0.8 }
           : { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 36, big: species[v.species].openness < PINE_CUSHION_OPEN ? 1 : 0, bigSize: 1, hang: 0, rise: 0.8 }
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
-          { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
+          // (One with pictures of its pads (a Monterey cypress's shelves): those on its big cards, as a pine's
+          // cushions, and its sprays fewer over them.)
+          l.cushion
+          ? { half, fill: 0.5 * CUSHION_SPRAYS, most: 24, big: Math.round(1 + (CUSHION_CARDS - 1) * closedOf(v.species)), bigSize: CUSHION_SIZE_OPEN + (CUSHION_SIZE - CUSHION_SIZE_OPEN) * closedOf(v.species), hang: 0 }
+          : { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
         : // (A weeping tree's sprays hang less over its crown's top, over the arches of its limbs.)
           { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0, hangTop: l.spray === "weeping" ? WEEPING_HANG_TOP : 0, lift: clothed(species[v.species]) };
   });
@@ -487,7 +513,10 @@ export function createTrees(options: TreesOptions): Trees {
   const midRises = plan.variants.map((v) => (looks[v.species].spray === "tufts" ? PINE_MID_RISE : 0));
   // (A pine with pictures of its cushions stands its big cards upright, its mid tree's too: the shader turns them to the eye.)
   const cushioned = plan.variants.map((v) => scanned && !!looks[v.species].cushion);
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards, undefined, cushioned) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs, undefined, midRises, cushioned) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
+  // (One with pictures of its canopy has bigger mid cards, each a strip of several cushions as wide as they are.)
+  // (An open pine's mid cards smaller, as its near ones are: its clumps with air between.)
+  const midSizes = plan.variants.map((v) => (scanned && looks[v.species].cushionFar ? CANOPY_SIZE : scanned && looks[v.species].cushion ? 1.45 - CUSHION_MID_OPEN * (1 - closedOf(v.species)) : 1.45));
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, noDabs, fixedCards, undefined, cushioned) : real && t === 1 ? cardPieces(grown, 2, 1.45, noDabs, undefined, midRises, cushioned, midSizes) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? noDabs : isPalm), lobes) : dabPieces(grown, s, "leaves", isPalm)));
   const frondSets: Pieces[] = TIER_SHAPES.map((_, t) => palmPieces(grown, t));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
   // from boughs to blots, pixel by pixel, a speckle over the whole hand-over.)
@@ -1007,6 +1036,8 @@ export function createTrees(options: TreesOptions): Trees {
     let sheetCols: { top: Vec3; under: Vec3 } | null = null;
     /** 1 on a pine's card (its needles' outline kept soft: `PINE_SOFT`), else 0. */
     let pineCard: Float | null = null;
+    /** Whether this is a pine's photographed cushion or canopy card (a near big card, a mid card or a far dab), whose warmth its texels keep. */
+    let photoBig: Float | null = null;
     let sheetFace: Vec3 | null = null;
     // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
     // (Only on the upper half of its lobe, as sprigs stand on the tops of clay masses: from below they would
@@ -1089,7 +1120,12 @@ export function createTrees(options: TreesOptions): Trees {
       const toEye = normalize(cameraPosition.sub(at));
       // (A far dab stands for a whole gathered group of clumps, its centre deep among them: lit as the group's
       // outside is, half its size out along its facing, as the near leaves it hands over to are.)
-      const litAt = t === 2 ? at.add(dirToWorld(T, fit.normal(aNormal.xyz)).mul(aDab.z.mul(fit.size).mul(0.5))) : at;
+      // (A pine's cushion card is lit as its top is, where its picture's light is: lit at its middle, deep in its
+      // clump, the light box's shade darkened a picture already dark beneath.)
+      const bigEarly = scanned && card && t === 0 ? step(float(0.5), aOffset.w) : float(0);
+      const cushionEarly = scanned && card ? T.srow(8).x.mul(t === 0 ? bigEarly : float(1)) : float(0);
+      if (scanned && !sheet && !stroke) photoBig = T.srow(8).y.mul(t === 0 ? bigEarly : float(1));
+      const litAt = t === 2 ? at.add(dirToWorld(T, fit.normal(aNormal.xyz)).mul(aDab.z.mul(fit.size).mul(0.5))) : at.add(vec3(0, aDab.z.mul(fit.size).mul(CUSHION_LIGHT_UP), 0).mul(cushionEarly));
       // (The photographs' near cards are many and small: four steps each, as a shoot's light hardly differs from
       // its neighbour's.)
       const C = crownAt(T, litAt, undefined, sheet ? own.add(aDab.x.mul(0.37)).add(aDab.y.mul(0.61)) : own, scanned && card && t === 0 ? 4 : undefined);
@@ -1109,6 +1145,8 @@ export function createTrees(options: TreesOptions): Trees {
       const cushionBig = scanned && card ? T.srow(8).x.mul(t === 0 ? big : float(1)) : float(0);
       /** How far a cushion card is seen from beneath it, tipped over to the eye: its flat dark underside, not its lit side. */
       let cushionBelow: Float = float(0);
+      /** ... and how far it is tipped over to the eye at all. */
+      let cushionTipped: Float = float(0);
       if (scanned && card) {
         // (A pine's tuft is a brush, the same all round its shoot: its card is turned about its shoot to the eye,
         // as far as PINE_FACE_EYE says. Seen aslant, a card of needles is squeezed, its mip chosen by the way it
@@ -1124,6 +1162,7 @@ export function createTrees(options: TreesOptions): Trees {
         const tip = smoothstep(float(CUSHION_TIP[0]), float(CUSHION_TIP[1]), abs(toEye.y));
         face = select(cushionBig.greaterThan(0.5), normalize(mix(level, toEye, tip)), face);
         cushionBelow = cushionBig.mul(tip).mul(step(toEye.y, float(0)));
+        cushionTipped = cushionBig.mul(tip);
       }
       const seen = face.mul(select(dot(face, toEye).lessThan(0), float(-1), float(1)));
       // (A sheet's own facing, its top's side, as fitted; and its clump's, which its light is laid over.)
@@ -1143,7 +1182,9 @@ export function createTrees(options: TreesOptions): Trees {
         const up = smoothstep(float(-1), float(0.8), inClump);
         const cushion = mix(vec3(PINE_CLUMP_LOW), vec3(PINE_CLUMP_TOP * 1.08, PINE_CLUMP_TOP, PINE_CLUMP_TOP * 0.78), up.mul(up));
         // (A cushion's picture has its own light and shade, top and beneath: only a little of this over it.)
-        albedo = albedo.mul(mix(vec3(1), cushion, pineCard.mul(mix(float(1), float(CUSHION_CLUMP_SHADE), cushionBig))));
+        // (A photograph's, its own light all but alone: CUSHION_PHOTO_SHADE.)
+        const shadeShare = mix(float(CUSHION_CLUMP_SHADE), float(CUSHION_PHOTO_SHADE), T.srow(8).y);
+        albedo = albedo.mul(mix(vec3(1), cushion, pineCard.mul(mix(float(1), shadeShare, cushionBig))));
         // (Seen from beneath, a cushion is its underside: as dark as its picture's foot all over.)
         albedo = albedo.mul(mix(float(1), float(CUSHION_BELOW), cushionBelow));
       }
@@ -1247,7 +1288,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (A pine with cushion cards keeps its tufts' cards close to the eye only: further off its cushions are its
       // needles, and a tuft a few pixels across is a broad leaf's blot on them.)
       const tuftsNear = scanned && card && t === 0 ? mix(float(1), smoothstep(float(CUSHION_TUFTS_FAR[1]), float(CUSHION_TUFTS_FAR[0]), length(cameraPosition.sub(at))), T.srow(8).x.mul(float(1).sub(big))) : float(1);
-      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece).mul(ownSize).mul(tuftsNear);
+      // (A cushion tipped over to an eye under it is drawn bigger, so the cushions overhead close into a ceiling
+      // and do not show as plates in rings with sky between.)
+      const size = half.mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig)).mul(bigNear).mul(handPiece).mul(ownSize).mul(tuftsNear).mul(float(1).add(cushionTipped.mul(CUSHION_TIP_GROW)));
       if (sheet) {
         // (A sheet's point is where it is (realistic), or turned a little about its middle line to the eye
         // (painterly). One handed over is drawn to its tree's foot, its triangles to nothing.)
@@ -1325,7 +1368,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (A near tier's big cards, a clump's mass under its small ones, are marked by `aOffset.w`.)
       // (A big card one of the row's big cards, by a number of its own decorrelated from its turn.)
       const bigCell = float(BIG_CARD).add(floor(own.mul(7.31).add(0.13).fract().mul(BIG_CARDS - 0.001)));
-      const realCell = scanned ? vec2(t === 0 ? select(aOffset.w.greaterThan(0.5), bigCell, floor(own.mul(NEAR_CARDS - 0.001))) : bigCell, cardRow) : vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
+      // (A mid or far tree's, one of its far cards: a stone pine's strip of canopy.)
+      const farCell = float(FAR_CARD).add(floor(own.mul(7.31).add(0.13).fract().mul(FAR_CARDS - 0.001)));
+      const realCell = scanned ? vec2(t === 0 ? select(aOffset.w.greaterThan(0.5), bigCell, floor(own.mul(NEAR_CARDS - 0.001))) : farCell, cardRow) : vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
       const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
       // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
       // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
@@ -1459,6 +1504,7 @@ export function createTrees(options: TreesOptions): Trees {
         const vEye = sheetCols && thruV ? varying(thruV.eye, "vTreeEye") : null;
         // (Close to only: further off a soft fringe is a lace the sky shows through, and a far crown goes pale.)
         const vPine = pineCard && t === 0 ? varying(pineCard, "vTreePine") : null;
+        const vWarm = photoBig ? varying(photoBig, "vTreeWarm") : null;
         // (The painted look's marks have no leaves of their own: each mark one thickness.)
         const ownLeaf = look === "stylized" ? 0 : 1;
         m.colorNode = Fn(() => {
@@ -1478,6 +1524,11 @@ export function createTrees(options: TreesOptions): Trees {
           Discard(mark.a.lessThan(uAlphaCut));
           let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
           base = base.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w));
+          // (A photographed cushion's own warmth (blue, 0.5 its mean): its sunlit top yellower, its underside cooler.)
+          if (vWarm) {
+            const w = mark.b.sub(0.5).mul(CUSHION_WARMTH);
+            base = base.mul(mix(vec3(1), vec3(float(1).add(w), float(1).add(w.mul(0.3)), float(1).sub(w.mul(1.2))).max(vec3(0)), vWarm));
+          }
           if (vThru) base = base.add(vThru.xyz.mul(vThru.w).mul(leafThin(ownLeaf ? mark.g : float(0.5))));
           return vec4(base, mark.a);
         })();
@@ -2141,9 +2192,11 @@ export function createTrees(options: TreesOptions): Trees {
             // (A pine's cushions, where it has pictures of them: its big cards.)
             const cushionSet = l.cushion ? leafSet(l.cushion) : undefined;
             const cushions = cushionSet ? { set: cushionSet, ...(await loadLeaves(cushionSet.id)) } : undefined;
+            const farSet = l.cushionFar ? leafSet(l.cushionFar) : undefined;
+            const far = farSet ? { set: farSet, ...(await loadLeaves(farSet.id)) } : undefined;
             if (disposed) return false;
             // (Its big card a mid card's width: a clump's, half again.)
-            drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7, 1 - species[sp].openness, cushions);
+            drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7, 1 - species[sp].openness, cushions, far);
             // (A row at a time, so a page keeps drawing between them.)
             await new Promise((done) => setTimeout(done, 0));
           }

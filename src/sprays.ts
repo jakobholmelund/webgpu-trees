@@ -17,12 +17,18 @@ import { type Pixels } from "./mips.ts";
 import { hash01 } from "./variants.ts";
 import { type LeafSet, type LeafSprite, type ScanLook, nearCardHalf } from "./scans.ts";
 
-/** Columns of a species' row: three near cards and two big ones. */
-export const SPRAY_COLS = 5;
+/** Columns of a species' row: three near cards, two big ones, and two far ones. */
+export const SPRAY_COLS = 7;
 export const NEAR_CARDS = 3;
-/** The first big card's column, and how many big cards a row has (a clump's mass, a mid tree's cards, a far dab's). */
+/** The first big card's column, and how many big cards a row has (a near clump's mass, a conifer's sheets). */
 export const BIG_CARD = 3;
 export const BIG_CARDS = 2;
+/**
+ * The first far card's column, and how many: a mid tree's cards and a far dab's. A big card again, but for a
+ * pine with pictures of its canopy (`ScanLook.cushionFar`, a strip of cushions side by side), that picture.
+ */
+export const FAR_CARD = 5;
+export const FAR_CARDS = 2;
 /** A leaf's tone on average (as leaves.ts's), and a twig's. */
 const LEAF = 0.6;
 const TWIG = 0.33;
@@ -94,6 +100,8 @@ interface Layer {
   tone: Float32Array;
   own: Float32Array;
   cover: Float32Array;
+  /** How warm each texel of a photograph is beside its sheet's mean (0.5 as warm), where it is kept: a cushion's sunlit yellow-green top, its cool dark underside. */
+  warm?: Float32Array;
 }
 
 function rng(seed: number): () => number {
@@ -340,6 +348,12 @@ function leaf(L: Layer, sh: Sheet, l: Lay, shadow: number): void {
       const q = (yi * sh.albedo.width + xi) * 4;
       const d = sh.albedo.data;
       const lum = 0.2126 * LIN[d[q]] + 0.7152 * LIN[d[q + 1]] + 0.0722 * LIN[d[q + 2]];
+      if (L.warm) {
+        // (Its warmth: red over blue for its lightness, beside its sheet's, as a share.)
+        const w = (LIN[d[q]] - LIN[d[q + 2]]) / Math.max(0.01, LIN[d[q]] + LIN[d[q + 1]] + LIN[d[q + 2]]);
+        const w0 = (sh.set.meanLinear[0] - sh.set.meanLinear[2]) / Math.max(0.01, sh.set.meanLinear[0] + sh.set.meanLinear[1] + sh.set.meanLinear[2]);
+        L.warm[j * n + i] = L.warm[j * n + i] * (1 - c) + clamp01(0.5 + (w - w0) * WARMTH) * c;
+      }
       // (Its relief, turned with it: lit a little from the card's top, so a vein or a curl shows.)
       const nx = sample(sh.normal, at[0], at[1], 0) * 2 - 1;
       const ny = sample(sh.normal, at[0], at[1], 1) * 2 - 1;
@@ -759,8 +773,12 @@ export function drawSprayCard(out: Pixels, ox: number, oy: number, n: number, sh
  */
 export function drawCushionCard(out: Pixels, ox: number, oy: number, n: number, cushions: Sheet, pick: number): void {
   const sprites = cushions.set.sprites;
-  const s = sprites[((pick % sprites.length) + sprites.length) % sprites.length];
-  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n) };
+  // (Stood as its picture stands, its base's middle under its top's: the sheet's stalk-to-tip line, from its
+  // lowest and highest covered rows' middles, leans on a wide cushion and would turn it aslant.)
+  const s0 = sprites[((pick % sprites.length) + sprites.length) % sprites.length];
+  const s: LeafSprite = { ...s0, base: [s0.w / 2, s0.base[1]], tip: [s0.w / 2, s0.tip[1]] };
+  // (Its warmth kept too: a photograph's sunlit top is yellower than its shaded underside.)
+  const L: Layer = { n, tone: new Float32Array(n * n), own: new Float32Array(n * n), cover: new Float32Array(n * n), warm: new Float32Array(n * n) };
   // (Its frame on the sheet: up from its base (its flat base's middle) to its top, as the sheet stands it.)
   const sl = Math.hypot(s.tip[0] - s.base[0], s.tip[1] - s.base[1]) || 1;
   const room = n - 2 * MARGIN - 4;
@@ -791,6 +809,8 @@ const CUSHION_CURL = 0.35;
 /** A pine less dense than this has loose clumps of lumps, not a dome. */
 const CUSHION_LOOSE = 0.5;
 const CUSHION_PACK = 6;
+/** How far a photograph's warmth (red over blue, a share of its lightness) is stretched about its sheet's mean, into 0..1. */
+const WARMTH = 4;
 
 /**
  * A pine's cushion drawn needle by needle, where it has no picture of one (`ScanLook.cushion` "drawn"): seen
@@ -920,24 +940,36 @@ function write(out: Pixels, ox: number, oy: number, n: number, L: Layer, mean: n
       const t = (tone * 255 + 0.5) | 0;
       out.data[p] = t;
       out.data[p + 1] = cov > 0 ? ((Math.min(1, L.own[o] / L.cover[o]) * 255 + 0.5) | 0) : 128;
-      out.data[p + 2] = t;
+      // (Blue: its tone again, or a photograph's warmth where it keeps it: `Layer.warm`.)
+      out.data[p + 2] = L.warm ? (cov > 0 ? ((Math.min(1, L.warm[o] / L.cover[o]) * 255 + 0.5) | 0) : 128) : t;
       out.data[p + 3] = cov;
     }
   }
 }
 
 /**
- * A species' row: its three near cards and its big cards. `bigExtent`: how wide its big cards are (m). A pine
- * with pictures of its cushions (`cushions`, `ScanLook.cushion`) has them on its big cards, one to a card.
+ * A species' row: its three near cards, its big cards and its far cards. `bigExtent`: how wide its big cards
+ * are (m). A pine with pictures of its cushions (`cushions`, `ScanLook.cushion`) has them on its big cards, one
+ * to a card, or its cushions drawn (`"drawn"`); with pictures of its canopy (`far`, `ScanLook.cushionFar`) those
+ * on its far cards. Else its far cards are its big cards again.
  */
-export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet): void {
+export function drawSprayRow(out: Pixels, row: number, n: number, sheet: Sheet, look: ScanLook, bigExtent: number, seed: number, density = 0, cushions?: Sheet, far?: Sheet): void {
   // (A palm's near cards are the drawn ones' size: a clump's radius and a little less (geometry.ts `cardPieces`),
   // a big card's 0.8 / 1.45 of it.)
   const near = 2 * nearCardHalf(look) || bigExtent * (0.8 / 1.45);
-  for (let c = 0; c < SPRAY_COLS; c++) {
+  for (let c = 0; c < FAR_CARD; c++) {
     const big = c >= BIG_CARD;
     if (big && look.cushion && cushions && cushions.set.sprites.length > 0) drawCushionCard(out, c * n, row * n, n, cushions, c - BIG_CARD);
     else if (big && look.cushion) drawnCushionCard(out, c * n, row * n, n, look, bigExtent, seed * 31 + c * 7 + 3, density);
     else drawSprayCard(out, c * n, row * n, n, sheet, look, big && look.spray !== "whole" ? bigExtent : near, big, seed * 31 + c * 7 + 3, density);
+  }
+  for (let c = FAR_CARD; c < FAR_CARD + FAR_CARDS; c++) {
+    if (far && far.set.sprites.length > 0) {
+      drawCushionCard(out, c * n, row * n, n, far, c - FAR_CARD);
+      continue;
+    }
+    // (Its big card again, copied.)
+    const from = BIG_CARD + ((c - FAR_CARD) % BIG_CARDS);
+    for (let j = 0; j < n; j++) out.data.copyWithin(((row * n + j) * out.width + c * n) * 4, ((row * n + j) * out.width + from * n) * 4, ((row * n + j) * out.width + from * n + n) * 4);
   }
 }

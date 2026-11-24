@@ -848,6 +848,9 @@ export const IN_CLUMP = 1.2;
 const SHOOT = 1.1;
 /** Where a spray's twig enters its card, from the card's centre, in its half-lengths (the sprays in leaves.ts start 0.7 to 0.97 below). */
 export const SPRAY_FOOT = 0.8;
+/** An upright cushion card's size about its kind's, from 1 - this / 2 to 1 + this / 2; and how far up or down its twig it stands, in its clump's radii. */
+const CUSHION_VARY = 0.7;
+const CUSHION_RISE = 1;
 
 /**
  * Each clump's twigs: the node it hangs on, then the ends of the other twigs inside it. A clump is a spray of
@@ -1389,7 +1392,7 @@ export interface FixedCards {
   rise?: number;
 }
 
-export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[], upright?: readonly boolean[]): Pieces {
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[], upright?: readonly boolean[], sizes?: readonly number[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
   trees.forEach((tree, v) => {
     b.begin();
@@ -1480,10 +1483,14 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const stands = upright?.[v] === true && (!fix || filler);
         const tangent = stands ? [0, 1, 0] : Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
         const facing = stands ? (Math.hypot(n[0], n[2]) > 1e-3 ? norm([n[0], 0, n[2]]) : norm([off[0] + 1e-3, 0, off[2]])) : face;
-        const half = (fix && !filler ? fix.half : fix ? r * fix.bigSize : r * size) * (0.8 + hash01(k, 24) * 0.4);
+        // (A variant's own size for its cards where `sizes` gives one: a stone pine's mid cards, strips of its canopy.)
+        // (Upright cushions vary more, and stand at heights of their own about their twigs, a half of the
+        // clump's radius up or down: at one height, a crown of them seen from beneath was rings of plates.)
+        const vary = stands ? CUSHION_VARY : 0.4;
+        const half = (fix && !filler ? fix.half : fix ? r * fix.bigSize : r * (sizes?.[v] ?? size)) * (1 - vary / 2 + hash01(k, 24) * vary);
         // (The spray's own twig enters its picture near the bottom edge (leaves.ts): its centre is that far
         // on from its foot.)
-        const on = half * SPRAY_FOOT;
+        const on = half * SPRAY_FOOT + (stands ? (hash01(k, 28) - 0.5) * r * CUSHION_RISE : 0);
         const at = [from.p[0] + tangent[0] * on, from.p[1] + tangent[1] * on, from.p[2] + tangent[2] * on];
         let f = -1;
         for (const [cx, cy] of CORNERS) {

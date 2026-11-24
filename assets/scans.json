@@ -225,7 +225,6 @@
           "Monterey pine",
           "Torrey pine",
           "Aleppo pine",
-          "Stone pine",
           "Eastern white pine"
         ],
         "source": "pine_bark"
@@ -416,6 +415,32 @@
           "Canary date palm (its pineapple cut)"
         ],
         "source": "ai_pineapple"
+      },
+      {
+        "id": "stonePine",
+        "layer": 15,
+        "tileCm": [
+          120,
+          120
+        ],
+        "tileFrom": "estimated: plates ~12–20 cm wide, an old stone pine's 10–25 cm",
+        "meanLinear": [
+          0.321,
+          0.176,
+          0.127
+        ],
+        "meanColor": "#997564",
+        "roughness": 0.778,
+        "seams": {
+          "albedo": 0.969,
+          "normal": 1.003
+        },
+        "origin": "generated",
+        "look": "thick flat reddish-brown plates between deep grey-brown fissures (an old stone pine's)",
+        "for": [
+          "Stone pine"
+        ],
+        "source": "ai_stonepine_bark"
       }
     ]
   },
@@ -768,141 +793,141 @@
       {
         "id": "londonPlane",
         "size": [
-          512,
-          1200
+          1024,
+          608
         ],
         "lengthCm": 30,
         "tone": false,
         "meanLinear": [
-          0.175,
-          0.258,
-          0.068
+          0.149,
+          0.163,
+          0.047
         ],
-        "meanColor": "#748b4a",
+        "meanColor": "#6c703d",
         "origin": "generated",
         "sprites": [
           {
-            "x": 4,
-            "y": 604,
-            "w": 220,
-            "h": 291,
-            "base": [
-              113.5,
-              285
-            ],
-            "tip": [
-              112,
-              6
-            ],
-            "size": 0.966
-          },
-          {
-            "x": 228,
-            "y": 604,
-            "w": 209,
-            "h": 291,
-            "base": [
-              107.5,
-              285
-            ],
-            "tip": [
-              103.5,
-              6
-            ],
-            "size": 0.966
-          },
-          {
-            "x": 4,
-            "y": 899,
-            "w": 219,
-            "h": 291,
-            "base": [
-              106,
-              285
-            ],
-            "tip": [
-              107,
-              5
-            ],
-            "size": 0.966
-          },
-          {
-            "x": 220,
+            "x": 256,
             "y": 4,
-            "w": 220,
-            "h": 292,
+            "w": 249,
+            "h": 299,
             "base": [
-              112,
-              286
+              129.5,
+              293
             ],
             "tip": [
-              108.5,
+              124,
               6
             ],
-            "size": 0.971
+            "size": 0.996
+          },
+          {
+            "x": 768,
+            "y": 308,
+            "w": 248,
+            "h": 288,
+            "base": [
+              120,
+              282
+            ],
+            "tip": [
+              128,
+              6
+            ],
+            "size": 0.956
+          },
+          {
+            "x": 509,
+            "y": 4,
+            "w": 247,
+            "h": 299,
+            "base": [
+              119,
+              293
+            ],
+            "tip": [
+              122,
+              6
+            ],
+            "size": 0.995
           },
           {
             "x": 4,
             "y": 308,
-            "w": 216,
+            "w": 252,
             "h": 292,
             "base": [
-              109,
+              128.5,
               286
             ],
             "tip": [
-              109,
+              128,
               6
             ],
             "size": 0.971
           },
           {
-            "x": 224,
+            "x": 515,
             "y": 308,
-            "w": 219,
-            "h": 292,
+            "w": 249,
+            "h": 291,
             "base": [
-              112.5,
+              126,
               285
             ],
             "tip": [
-              111.5,
-              6
+              126.5,
+              7
             ],
-            "size": 0.969
+            "size": 0.968
           },
           {
-            "x": 227,
-            "y": 899,
-            "w": 234,
-            "h": 287,
+            "x": 260,
+            "y": 308,
+            "w": 251,
+            "h": 292,
             "base": [
               121,
-              280
+              285
             ],
             "tip": [
-              115,
+              122,
               6
             ],
-            "size": 0.952
+            "size": 0.97
           },
           {
             "x": 4,
             "y": 4,
-            "w": 212,
+            "w": 248,
             "h": 300,
             "base": [
-              111,
+              129.5,
               294
             ],
             "tip": [
-              107,
-              5
+              125,
+              6
             ],
             "size": 1
+          },
+          {
+            "x": 760,
+            "y": 4,
+            "w": 249,
+            "h": 296,
+            "base": [
+              119,
+              290
+            ],
+            "tip": [
+              125,
+              6
+            ],
+            "size": 0.985
           }
         ],
-        "look": "palmate London plane leaves, five-lobed, on long stalks",
+        "look": "broad London plane leaves, three big pointed lobes and two small, sparse coarse teeth, stalks swollen at the base",
         "for": [
           "Plane"
         ],
@@ -2077,6 +2102,324 @@
           "Eucalyptus"
         ],
         "source": "ai_eucalyptus_leaves"
+      },
+      {
+        "id": "stonePineCushion",
+        "size": [
+          1024,
+          864
+        ],
+        "lengthCm": 100,
+        "tone": false,
+        "meanLinear": [
+          0.141,
+          0.156,
+          0.04
+        ],
+        "meanColor": "#696e38",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 460,
+            "w": 1006,
+            "h": 393,
+            "base": [
+              450,
+              385
+            ],
+            "tip": [
+              479.5,
+              6
+            ],
+            "size": 0.865
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 1015,
+            "h": 452,
+            "base": [
+              282.5,
+              444
+            ],
+            "tip": [
+              556,
+              7
+            ],
+            "size": 1
+          }
+        ],
+        "look": "one dense stone pine cushion seen from the side, flat beneath, domed above, lit on top",
+        "for": [
+          "Stone pine"
+        ],
+        "source": "ai_stonepine_cushion"
+      },
+      {
+        "id": "stonePineCanopy",
+        "size": [
+          1024,
+          448
+        ],
+        "lengthCm": 150,
+        "tone": false,
+        "meanLinear": [
+          0.129,
+          0.132,
+          0.029
+        ],
+        "meanColor": "#65662f",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 888,
+            "h": 222,
+            "base": [
+              300,
+              216
+            ],
+            "tip": [
+              553.3,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 230,
+            "w": 858,
+            "h": 207,
+            "base": [
+              475.7,
+              201
+            ],
+            "tip": [
+              535.5,
+              6
+            ],
+            "size": 0.928
+          }
+        ],
+        "look": "a strip of stone pine canopy: several cushions side by side, crooked branches beneath",
+        "for": [
+          "Stone pine"
+        ],
+        "source": "ai_stonepine_canopy"
+      },
+      {
+        "id": "pineClumpDark",
+        "size": [
+          768,
+          960
+        ],
+        "lengthCm": 150,
+        "tone": false,
+        "meanLinear": [
+          0.065,
+          0.085,
+          0.029
+        ],
+        "meanColor": "#48522f",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 665,
+            "h": 524,
+            "base": [
+              332.5,
+              515
+            ],
+            "tip": [
+              387,
+              8
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 532,
+            "w": 620,
+            "h": 424,
+            "base": [
+              374,
+              417
+            ],
+            "tip": [
+              283,
+              6
+            ],
+            "size": 0.803
+          }
+        ],
+        "look": "a dense dark Monterey pine clump of stout needle brushes",
+        "for": [
+          "Monterey pine"
+        ],
+        "source": "ai_pine_clump_dark"
+      },
+      {
+        "id": "pineClumpLight",
+        "size": [
+          768,
+          1024
+        ],
+        "lengthCm": 150,
+        "tone": false,
+        "meanLinear": [
+          0.228,
+          0.199,
+          0.13
+        ],
+        "meanColor": "#837b65",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 532,
+            "w": 674,
+            "h": 484,
+            "base": [
+              298,
+              476
+            ],
+            "tip": [
+              409,
+              11
+            ],
+            "size": 0.921
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "w": 663,
+            "h": 524,
+            "base": [
+              378,
+              515
+            ],
+            "tip": [
+              346,
+              9
+            ],
+            "size": 1
+          }
+        ],
+        "look": "an open grey-green Aleppo pine clump, its twigs showing",
+        "for": [
+          "Aleppo pine"
+        ],
+        "source": "ai_pine_clump_light"
+      },
+      {
+        "id": "scotsPineClump",
+        "size": [
+          768,
+          976
+        ],
+        "lengthCm": 150,
+        "tone": false,
+        "meanLinear": [
+          0.098,
+          0.127,
+          0.058
+        ],
+        "meanColor": "#586444",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 738,
+            "h": 524,
+            "base": [
+              398,
+              518
+            ],
+            "tip": [
+              292,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 532,
+            "w": 727,
+            "h": 436,
+            "base": [
+              383,
+              429
+            ],
+            "tip": [
+              410.5,
+              7
+            ],
+            "size": 0.827
+          }
+        ],
+        "look": "a dense blue-green Scots pine clump of short paired needles on a thin orange-brown branch",
+        "for": [
+          "Scots pine"
+        ],
+        "source": "ai_scotspine_clump"
+      },
+      {
+        "id": "cypressPad",
+        "size": [
+          1024,
+          480
+        ],
+        "lengthCm": 90,
+        "tone": false,
+        "meanLinear": [
+          0.072,
+          0.086,
+          0.02
+        ],
+        "meanColor": "#4c5327",
+        "origin": "generated",
+        "sprites": [
+          {
+            "x": 4,
+            "y": 4,
+            "w": 909,
+            "h": 232,
+            "base": [
+              521,
+              226
+            ],
+            "tip": [
+              444,
+              6
+            ],
+            "size": 1
+          },
+          {
+            "x": 4,
+            "y": 240,
+            "w": 909,
+            "h": 228,
+            "base": [
+              604,
+              222
+            ],
+            "tip": [
+              538,
+              6
+            ],
+            "size": 0.98
+          }
+        ],
+        "look": "a flat-topped Monterey cypress shelf of dense scale-leaf cords, flat beneath",
+        "for": [
+          "Monterey cypress"
+        ],
+        "source": "ai_cypress_pad"
       },
       {
         "id": "torreyPine",
