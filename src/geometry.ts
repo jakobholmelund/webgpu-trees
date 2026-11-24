@@ -568,10 +568,12 @@ function buttresses(seed: number, hf: number, foot = 0): (angle: number, h: numb
  * `aRadial` which way the surface lies from it (as long as the surface swells there: buttresses), and the
  * radius there; `aNormal` which way the surface faces; `aLimb` the foot of the limb it is on (a stem's:
  * below its foot), and its variant; `aWood` how far along the wood from the ground (m), its order, a number
- * of its own (its tube's), and how far along the piece of wood between two nodes it is.
+ * of its own (its tube's), and how far along the piece of wood between two nodes it is; `aFrame` the ring's
+ * own first direction out from the centre line (carried along the tube without twisting) and `aAxis` the
+ * way the wood runs there, so a picture of bark can be wrapped round it (engine.ts).
  */
 export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Pieces {
-  const b = new Builder({ position: 3, aRadial: 4, aNormal: 3, aLimb: 4, aWood: 4 });
+  const b = new Builder({ position: 3, aRadial: 4, aNormal: 3, aLimb: 4, aWood: 4, aFrame: 3, aAxis: 3 });
   trees.forEach((tree, v) => {
     b.begin();
     const sk = tree.skeleton;
@@ -668,7 +670,7 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
             const at = leaving([c[0] + e[0] * r, c[1] + e[1] * r, c[2] + e[2] * r], r);
             if (at && at.w > 0) nrm = norm(add(scale(nrm, 1 - at.w), scale(at.n, at.w)));
           }
-          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [along, order, ownAt(along), up] });
+          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [along, order, ownAt(along), up], aFrame: u, aAxis: d });
           if (first < 0) first = k;
         }
         if (last >= 0) stitch(last, lastSides, first, sides);
@@ -716,13 +718,13 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
           const a = (s / lastSides) * Math.PI * 2;
           const e = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
           const dir = [e[0] * cs + d[0] * sn, e[1] * cs + d[1] * sn, e[2] * cs + d[2] * sn];
-          const k = b.vertex({ position: c, aRadial: [...dir, r], aNormal: dir, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1] });
+          const k = b.vertex({ position: c, aRadial: [...dir, r], aNormal: dir, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
           if (first < 0) first = k;
         }
         stitch(rim, rimSides, first, lastSides);
         rim = first;
       }
-      const tip = b.vertex({ position: c, aRadial: [...d, r], aNormal: d, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1] });
+      const tip = b.vertex({ position: c, aRadial: [...d, r], aNormal: d, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
       for (let s = 0; s < rimSides; s++) b.index.push(rim + s, tip, rim + ((s + 1) % rimSides));
     }
     b.end();
@@ -1254,7 +1256,20 @@ function sheet(b: Builder, foot: number[], dir: number[], length: number, half: 
  * way its twig runs (unit, square to its facing); `aLimb` the foot of its limb and its variant. A variant
  * `skip` says is left without cards.
  */
-export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[]): Pieces {
+/** Near cards of a size of their own (m, half across), as many to a clump as cover it, hanging as much as `hang` (0..1). */
+export interface FixedCards {
+  half: number;
+  /** How much more of a card its spray fills than a whole clump's picture does (so how many fewer are needed). */
+  fill: number;
+  /** The most cards to a clump. */
+  most: number;
+  /** Big cards to a clump besides, `bigSize` of its radius from their middle (`aOffset.w` 1 on them). */
+  big: number;
+  bigSize: number;
+  hang: number;
+}
+
+export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
   trees.forEach((tree, v) => {
     b.begin();
@@ -1273,9 +1288,17 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
       // is left bare. A few broad cards a clump (mid) cover it whole, and its twigs are under a pixel there.
       // Deep in the crown, fewer: little of it shows.)
       const shoots = twigs[c].map((t) => shootOf(sk, lines, t, r * SHOOT));
-      const base = cl.depth[c] > 0.65 ? Math.max(1, perClump >> 1) : perClump;
-      const count = perClump >= 4 ? Math.max(base, Math.min(shoots.length, 4 * perClump)) : base;
-      for (let d = 0; d < count; d++) {
+      const fix = fixed?.[v] ?? null;
+      // (Cards of a fixed size: as many as cover the clump as the usual ones would, the leaves' spray a card
+      // fills more of than a whole clump's; the deep ones fewer, as below.)
+      const own = fix ? Math.round(Math.min(fix.most, Math.max(perClump, perClump * ((r * size) / fix.half) ** 2 * fix.fill))) : perClump;
+      const base = cl.depth[c] > 0.65 ? Math.max(1, own >> 1) : own;
+      const count = fix ? base : perClump >= 4 ? Math.max(base, Math.min(shoots.length, 4 * perClump)) : base;
+      // (With small cards, a few big ones too, a clump wide, set a little into it: the mass of its leaves, which
+      // the small ones at its surface lay their detail over.)
+      const big = fix ? (cl.depth[c] > 0.65 ? 1 : fix.big) : 0;
+      for (let d = 0; d < count + big; d++) {
+        const filler = d >= count;
         const twig = twigs[c][d % shoots.length];
         const shoot = shoots[d % shoots.length];
         const reach = shoot.length;
@@ -1290,7 +1313,11 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         // (Its foot is on the wood: on its twig, or on the last of the wood leading to it, more of them near
         // its end, and each twig's first card at its very end. A spray grows from a shoot; set about the
         // clump's centre, the cards hang in the air beside the twig, and past its end.)
-        const from = shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
+        const at0 = shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
+        // (Small cards spread through the clump about their shoots, as its side twigs carry them: else they
+        // would crowd along a line or two.)
+        const spread = fix && !filler ? r * 0.55 * Math.sqrt(hash01(k, 26)) : 0;
+        const from = fix && !filler ? { p: [at0.p[0] + off[0] * spread, at0.p[1] + off[1] * spread, at0.p[2] + off[2] * spread], d: at0.d } : at0;
         // (Its facing: out of the crown and up, turned its own way by as much again.)
         const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
         // (Its twig: on along the wood its foot is on, out of the crown a little, turned its own way (a
@@ -1298,18 +1325,22 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
         const [e1, e2] = basis(face);
         const t = hash01(k, 23) * Math.PI * 2;
         const spin = [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
-        const along = [from.d[0] + spin[0] * 0.6 + n[0] * 0.3, from.d[1] + spin[1] * 0.6 + n[1] * 0.3, from.d[2] + spin[2] * 0.6 + n[2] * 0.3];
+        // (A hanging spray's twig turned down, as far as the species' sprays hang: a eucalyptus's, a willow's.)
+        const hang = fix && !filler ? fix.hang * (0.75 + 0.5 * hash01(k, 27)) : 0;
+        const along0 = [from.d[0] + spin[0] * 0.6 + n[0] * 0.3, from.d[1] + spin[1] * 0.6 + n[1] * 0.3, from.d[2] + spin[2] * 0.6 + n[2] * 0.3];
+        const l0 = Math.hypot(along0[0], along0[1], along0[2]) || 1;
+        const along = [(along0[0] / l0) * (1 - hang), (along0[1] / l0) * (1 - hang) - hang, (along0[2] / l0) * (1 - hang)];
         const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
         const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
         const tangent = Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
-        const half = r * size * (0.8 + hash01(k, 24) * 0.4);
+        const half = (fix && !filler ? fix.half : fix ? r * fix.bigSize : r * size) * (0.8 + hash01(k, 24) * 0.4);
         // (The spray's own twig enters its picture near the bottom edge (leaves.ts): its centre is that far
         // on from its foot.)
         const on = half * SPRAY_FOOT;
         const at = [from.p[0] + tangent[0] * on, from.p[1] + tangent[1] * on, from.p[2] + tangent[2] * on];
         let f = -1;
         for (const [cx, cy] of CORNERS) {
-          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, 0], aTangent: [...tangent, 0], aLimb: [...limb, v] });
+          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, filler ? 1 : 0], aTangent: [...tangent, 0], aLimb: [...limb, v] });
           if (f < 0) f = i;
         }
         b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);

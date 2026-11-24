@@ -19,7 +19,7 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, texture3D, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, Loop, abs, atan, fwidth, int, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, texture3D, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
 
 /** The painted look's brush marks' texels (dabs.ts makes them as a texture). */
@@ -29,13 +29,15 @@ function makeDabPixels(): Pixels {
   tex.dispose();
   return { data: img.data, width: img.width, height: img.height };
 }
-import { leafAtlasPixels } from "./leaves.ts";
+import { leafAtlasPixels, leafCell } from "./leaves.ts";
 import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToCrownFit } from "./light.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
 import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
-import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
+import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
+import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase } from "./scans.ts";
+import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow } from "./sprays.ts";
 import { growTree } from "./grow.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
 import { type Stand, standingOf } from "./stand.ts";
@@ -53,6 +55,8 @@ const TIERS = 3;
 const STAND_SKY = 0.22;
 /** Rows (vec4) a tree has in the shaders' list of trees. */
 const TREE_ROWS = 5;
+/** Rows (vec4) a species has in the shaders' list of species. */
+const SPECIES_ROWS = 7;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
 const MAX_LOBES = 32;
 
@@ -93,6 +97,15 @@ export interface TreesOptions {
   grow?: (species: TreeSpecies, size: TreeSize, seed: number, stand?: Stand) => GrownTree;
   /** The look (`stylized` unless given). `style` starts as the look's (`LOOK_STYLES`). */
   look?: TreeLook;
+  /**
+   * The realistic look's photographs (scans.ts): scanned bark wrapped round the wood, and leaf cards made of
+   * scanned leaves. Fetched once a page from the package's assets/ (or from `base`, a folder laid out as
+   * assets/ is, for a host whose bundler moves the package's modules away from its files); until they come
+   * the trees are drawn as without them. `looks` gives species (by name) photographs of their own; `barkSize`
+   * the bark's texels across (1024; 512 for less memory); `leafCell` a leaf card's (512 for up to six
+   * species, else 256). `false`: none, the drawn bark and sprays.
+   */
+  scans?: false | { base?: string; looks?: Readonly<Record<string, Partial<ScanLook>>>; barkSize?: number; leafCell?: number };
 }
 
 export interface Trees {
@@ -135,6 +148,11 @@ export interface Trees {
    * outside it, or before it): for a host's ground and grass (the grass library's `world.sun`).
    */
   sunAt(xz: Vec2): Float;
+  /**
+   * Settles once the realistic look's photographs are in (true), or could not be had or are not used
+   * (false): until then the trees are drawn without them.
+   */
+  readonly ready: Promise<boolean>;
   /** Which tiers are drawn (for looking at one alone). */
   show: { near: boolean; mid: boolean; far: boolean; wood: boolean; leaves: boolean };
   dispose(): void;
@@ -147,6 +165,11 @@ export interface Trees {
 const atlasMips: Partial<Record<"painterly" | "sculpted" | "sheets" | "leaves" | "dabs", Pixels[]>> = {};
 function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs", cell = MARK_CELL, from?: Pixels, fill = 0): THREE.DataTexture {
   const levels = (atlasMips[which] ??= coverageMips(from ?? (which === "painterly" ? painterlyAtlasPixels() : which === "sculpted" ? sculptedAtlasPixels() : which === "sheets" ? sheetAtlasPixels() : leafAtlasPixels()), cell, ALPHA_CUT, fill));
+  return atlasTexture(levels, which === "sheets" ? 4 : 1);
+}
+
+/** An atlas's texture from its mips (`coverageMips`). */
+function atlasTexture(levels: Pixels[], anisotropy: number): THREE.DataTexture {
   const tex = new THREE.DataTexture(levels[0].data, levels[0].width, levels[0].height, THREE.RGBAFormat, THREE.UnsignedByteType);
   tex.mipmaps = levels as unknown as typeof tex.mipmaps;
   tex.colorSpace = THREE.NoColorSpace;
@@ -154,7 +177,7 @@ function markAtlas(which: "painterly" | "sculpted" | "sheets" | "leaves" | "dabs
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = false;
   // (Sheets and cards are seen aslant, from under a bough: sampled along the slant, they keep their needles.)
-  tex.anisotropy = which === "sheets" ? 4 : 1;
+  tex.anisotropy = anisotropy;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
@@ -190,6 +213,25 @@ export function createTrees(options: TreesOptions): Trees {
   group.name = "trees";
   const look: TreeLook = options.look ?? "stylized";
   const real = look === "real";
+  // (The realistic look's photographs: which each species wears, and the bark sets the trees here need, each
+  // a layer of the bark texture (scans.ts).)
+  const scanOpts = options.scans === false ? null : (options.scans ?? {});
+  const scanned = real && scanOpts !== null;
+  if (scanOpts?.base !== undefined) setScanBase(scanOpts.base);
+  let looks = species.map((s) => scanLookOf(s, scanOpts?.looks));
+  const usedSpecies = [...new Set(plan.variants.map((v) => v.species))].sort((a, b) => a - b);
+  const leafRowOf = new Map(usedSpecies.map((s, i) => [s, i] as const));
+  const barkIds: string[] = [];
+  const layerOf = (id: string | undefined): number => {
+    if (!id || !barkSet(id)) return 0;
+    let i = barkIds.indexOf(id);
+    if (i < 0) i = barkIds.push(id) - 1;
+    return i;
+  };
+  if (scanned) for (const s of usedSpecies) {
+    layerOf(looks[s].bark);
+    layerOf(looks[s].upper?.set);
+  }
   // (Every look but the realistic one lays its leaves as dabs lit over the crown's lobes, as far as its style's
   // `lobe` says: the painted look's says not at all.)
   const lobed = !real && look !== "stylized";
@@ -233,15 +275,23 @@ export function createTrees(options: TreesOptions): Trees {
   // goes up the trunk; the colour of light through its leaves, and its stiffness; how fast its crown
   // takes the light (per metre), how deep its leaves go, its kind of leaf, and how much moss its bark
   // takes (none on a palm's stem, less on pale, peeling bark: a birch's, a eucalyptus's, a plane's).
-  const speciesData = new Float32Array(Math.max(1, species.length) * 16);
+  const speciesData = new Float32Array(Math.max(1, species.length) * SPECIES_ROWS * 4);
   const packSpecies = () => {
     species.forEach((s, i) => {
+      // (Its photographs: its bark's layers, the share of its height the lower gives way to the upper over,
+      // its leaves' row of cards, its bark's scale on each, and its foot's colour where not its bark's.)
+      const sl = looks[i] ?? scanLookOf(s, scanOpts?.looks);
+      const up = sl.upper;
+      const foot = sl.barkFoot ? linear(sl.barkFoot) : null;
+      const lower = barkIds.indexOf(sl.bark);
+      const upper = up ? barkIds.indexOf(up.set) : -1;
+      speciesData.set([Math.max(0, lower), upper >= 0 ? upper : Math.max(0, lower), up && upper >= 0 ? up.from : 9, up && upper >= 0 ? up.to : 10, leafRowOf.get(i) ?? 0, sl.barkScale ?? 1, up?.scale ?? 1, 0, foot?.r ?? 0, foot?.g ?? 0, foot?.b ?? 0, foot ? 1 : 0], (i * SPECIES_ROWS + 4) * 4);
       const leaf = linear(s.leafColor);
       const bark = linear(s.barkColor);
       // (Leaf area per cubic metre of crown, about 0.3 in an open crown to 1.4 in a dense one, half of it
       // facing any one way: Monsi and Saeki's extinction through a crown, with G = 0.5.)
       const k = 0.5 * (0.3 + (1 - s.openness) * 1.1);
-      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * 16);
+      speciesData.set([leaf.r, leaf.g, leaf.b, s.leafVariation, bark.r, bark.g, bark.b, s.barkPale, s.throughTint[0], s.throughTint[1], s.throughTint[2], s.stiffness, k, s.foliageDepth, Math.max(0, LEAF_KIND_ROWS.indexOf(s.leafKind)), s.architecture === "palm" ? 0 : 1 - 0.6 * s.barkPale], i * SPECIES_ROWS * 4);
     });
   };
   packSpecies();
@@ -257,6 +307,14 @@ export function createTrees(options: TreesOptions): Trees {
   lobes.forEach((list, v) => list.slice(0, MAX_LOBES).forEach((l, i) => lobeData.set([l.x, l.y, l.z, l.radius], (v * MAX_LOBES + i) * 4)));
   const lobeAttr = new THREE.StorageBufferAttribute(lobeData, 4);
   const lobesR = storage(lobeAttr, "vec4", lobeData.length / 4).toReadOnly();
+  // (Each bark layer: its mean colour (linear) and its tile's width across the wood (m); its tile's length.)
+  const layerData = new Float32Array(Math.max(1, barkIds.length) * 8);
+  barkIds.forEach((id, i) => {
+    const b = barkSet(id)!;
+    layerData.set([...b.meanLinear, b.tileCm[0] / 100, b.tileCm[1] / 100, 0, 0, 0], i * 8);
+  });
+  const layerAttr = new THREE.StorageBufferAttribute(layerData, 4);
+  const layersR = storage(layerAttr, "vec4", layerData.length / 4).toReadOnly();
   // (Each variant's box of light: its corner and size in its own frame, two rows; its cells in one 3D texture.)
   const lightBoxData = new Float32Array(Math.max(1, V) * 8);
   volumes.forEach((vol, v) => lightBoxData.set([...vol.min, 0, ...vol.size, 0], v * 8));
@@ -292,7 +350,19 @@ export function createTrees(options: TreesOptions): Trees {
   // dabs or cards: `sheetPieces`.)
   const sheetKinds = look === "painterly" || real ? plan.variants.map((v) => sheetKindOf(species[v.species])) : plan.variants.map(() => -1);
   const sheeted = sheetKinds.map((k) => k >= 0);
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, sheeted) : real && t === 1 ? cardPieces(grown, 2, 1.45, sheeted) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? sheeted : undefined), lobes) : dabPieces(grown, s)));
+  // (With the photographs, the near cards are a species' own sprays at their size, a third of a metre or so,
+  // many to a clump; a palm's, its whole leaves, as before.)
+  const fixedCards: (FixedCards | null)[] = plan.variants.map((v) => {
+    const l = looks[v.species];
+    const half = scanned ? nearCardHalf(l) : 0;
+    if (half <= 0) return null;
+    // (A palm's: two of its leaves (or long stretches of one) a clump, and no big cards under them.)
+    return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "sprays" || l.spray === "tufts"
+        ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
+          { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
+        : { half, fill: 0.5, most: 36, big: 2, bigSize: 1.15, hang: l.hang ?? 0 };
+  });
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8, sheeted, fixedCards) : real && t === 1 ? cardPieces(grown, 2, 1.45, sheeted) : lobed ? withLobes(dabPieces(grown, s, "leaves", t <= 1 ? sheeted : undefined), lobes) : dabPieces(grown, s)));
   // (Mid trees too, in longer, coarser sheets: drawn as dabs, a conifer passing from near to mid changed
   // from boughs to blots, pixel by pixel, a speckle over the whole hand-over.)
   const sheetSets: Pieces[] = TIER_SHAPES.map((_, t) => {
@@ -417,7 +487,7 @@ export function createTrees(options: TreesOptions): Trees {
     const r2 = treesR.element(id.mul(TREE_ROWS).add(2));
     const r3 = treesR.element(id.mul(TREE_ROWS).add(3));
     const r4 = treesR.element(id.mul(TREE_ROWS).add(4));
-    const rows = [0, 1, 2, 3].map((k) => speciesR.element(uint(vrow1.z).mul(4).add(k)));
+    const rows = Array.from({ length: SPECIES_ROWS }, (_, k) => speciesR.element(uint(vrow1.z).mul(SPECIES_ROWS).add(k)));
     const srow = (k: number) => rows[k];
     // (Its yaw's cosine and sine, once: every turn into and out of the tree's frame uses them.)
     const yawC = cos(r0.w);
@@ -508,7 +578,7 @@ export function createTrees(options: TreesOptions): Trees {
    * Saeki: exp(-sum)), in its tier's LIGHT_STEPS steps each a share of the way out of the box, put at a place along its share
    * of its own (`seed`, 0..1, a piece's own number: the same every frame); the sky, read where it is.
    */
-  const volumeAt = (T: TreeRows, at: Vec3, seed: Float) => {
+  const volumeAt = (T: TreeRows, at: Vec3, seed: Float, stepsOver?: number) => {
     const fit = fitOf(T);
     const vi = uint(T.r3.w);
     const lo = lightBoxR.element(vi.mul(2)).xyz;
@@ -541,7 +611,7 @@ export function createTrees(options: TreesOptions): Trees {
     // if it were inside. The shoot's own side away from the sun is its facing's to darken.)
     const reach = min(min(cell.x, cell.y), cell.z).mul(1.5);
     const t0 = max(max(max(tNear.x, tNear.y), tNear.z), reach);
-    const steps = LIGHT_STEPS[T.tier];
+    const steps = stepsOver ?? LIGHT_STEPS[T.tier];
     const dt = max(t1.sub(t0), float(0)).div(steps);
     // (Its variant's slot in the texture.)
     const col = floor(T.r3.w.div(lightPack.perColumn).add(1e-3));
@@ -580,7 +650,7 @@ export function createTrees(options: TreesOptions): Trees {
    * leaves it (`standOn`). The crown is its own leaves and wood (`volumeAt`) as far as the style's `structure`
    * says, and its ellipsoid for the rest; `seed` is the piece's own number, 0..1.
    */
-  const crownAt = (T: TreeRows, at: Vec3, n?: Vec3, seed?: Float) => {
+  const crownAt = (T: TreeRows, at: Vec3, n?: Vec3, seed?: Float, steps?: number) => {
     const k = T.srow(3).x.mul(uStyle3.x);
     const ry = max(T.r1.x.sub(T.r1.y).mul(0.5), float(0.05));
     const rx = max(T.r1.z, float(0.05));
@@ -601,7 +671,7 @@ export function createTrees(options: TreesOptions): Trees {
     // what the ellipsoid counts is air about a narrower crown.)
     const shell = max(T.srow(3).y, float(0.15)).mul(min(rx, ry));
     const leafy = (d: Vec3): Float => min(max(crossing(d).sub(min(rx, ry).mul(0.18)), float(0)), shell.mul(2));
-    const vol = volumeAt(T, at, seed ?? float(0.5));
+    const vol = volumeAt(T, at, seed ?? float(0.5), steps);
     // (Its own leaves taken as they are, as thick as the style's `density` says: `selfShade` was the ellipsoid's
     // amends for a crown with no gaps. The sky a piece sees past them: never less than what the leaves pass on
     // to one another.)
@@ -687,9 +757,38 @@ export function createTrees(options: TreesOptions): Trees {
     Discard(s.lessThan(shares.x).or(s.greaterThanEqual(shares.y)));
   };
 
-  const atlas = real ? markAtlas("leaves") : look === "painterly" ? markAtlas("painterly") : look === "sculpted" ? markAtlas("sculpted") : markAtlas("dabs", 128, makeDabPixels());
+  // (The realistic look's cards with photographs: a row of cards for each species here, its three near ones
+  // and its big one (sprays.ts); until the photographs come, its kind's two drawn sprays in their places.)
+  const cardRows = Math.max(1, usedSpecies.length);
+  const uCardGrid = uniform(new THREE.Vector2(SPRAY_COLS, cardRows));
+  const drawnCards = (): THREE.DataTexture => {
+    const drawn = leafAtlasPixels();
+    const C = 256;
+    const px: Pixels = { data: new Uint8Array(SPRAY_COLS * C * cardRows * C * 4), width: SPRAY_COLS * C, height: cardRows * C };
+    usedSpecies.forEach((sp, row) => {
+      const kind = Math.max(0, LEAF_KIND_ROWS.indexOf(species[sp].leafKind));
+      for (let c = 0; c < SPRAY_COLS; c++) {
+        const { u0, v0 } = leafCell(kind, c % 2);
+        const sx = Math.round(u0 * drawn.width);
+        const sy = Math.round(v0 * drawn.height);
+        for (let j = 0; j < C; j++) px.data.set(drawn.data.subarray(((sy + j) * drawn.width + sx) * 4, ((sy + j) * drawn.width + sx + C) * 4), ((row * C + j) * px.width + c * C) * 4);
+      }
+    });
+    return atlasTexture(coverageMips(px, C, ALPHA_CUT, 0), 1);
+  };
+  const atlas = scanned ? drawnCards() : real ? markAtlas("leaves") : look === "painterly" ? markAtlas("painterly") : look === "sculpted" ? markAtlas("sculpted") : markAtlas("dabs", 128, makeDabPixels());
   // (A painterly conifer's sheets carry boughs of needles of their own; a realistic one's, its needle sprays.)
   const sheetAtlas = look === "painterly" && sheeted.some((k) => k) ? markAtlas("sheets", SHEET_CELL, undefined, 0.3) : null;
+
+  /** The leaf texture nodes that read the atlas, so the photographs' cards can take its place. */
+  const atlasNodes: ReturnType<typeof texture>[] = [];
+  // (The cards as they are now: a shader built after the photographs came reads theirs from the start.)
+  let cardsTex: THREE.DataTexture = atlas;
+  const markTex = (marks: THREE.Texture, uv: Vec2) => {
+    const n = texture(marks === atlas ? cardsTex : marks, uv);
+    if (marks === atlas) atlasNodes.push(n);
+    return n;
+  };
 
   // ---- The dabs. ----
 
@@ -817,7 +916,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (A far dab stands for a whole gathered group of clumps, its centre deep among them: lit as the group's
       // outside is, half its size out along its facing, as the near leaves it hands over to are.)
       const litAt = t === 2 ? at.add(dirToWorld(T, fit.normal(aNormal.xyz)).mul(aDab.z.mul(fit.size).mul(0.5))) : at;
-      const C = crownAt(T, litAt, undefined, sheet ? own.add(aDab.x.mul(0.37)).add(aDab.y.mul(0.61)) : own);
+      // (The photographs' near cards are many and small: four steps each, as a shoot's light hardly differs from
+      // its neighbour's.)
+      const C = crownAt(T, litAt, undefined, sheet ? own.add(aDab.x.mul(0.37)).add(aDab.y.mul(0.61)) : own, scanned && card && t === 0 ? 4 : undefined);
       // (A card: its own face, turned towards the eye as far as `faceEye` says, and lit from the side the eye
       // sees, as a leaf is: the other side's light is what comes through it.)
       const face0 = dirToWorld(T, fit.normal(aOffset.xyz));
@@ -962,7 +1063,10 @@ export function createTrees(options: TreesOptions): Trees {
       // one of three clusters of its kind of leaf near, the cluster of smaller leaves for a gathered dab
       // (marks.ts); for the sculpted, one of three discs or a sprig.)
       const kind = T.srow(3).z;
-      const realCell = vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
+      // (With the photographs: the species' row, one of its three near cards close to, its big card further off.)
+      const cardRow = T.srow(5).x;
+      // (A near tier's big cards, a clump's mass under its small ones, are marked by `aOffset.w`.)
+      const realCell = scanned ? vec2(t === 0 ? select(aOffset.w.greaterThan(0.5), float(BIG_CARD), floor(own.mul(NEAR_CARDS - 0.001))) : float(BIG_CARD), cardRow) : vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
       const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
       // (Painterly: the coarsest density whose leaves keep under leafSize in metres on this dab, the leaf of its
       // kind being LEAF_SHARE of the dab's half width at the coarsest; a gathered dab at least the second.)
@@ -983,9 +1087,9 @@ export function createTrees(options: TreesOptions): Trees {
       // (A sheet: its kind's top in the sheet atlas (its underside is the row above, chosen by the pixel), a
       // fir one of two by its own number; realistic, its kind's needle or scale spray in the leaf atlas.)
       const sheetKind = aOffset.w;
-      const sheetCell = real ? vec2(sheetKind.mul(2), 1) : vec2(select(sheetKind.equal(float(0)), floor(own.mul(1.999)), float(2)), 0);
+      const sheetCell = scanned ? vec2(float(BIG_CARD), cardRow) : real ? vec2(sheetKind.mul(2), 1) : vec2(select(sheetKind.equal(float(0)), floor(own.mul(1.999)), float(2)), 0);
       const cell = sheet ? sheetCell : real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
-      const cells = sheet && !real ? vec2(SHEET_COLS, SHEET_ROWS) : real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
+      const cells: Vec2 = sheet && !real ? vec2(SHEET_COLS, SHEET_ROWS) : scanned ? uCardGrid : real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
       /** A mark's alpha, kept crisp at any distance (see below). */
       const crisp = (tex: Vec4): Float => {
         // (Its outline kept crisp: the edge's ramp drawn over one pixel, not over however many a texel spans
@@ -1018,7 +1122,7 @@ export function createTrees(options: TreesOptions): Trees {
           const eye = normalize(vEye);
           const under = underOf(eye);
           const uv = sheetUv(vUv, under);
-          const tex = texture(marks, uv);
+          const tex = markTex(marks, uv);
           const mark = vec4(tex.rgb, crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
           // (A point on a ball seen from the eye, from where it is across the ball's disc in its radii; held
@@ -1062,7 +1166,7 @@ export function createTrees(options: TreesOptions): Trees {
           const eye = vEye ? normalize(vEye) : vec3(0, 1, 0);
           const under = underOf(eye);
           const uv = sheetUv(vUv, under);
-          const tex = texture(marks, uv);
+          const tex = markTex(marks, uv);
           const mark = vec4(tex.rgb, crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
           let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
@@ -1083,6 +1187,23 @@ export function createTrees(options: TreesOptions): Trees {
   };
 
   // ---- The wood. ----
+
+  // (The photographs' bark: every set the trees here wear, one layer each, colour and relief; a texel each
+  // until they come, and `uBarkOn` 0.)
+  const placeholder = (): THREE.DataArrayTexture => {
+    const tex = new THREE.DataArrayTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  };
+  let barkAlbedo = placeholder();
+  let barkNormal = placeholder();
+  const uBarkOn = uniform(0);
+  const barkNodes: { node: ReturnType<typeof texture>; normal: boolean }[] = [];
+  const barkTex = (tex: THREE.DataArrayTexture, uv: Vec2, layer: THREE.Node<"int">): Vec4 => {
+    const n = texture(tex, uv);
+    barkNodes.push({ node: n, normal: tex === barkNormal });
+    return n.depth(layer) as unknown as Vec4;
+  };
 
   const woodMaterial = (t: number) => {
     const m = new THREE.MeshBasicNodeMaterial({ fog: true });
@@ -1132,28 +1253,121 @@ export function createTrees(options: TreesOptions): Trees {
       .mul(uThrough.w.mul(T.srow(3).w).mul(1.6));
     // (A painter's moss a soft yellow-green; a real one darker, olive.)
     const mossAlbedo = mix(vec3(0.2, 0.3, 0.06), vec3(0.075, 0.1, 0.028), uStyle3.z);
-    const vMoss = varying(vec4(intoAir(mossAlbedo.mul(light), at), mossAmount), "vWoodMoss");
     m.positionNode = at;
-    const vCol = varying(intoAir(col, at), "vWoodCol");
     const vShares = varying(sharesFor(t, T), "vWoodShares");
-    // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go; round
-    // by the way its surface faces, so where a limb leaves its parent, lit as its parent, they run on from its.)
-    const vBark = varying(vec3(aNormal.x, aNormal.z, aWood.x), "vWoodBark");
-    m.colorNode = Fn(() => {
-      handOver(vShares);
-      const round = atan(vBark.y, vBark.x);
-      const ridge = sin(round.mul(9).add(sin(vBark.z.mul(1.7).add(round.mul(2))).mul(1.4)));
-      const furrows = mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z);
-      // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
-      // in patches, a cheap wobble of the furrows' own coordinates.)
-      const patch = sin(round.mul(7).add(vBark.z.mul(4.3))).mul(sin(round.mul(4).sub(vBark.z.mul(6.1)))).mul(0.22).add(sin(vBark.z.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(vBark.z.mul(27.1)))).mul(0.16)).add(0.5);
-      const inFurrow = float(1).sub(smoothstep(float(-0.4), float(0.7), ridge));
-      const where = patch.mul(0.6).add(inFurrow.mul(0.4));
-      const real = smoothstep(float(1).sub(vMoss.w), float(1.18).sub(vMoss.w), where);
-      const cover = mix(smoothstep(float(0.4), float(0.5), vMoss.w), real, uStyle3.z);
-      const moss = vMoss.xyz.mul(mix(float(1), patch.mul(0.5).add(0.75), uStyle3.z));
-      return vec4(mix(vCol.mul(furrows), moss, cover), 1);
-    })();
+    // (The photographs' bark, close to: wrapped round the wood and lit pixel by pixel. Further off, and until
+    // the photographs come, the bark is drawn as without them.)
+    if (scanned && t === 0) {
+      const aFrame = attribute<"vec3">("aFrame", "vec3");
+      const aAxis = attribute<"vec3">("aAxis", "vec3");
+      // (Directions out of the tree's frame, fitted as its normals are.)
+      const toW = (v: Vec3): Vec3 => dirToWorld(T, normalize(fit.radial(v)));
+      // (Where it is up the tree, as a share of its height: where one bark gives way to the next.)
+      const S4 = T.srow(4);
+      const upper = smoothstep(S4.z, S4.w, surface.y.div(max(T.r1.x, float(0.01))));
+      const vE = varying(nWorld, "vWoodE");
+      const vU = varying(toW(aFrame), "vWoodU");
+      const vD = varying(toW(aAxis), "vWoodD");
+      const vGeo = varying(vec4(r0.mul(keepThin), aWood.x.mul(fit.trunkUp), upper, twig), "vWoodGeo");
+      // (Its light: the sky's, darker at its foot; the sun's share past the crown; its foot's dark; how pale.)
+      const vLight = varying(vec4(C.sky.mul(foot), C.sunIn.mul(C.cloud), foot, pale), "vWoodLight");
+      const vInfo = varying(vec2(T.vrow1.z, barkTone(T).mul(float(0.9).add(aWood.z.mul(0.2)))), "vWoodInfo");
+      // (The air between it and the eye, as a scale and an offset: only if the host has any.)
+      const airAdd = world.air ? intoAir(vec3(0), at) : null;
+      const vAirAdd = airAdd ? varying(airAdd, "vWoodAirAdd") : null;
+      const vAirMul = airAdd ? varying(intoAir(vec3(1), at).sub(airAdd), "vWoodAirMul") : null;
+      const vMossRaw = varying(vec4(mossAlbedo, mossAmount), "vWoodMoss");
+      m.colorNode = Fn(() => {
+        handOver(vShares);
+        // The photograph wrapped round the wood, at its size in metres: seen from two sides square to the wood,
+        // each side's picture laid as the bark runs (up the wood), the two blended by which way the surface
+        // faces (and by their relief, the proud parts showing through), so there is no seam round the stem.
+        const e = normalize(vE);
+        const d = normalize(vD);
+        const u = normalize(vU.sub(d.mul(dot(vU, d))));
+        const w = cross(d, u);
+        const cu = dot(e, u);
+        const cw = dot(e, w);
+        const sa = select(cu.lessThan(0), float(-1), float(1));
+        const sb = select(cw.lessThan(0), float(-1), float(1));
+        const r = vGeo.x;
+        const alongW = vGeo.y;
+        const round = atan(cw, cu);
+        // (Where the upper bark takes over, in tongues up and down the furrows, not in a line round the stem.)
+        const tongue = sin(alongW.mul(5.3).add(round.mul(3))).mul(0.22).add(sin(alongW.mul(13.1).sub(round.mul(7))).mul(0.16)).add(sin(alongW.mul(2.3).add(round.mul(11))).mul(0.12)).add(0.5);
+        const up = step(tongue, vGeo.z);
+        const sp = uint(vInfo.x).mul(SPECIES_ROWS);
+        const S4f = speciesR.element(sp.add(4));
+        const S5 = speciesR.element(sp.add(5));
+        const S6 = speciesR.element(sp.add(6));
+        const layer = mix(S4f.x, S4f.y, up);
+        const L0 = layersR.element(uint(layer).mul(2));
+        const L1 = layersR.element(uint(layer).mul(2).add(1));
+        const tile = vec2(L0.w, L1.x).mul(mix(S5.y, S5.z, up));
+        const uvA = vec2(r.mul(cw).mul(sa), alongW.negate()).div(tile);
+        const uvB = vec2(r.mul(cu).mul(sb).negate(), alongW.negate()).div(tile);
+        const li = int(layer);
+        const colA = barkTex(barkAlbedo, uvA, li);
+        const colB = barkTex(barkAlbedo, uvB, li);
+        const nA = barkTex(barkNormal, uvA, li);
+        const nB = barkTex(barkNormal, uvB, li);
+        const wA = pow(abs(cu), float(4)).mul(nA.b.add(0.3));
+        const wB = pow(abs(cw), float(4)).mul(nB.b.add(0.3));
+        const kA = wA.div(max(wA.add(wB), float(1e-4)));
+        const kB = float(1).sub(kA);
+        // (Its colour, light as it adds (the picture is sRGB), scaled from the set's own mean to the species'
+        // bark (paler up the trunk where the species' is), or to its foot's where it has one of its own.)
+        const albedo = pow(max(colA.rgb.mul(kA).add(colB.rgb.mul(kB)), vec3(0)), vec3(2.2));
+        const bark = speciesR.element(sp.add(1)).xyz;
+        const paled = mix(bark, vec3(0.42, 0.4, 0.35), vLight.w.mul(0.7));
+        const target = mix(select(S6.w.greaterThan(0.5), S6.xyz, paled), paled, up);
+        const tinted = mix(albedo.mul(target).div(max(L0.xyz, vec3(0.005))), target, float(1).sub(uBarkOn)).mul(vInfo.y);
+        // (Its relief: each side's normal from its picture, round the wood (across the picture) and along it
+        // (up the picture), as far as the style's `bark` takes it.)
+        const relief = (nt: Vec4, across: Vec3): Vec3 => {
+          const x = nt.r.mul(2).sub(1);
+          const y = nt.g.mul(2).sub(1);
+          const z = sqrt(max(float(1).sub(x.mul(x)).sub(y.mul(y)), float(0.02)));
+          return across.mul(x).add(d.mul(y)).add(e.mul(z));
+        };
+        const n = normalize(mix(e, relief(nA, w.mul(sa)).mul(kA).add(relief(nB, u.mul(sb).negate()).mul(kB)), uStyle3.z.mul(uBarkOn)));
+        const height = mix(float(0.6), nA.b.mul(kA).add(nB.b.mul(kB)), uBarkOn);
+        // (The sky's light less deep in its furrows; the sun's on the side of each ridge that faces it.)
+        const skyLight = uShadeTint.mul(vLight.x).mul(mix(float(0.5), float(1), height));
+        const sunOf = (nn: Vec3): Vec3 => uSunTint.mul(vLight.z).mul(smoothstep(float(-0.2), uStyle3.y, dot(nn, uSun)).mul(vLight.y));
+        let lit = tinted.mul(skyLight.add(sunOf(n)));
+        // (A twig is a twig's dark grey-brown, lit as its round.)
+        const twigCol = vec3(0.055, 0.047, 0.038).mul(vInfo.y).mul(uShadeTint.mul(vLight.x).add(sunOf(e)));
+        lit = mix(lit, twigCol, vGeo.w.mul(0.85));
+        // (Moss in its furrows first, and in patches, lit as the bark's sky and sun.)
+        const patch = sin(round.mul(7).add(alongW.mul(4.3))).mul(sin(round.mul(4).sub(alongW.mul(6.1)))).mul(0.22).add(sin(alongW.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(alongW.mul(27.1)))).mul(0.16)).add(0.5);
+        const mossHere = smoothstep(float(1).sub(vMossRaw.w), float(1.18).sub(vMossRaw.w), patch.mul(0.55).add(float(1).sub(height).mul(0.45)));
+        lit = mix(lit, vMossRaw.xyz.mul(patch.mul(0.5).add(0.75)).mul(skyLight.add(sunOf(e))), mossHere);
+        const seen = vAirAdd && vAirMul ? lit.mul(vAirMul).add(vAirAdd) : lit;
+        return vec4(seen, 1);
+      })();
+    } else {
+      const vCol = varying(intoAir(col, at), "vWoodCol");
+      const vMoss = varying(vec4(intoAir(mossAlbedo.mul(light), at), mossAmount), "vWoodMoss");
+      // (Its furrows: ridges running up the wood, some nine round a trunk, wandering a little as they go; round
+      // by the way its surface faces, so where a limb leaves its parent, lit as its parent, they run on from its.)
+      const vBark = varying(vec3(aNormal.x, aNormal.z, aWood.x), "vWoodBark");
+      m.colorNode = Fn(() => {
+        handOver(vShares);
+        const round = atan(vBark.y, vBark.x);
+        const ridge = sin(round.mul(9).add(sin(vBark.z.mul(1.7).add(round.mul(2))).mul(1.4)));
+        const furrows = mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z);
+        // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
+        // in patches, a cheap wobble of the furrows' own coordinates.)
+        const patch = sin(round.mul(7).add(vBark.z.mul(4.3))).mul(sin(round.mul(4).sub(vBark.z.mul(6.1)))).mul(0.22).add(sin(vBark.z.mul(19.7).add(round.mul(23))).mul(sin(round.mul(31).sub(vBark.z.mul(27.1)))).mul(0.16)).add(0.5);
+        const inFurrow = float(1).sub(smoothstep(float(-0.4), float(0.7), ridge));
+        const where = patch.mul(0.6).add(inFurrow.mul(0.4));
+        const real = smoothstep(float(1).sub(vMoss.w), float(1.18).sub(vMoss.w), where);
+        const cover = mix(smoothstep(float(0.4), float(0.5), vMoss.w), real, uStyle3.z);
+        const moss = vMoss.xyz.mul(mix(float(1), patch.mul(0.5).add(0.75), uStyle3.z));
+        return vec4(mix(vCol.mul(furrows), moss, cover), 1);
+      })();
+    }
     m.name = `trees-wood-${t}`;
     return m;
   };
@@ -1320,6 +1534,68 @@ export function createTrees(options: TreesOptions): Trees {
     return mix(float(1), shadeNode.sample(uv).level(float(0)).r, inside);
   };
 
+  // ---- The photographs: fetched, then put in place of the drawn bark and cards. ----
+
+  let disposed = false;
+  const ready: Promise<boolean> = !scanned
+    ? Promise.resolve(false)
+    : (async () => {
+        try {
+          const size = scanOpts?.barkSize ?? BARK_SIZE;
+          const sets = await Promise.all(barkIds.map((id) => loadBark(id, size)));
+          if (disposed) return false;
+          const layers = (pick: (s: (typeof sets)[number]) => Pixels): THREE.DataArrayTexture => {
+            const data = new Uint8Array(size * size * 4 * sets.length);
+            sets.forEach((s, i) => data.set(pick(s).data.subarray(0, size * size * 4), i * size * size * 4));
+            const tex = new THREE.DataArrayTexture(data, size, size, sets.length);
+            tex.format = THREE.RGBAFormat;
+            tex.type = THREE.UnsignedByteType;
+            tex.colorSpace = THREE.NoColorSpace;
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.magFilter = THREE.LinearFilter;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.generateMipmaps = true;
+            tex.anisotropy = 4;
+            tex.needsUpdate = true;
+            return tex;
+          };
+          if (sets.length > 0) {
+            const albedo = layers((s) => s.albedo);
+            const normal = layers((s) => s.normal);
+            for (const b of barkNodes) b.node.value = b.normal ? normal : albedo;
+            barkAlbedo.dispose();
+            barkNormal.dispose();
+            barkAlbedo = albedo;
+            barkNormal = normal;
+            uBarkOn.value = 1;
+          }
+          // The cards: each species' row drawn from its leaves' photographs (sprays.ts).
+          const C = scanOpts?.leafCell ?? (cardRows <= 6 ? 512 : 256);
+          const px: Pixels = { data: new Uint8Array(SPRAY_COLS * C * cardRows * C * 4), width: SPRAY_COLS * C, height: cardRows * C };
+          for (const [row, sp] of usedSpecies.entries()) {
+            const l = looks[sp];
+            const set = leafSet(l.leaves);
+            if (!set) throw new Error(`no leaf set ${l.leaves}`);
+            const sheet = await loadLeaves(set.id);
+            if (disposed) return false;
+            // (Its big card a mid card's width: a clump's, half again.)
+            drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7);
+            // (A row at a time, so a page keeps drawing between them.)
+            await new Promise((done) => setTimeout(done, 0));
+          }
+          if (disposed) return false;
+          const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, 0), 1);
+          // (Shaders are built when first drawn: those built already are given the new cards, the rest read them.)
+          for (const n of atlasNodes) n.value = cards;
+          cardsTex = cards;
+          atlas.dispose();
+          return true;
+        } catch (err) {
+          console.warn("webgpu-trees: the realistic look's photographs could not be had; drawing without them.", err);
+          return false;
+        }
+      })();
+
   const frustum = new THREE.Frustum();
   const pv = new THREE.Matrix4();
   const size = new THREE.Vector2();
@@ -1365,8 +1641,10 @@ export function createTrees(options: TreesOptions): Trees {
     },
     bakeShade,
     sunAt,
+    ready,
     setSpecies(list) {
       species = list;
+      looks = species.map((s) => scanLookOf(s, scanOpts?.looks));
       packSpecies();
       speciesAttr.needsUpdate = true;
     },
@@ -1383,13 +1661,16 @@ export function createTrees(options: TreesOptions): Trees {
     dispose() {
       // (The compute passes own pipelines and bind groups in the renderer, and the storage buffers live
       // apart from any geometry: none of them is freed unless disposed by name.)
+      disposed = true;
       cull.dispose();
       finish.dispose();
-      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, lightBoxAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
+      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, layerAttr, lightBoxAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs, sheetArgs]) a.dispose();
       lightTex.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
-      atlas.dispose();
+      cardsTex.dispose();
+      barkAlbedo.dispose();
+      barkNormal.dispose();
       sheetAtlas?.dispose();
       if (shadeNode.value !== shadeTex) shadeNode.value.dispose();
       shadeTex.dispose();

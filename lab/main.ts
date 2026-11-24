@@ -14,6 +14,7 @@
 //   ?at=x,y,z,tx,ty,tz   exactly a view, as "Share view" writes it
 //   ?look=painterly  the look: stylized (painted), painterly, sculpted or real
 //   ?tier=0|1|2      draw one tier alone
+//   ?scans=0         the realistic look without its photographs (drawn bark and sprays)
 //   ?fresh           ignore what the lab kept from last time
 
 import * as THREE from "three/webgpu";
@@ -163,7 +164,7 @@ async function start() {
   const growNow = () => {
     const list = treesFor();
     const t0 = performance.now();
-    const made = createTrees({ trees: list, species, variants: { ...variants }, look: state.look });
+    const made = createTrees({ trees: list, species, variants: { ...variants }, look: state.look, scans: query.get("scans") === "0" ? false : undefined });
     return { made, count: list.length, ms: performance.now() - t0 };
   };
   let grownAt = growNow();
