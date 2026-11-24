@@ -27,9 +27,13 @@ export interface TierShape {
   sides: [number, number];
 }
 
+// (Near, all the wood: every leaf grows from a twig, and a twig left out leaves its leaves in the air and the
+// branch it grew on ending bare. A twig thinner than a pixel is shrunk away in the shader (engine.ts
+// `keepThin`). Mid, the branches that are still a pixel or so across where a tree is handed to it, reaching
+// up into the leaves; its twigs would be under a pixel there, and only cost.)
 export const TIER_SHAPES: readonly TierShape[] = [
-  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0.07, sides: [7, 4] },
-  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.3, sides: [5, 3] },
+  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0, sides: [7, 4] },
+  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.1, sides: [5, 3] },
   { dabsPerClump: 0, dabSize: 1, gather: 16, woodFrom: 9, sides: [3, 3] },
 ];
 
@@ -53,7 +57,10 @@ class Builder {
   readonly ranges: Range[] = [];
   vertices = 0;
   private start = { index: 0, vertex: 0 };
-  constructor(readonly sizes: Record<string, number>) {
+  // (Not a parameter property: node runs this file's tests by stripping its types, which those are not.)
+  readonly sizes: Record<string, number>;
+  constructor(sizes: Record<string, number>) {
+    this.sizes = sizes;
     for (const k of Object.keys(sizes)) this.floats[k] = [];
   }
   begin(): void {
@@ -112,12 +119,14 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
         quad([0, top / 2, 0], top / 2, 0.5, [trunkHalfWidth(tree), 0, 0], 0, [0, 0, 0], 1, [0, -1, 0], v);
       }
     } else if (shape.dabsPerClump > 0) {
+      const twigs = clumpTwigs(tree);
       for (let c = 0; c < cl.count; c++) {
         const centre = [cl.x[c], cl.y[c], cl.z[c]];
         const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
         const r = cl.radius[c];
         // (A clump deep in the crown is mostly hidden by those outside it: one dab is all of it that shows.)
         const dabs = cl.depth[c] > 0.65 ? 1 : shape.dabsPerClump;
+        const laid: number[][] = [];
         for (let d = 0; d < dabs; d++) {
           const own = hash01(c * 31 + d, v * 977 + 3);
           let off = [0, 0, 0];
@@ -132,8 +141,19 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
           }
           const reach = dabs > 1 ? r * 0.5 : 0;
           const size = dabs > 1 ? shape.dabSize : 1.45;
-          quad([centre[0] + off[0] * reach, centre[1] + off[1] * reach, centre[2] + off[2] * reach], r * size * (0.85 + own * 0.3), own, n, cl.depth[c], off, 0, limbOf(cl.node[c]), v);
+          const at = [centre[0] + off[0] * reach, centre[1] + off[1] * reach, centre[2] + off[2] * reach];
+          laid.push([...at, r * size * (0.85 + own * 0.3)]);
+          quad(at, laid[d][3], own, n, cl.depth[c], off, 0, limbOf(cl.node[c]), v);
         }
+        // (And one more over each of its twigs' ends that none of those covers, half way in to its centre:
+        // no twig of a clump pokes out of it bare.)
+        twigs[c].forEach((t, j) => {
+          if (laid.some((q) => Math.hypot(sk.x[t] - q[0], sk.y[t] - q[1], sk.z[t] - q[2]) < q[3])) return;
+          const own = hash01(c * 31 + dabs + j, v * 977 + 3);
+          const at = [(sk.x[t] + centre[0]) / 2, (sk.y[t] + centre[1]) / 2, (sk.z[t] + centre[2]) / 2];
+          const off = norm([sk.x[t] - centre[0], sk.y[t] - centre[1], sk.z[t] - centre[2]]);
+          quad(at, r * shape.dabSize * (0.85 + own * 0.3), own, n, cl.depth[c], off, 0, limbOf(t), v);
+        });
       }
     } else {
       for (const g of gatherClumps(tree, shape.gather)) {
@@ -306,9 +326,91 @@ function basis(d: number[]): [number[], number[]] {
   return [u, w];
 }
 
+/** How far from a clump's centre (in its radii) a twig's end may be and still be one of the clump's twigs: a little past the grower's 0.8, which the fitting and the outline move. */
+export const IN_CLUMP = 1.2;
+/** How far back along the wood from a clump's twig end its cards' feet may be, in the clump's radii. */
+const SHOOT = 1.1;
+/** Where a spray's twig enters its card, from the card's centre, in its half-lengths (the sprays in leaves.ts start 0.7 to 0.97 below). */
+export const SPRAY_FOOT = 0.8;
+
 /**
- * The realistic look's near leaves: each clump as `perClump` cards, each a spray of leaves on a twig, set
- * in the crown at angles of their own (not turned to the eye: a card's face shows as it is). They face
+ * Each clump's twigs: the node it hangs on, then the ends of the other twigs inside it. A clump is a spray of
+ * leaves over the twigs where it hangs, and the grower keeps the twigs inside one for that (grow.ts
+ * `leafy`); a twig's end that no clump hangs on goes to the clump it is deepest in, if it is in one.
+ */
+export function clumpTwigs(tree: GrownTree): number[][] {
+  const { clumps: cl, skeleton: sk } = tree;
+  const out: number[][] = [];
+  const hung = new Uint8Array(sk.count);
+  for (let c = 0; c < cl.count; c++) {
+    out.push([cl.node[c]]);
+    hung[cl.node[c]] = 1;
+  }
+  const kids = new Uint8Array(sk.count);
+  for (let i = 0; i < sk.count; i++) if (sk.parent[i] >= 0) kids[sk.parent[i]] = 1;
+  for (let i = 0; i < sk.count; i++) {
+    if (kids[i] || hung[i] || sk.parent[i] < 0) continue;
+    let best = -1;
+    let bestF = IN_CLUMP;
+    for (let c = 0; c < cl.count; c++) {
+      const f = Math.hypot(sk.x[i] - cl.x[c], sk.y[i] - cl.y[c], sk.z[i] - cl.z[c]) / cl.radius[c];
+      if (f < bestF) {
+        bestF = f;
+        best = c;
+      }
+    }
+    if (best >= 0) out[best].push(i);
+  }
+  return out;
+}
+
+/**
+ * The wood leading to a node, back from it along its parents for up to `most` metres (not down onto a stem,
+ * unless the node is on one): `at(s)` is the point `s` metres back from the node, and which way the wood
+ * runs there (out, towards the node).
+ */
+function shootOf(sk: GrownTree["skeleton"], node: number, most: number): { length: number; at(s: number): { p: number[]; d: number[] } } {
+  const pts: number[][] = [[sk.x[node], sk.y[node], sk.z[node]]];
+  const dirs: number[][] = [];
+  const lens: number[] = [];
+  let length = 0;
+  for (let i = node; length < most; ) {
+    const p = sk.parent[i];
+    if (p < 0 || (sk.order[i] === 0 && sk.order[node] > 0)) break;
+    const seg = [sk.x[i] - sk.x[p], sk.y[i] - sk.y[p], sk.z[i] - sk.z[p]];
+    const l = Math.hypot(seg[0], seg[1], seg[2]);
+    if (l > 1e-6) {
+      pts.push([sk.x[p], sk.y[p], sk.z[p]]);
+      dirs.push(seg.map((q) => q / l));
+      lens.push(l);
+      length += l;
+    }
+    i = p;
+  }
+  length = Math.min(length, most);
+  return {
+    length,
+    at(s: number) {
+      if (dirs.length === 0) return { p: pts[0], d: [0, 1, 0] };
+      let left = Math.min(Math.max(0, s), length);
+      for (let j = 0; j < lens.length; j++) {
+        if (left <= lens[j] || j === lens.length - 1) {
+          const f = Math.min(1, left / lens[j]);
+          const a = pts[j];
+          const b = pts[j + 1];
+          return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f], d: dirs[j] };
+        }
+        left -= lens[j];
+      }
+      return { p: pts[0], d: dirs[0] };
+    },
+  };
+}
+
+/**
+ * The realistic look's near leaves: each clump as `perClump` cards (close to, at least one for each of its
+ * twigs), each a spray of leaves growing from the tree's own wood, its foot on one of the clump's
+ * twigs, set in the crown at angles of their own (not turned to the eye: a card's face shows as it is). They face
  * out of the crown and a little up, as leaves turn to the light, each its own way about that. Each card:
  * `position` its centre; `aDab` its corner, its size (m, across half of it), a number of its own;
  * `aNormal` its clump's outward normal and depth; `aOffset` its own facing (unit) and 0; `aTangent` the
@@ -319,37 +421,48 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
   trees.forEach((tree, v) => {
     b.begin();
     const { clumps: cl, skeleton: sk } = tree;
+    const twigs = clumpTwigs(tree);
     for (let c = 0; c < cl.count; c++) {
       const n = [cl.nx[c], cl.ny[c], cl.nz[c]];
       const r = cl.radius[c];
-      const node = cl.node[c];
-      const l = sk.limb[node];
-      const limb = sk.order[node] === 0 ? [0, -1, 0] : [sk.x[l], sk.y[l], sk.z[l]];
-      // (Deep in the crown, fewer: little of it shows.)
-      const count = cl.depth[c] > 0.65 ? Math.max(1, perClump >> 1) : perClump;
+      // (Its twigs in turn, the one it hangs on first. Close to, a card for each at the least: no twig of it
+      // is left bare. A few broad cards a clump (mid) cover it whole, and its twigs are under a pixel there.
+      // Deep in the crown, fewer: little of it shows.)
+      const shoots = twigs[c].map((t) => shootOf(sk, t, r * SHOOT));
+      const base = cl.depth[c] > 0.65 ? Math.max(1, perClump >> 1) : perClump;
+      const count = perClump >= 4 ? Math.max(base, Math.min(shoots.length, 4 * perClump)) : base;
       for (let d = 0; d < count; d++) {
+        const twig = twigs[c][d % shoots.length];
+        const shoot = shoots[d % shoots.length];
+        const reach = shoot.length;
+        const l = sk.limb[twig];
+        const limb = sk.order[twig] === 0 ? [0, -1, 0] : [sk.x[l], sk.y[l], sk.z[l]];
         const k = c * 37 + d;
         const own = hash01(k, v * 613 + 7);
         const u = hash01(k, 21) * 2 - 1;
         const a = hash01(k, 22) * Math.PI * 2;
         const s = Math.sqrt(1 - u * u);
         const off = [s * Math.cos(a), u, s * Math.sin(a)];
-        // (Spread along the twig more than about it: a spray of leaves is longer than it is round, and
-        // twelve cards about one point read as a ball.)
-        const along0 = (hash01(k, 25) * 2 - 1) * r * 0.85;
-        const at = [cl.x[c] + off[0] * r * 0.3 + cl.tx[c] * along0, cl.y[c] + off[1] * r * 0.3 + cl.ty[c] * along0, cl.z[c] + off[2] * r * 0.3 + cl.tz[c] * along0];
+        // (Its foot is on the wood: on its twig, or on the last of the wood leading to it, more of them near
+        // its end, and each twig's first card at its very end. A spray grows from a shoot; set about the
+        // clump's centre, the cards hang in the air beside the twig, and past its end.)
+        const from = shoot.at(reach * hash01(k, 25) ** 1.6 * (d < shoots.length ? 0.2 : 1));
         // (Its facing: out of the crown and up, turned its own way by as much again.)
         const face = norm([n[0] * 0.9 + off[0] * 0.8, n[1] * 0.9 + off[1] * 0.8 + 0.5, n[2] * 0.9 + off[2] * 0.8]);
-        // (Its twig: along the twig the clump hangs on, turned a little its own way (a frond's leaves follow
-        // the frond, a whip's hang with the whip), and square to its facing.)
+        // (Its twig: on along the wood its foot is on, out of the crown a little, turned its own way (a
+        // frond's leaves follow the frond, a whip's hang with the whip), and square to its facing.)
         const [e1, e2] = basis(face);
         const t = hash01(k, 23) * Math.PI * 2;
         const spin = [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
-        const along = [cl.tx[c] + spin[0] * 0.45, cl.ty[c] + spin[1] * 0.45, cl.tz[c] + spin[2] * 0.45];
+        const along = [from.d[0] + spin[0] * 0.6 + n[0] * 0.3, from.d[1] + spin[1] * 0.6 + n[1] * 0.3, from.d[2] + spin[2] * 0.6 + n[2] * 0.3];
         const dotF = along[0] * face[0] + along[1] * face[1] + along[2] * face[2];
         const flat = [along[0] - face[0] * dotF, along[1] - face[1] * dotF, along[2] - face[2] * dotF];
         const tangent = Math.hypot(flat[0], flat[1], flat[2]) > 1e-3 ? norm(flat) : norm(spin);
         const half = r * size * (0.8 + hash01(k, 24) * 0.4);
+        // (The spray's own twig enters its picture near the bottom edge (leaves.ts): its centre is that far
+        // on from its foot.)
+        const on = half * SPRAY_FOOT;
+        const at = [from.p[0] + tangent[0] * on, from.p[1] + tangent[1] * on, from.p[2] + tangent[2] * on];
         let f = -1;
         for (const [cx, cy] of CORNERS) {
           const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...face, 0], aTangent: [...tangent, 0], aLimb: [...limb, v] });

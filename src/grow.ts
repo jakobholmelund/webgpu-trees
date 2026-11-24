@@ -35,7 +35,8 @@
 // twigs: a short arch out, then straight down towards the crown's base, leaved
 // all along, in place of the leaves at those twigs' ends.
 //
-// Then the same for all: clumps that crowd each other are thinned, the tree is
+// Then the same for all: clumps that crowd each other are thinned, the twigs
+// that thinning left bare are shed (no twig ends without leaves), the tree is
 // fitted to its size (a survey measured it, and a ball meets it there), and the
 // radii come from the pipe model: a branch carries the wood of all it bears,
 // of the branches it has shed, and of the twigs it once bore. A bole under a
@@ -224,6 +225,8 @@ const WHIP_DIP = -20 * DEG;
 const WHIP_STAGGER = 0.45;
 
 // Clumps.
+/** How far from a clump's centre (in its radii) the twigs it covers are: they bear its leaves, and are not shed as bare. */
+const IN_SPRAY = 0.8;
 /** How far past a twig's end its clump's centre sits, in the clump's radii. */
 const HANG = 0.3;
 /** How far a clump is lifted out of the crown from its twig, in its radii. */
@@ -1768,7 +1771,8 @@ function palm(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: num
 
 function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree {
   const env = new Envelope(sp, size);
-  const keep = thin(sp, env, hung);
+  let keep = thin(sp, env, hung);
+  if (sp.architecture !== "palm") keep = shedBare(w, hung, keep);
   fit(size, w, hung, keep);
   if (sp.architecture !== "palm") keepToOutline(env, w, hung);
   if (!w.radius) refineBoles(size, w, hung);
@@ -1855,21 +1859,115 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung): GrownTree
 }
 
 /**
+ * Which nodes bear leaves (1) or lead to wood that does: a node a clump hangs on, a node inside a clump
+ * (within IN_SPRAY of its radii of its centre: a clump is a spray of leaves over the twigs there, not one
+ * twig's), every node on the way down from one, and every stem's foot. Each clump is [node, x, y, z,
+ * radius]; nodes not `alive` (if given) bear nothing.
+ */
+function leafy(n: number, parent: ArrayLike<number>, x: ArrayLike<number>, y: ArrayLike<number>, z: ArrayLike<number>, clumps: number[][], alive?: Uint8Array): Uint8Array {
+  const bears = new Uint8Array(n);
+  for (const [node] of clumps) bears[node] = 1;
+  // (A hashed grid of the clumps, by the largest's reach.)
+  let most = 0;
+  for (const c of clumps) most = Math.max(most, IN_SPRAY * c[4]);
+  const cell = Math.max(1e-3, most);
+  const size = 4096;
+  const head = new Int32Array(size).fill(-1);
+  const next = new Int32Array(clumps.length).fill(-1);
+  const key = (ix: number, iy: number, iz: number) => (Math.imul(ix, 73856093) ^ Math.imul(iy, 19349663) ^ Math.imul(iz, 83492791)) & (size - 1);
+  clumps.forEach((c, k) => {
+    const h = key(Math.floor(c[1] / cell), Math.floor(c[2] / cell), Math.floor(c[3] / cell));
+    next[k] = head[h];
+    head[h] = k;
+  });
+  for (let i = 0; i < n; i++) {
+    if (bears[i] || (alive && !alive[i])) continue;
+    const ix = Math.floor(x[i] / cell);
+    const iy = Math.floor(y[i] / cell);
+    const iz = Math.floor(z[i] / cell);
+    for (let a = -1; a <= 1 && !bears[i]; a++)
+      for (let b = -1; b <= 1 && !bears[i]; b++)
+        for (let d = -1; d <= 1 && !bears[i]; d++)
+          for (let k = head[key(ix + a, iy + b, iz + d)]; k >= 0; k = next[k]) {
+            const c = clumps[k];
+            const reach = IN_SPRAY * c[4];
+            if ((x[i] - c[1]) ** 2 + (y[i] - c[2]) ** 2 + (z[i] - c[3]) ** 2 < reach * reach) {
+              bears[i] = 1;
+              break;
+            }
+          }
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    const p = parent[i];
+    if (alive && !alive[i]) bears[i] = 0;
+    if (p < 0) bears[i] = 1;
+    else if (bears[i]) bears[p] = 1;
+  }
+  return bears;
+}
+
+/**
+ * Every twig that bears no leaves, nor leads to any, is shed, back to the wood that does: once the crown is
+ * thinned, a twig whose clump went is a dead twig, and a tree drops those (they are what litters the ground
+ * under it). Left on, they are bare forks poking out of the crown, and the leaves they no longer lead to
+ * hang in the air between them. A stem's foot stays. (The pipe model is not told of these, as it is of the
+ * branches shed in the dark: they are many and small, and a fork that kept their pipes would be far thicker
+ * than Leonardo's rule has it.) Keeps only the kept clumps in `h`, and returns their indices, now 0, 1, ...
+ */
+function shedBare(w: Wood, h: Hung, keep: number[]): number[] {
+  const n = w.x.length;
+  if (keep.length === 0) return keep;
+  const bears = leafy(n, w.parent, w.x, w.y, w.z, keep.map((c) => [h.node[c], h.x[c], h.y[c], h.z[c], h.r[c]]));
+  const to = new Int32Array(n).fill(-1);
+  const out = newWood();
+  const outShed: number[] = [];
+  const outRadius: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (!bears[i]) continue;
+    const p = w.parent[i];
+    to[i] = addNode(out, w.x[i], w.y[i], w.z[i], p < 0 ? -1 : to[p], w.cont[i]);
+    out.stem[to[i]] = w.stem[i];
+    outShed.push(w.shed ? w.shed[i] : 0);
+    if (w.radius) outRadius.push(w.radius[i]);
+  }
+  w.x = out.x;
+  w.y = out.y;
+  w.z = out.z;
+  w.parent = out.parent;
+  w.cont = out.cont;
+  w.kids = out.kids;
+  w.stem = out.stem;
+  w.shed = outShed;
+  if (w.radius) w.radius = outRadius;
+  const kept = newHung();
+  for (const c of keep) hang(kept, to[h.node[c]], h.x[c], h.y[c], h.z[c], h.r[c], h.whip[c]);
+  Object.assign(h, kept);
+  return keep.map((_, k) => k);
+}
+
+/**
  * Wood that has strayed well out of the tree's own space is shed, from where it strays on: a long thin
  * branch bowed by its weight out below the crown's base or out past its reach (in a narrow crown, a hook
  * hanging from it), as a tree drops a limb it cannot hold up or light. Stems stay; a clump on shed wood
- * goes with it.
+ * goes with it, and wood it leaves bare goes after it.
  */
 function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps): GrownTree {
   const depth = Math.max(0.01, size.height - size.crownBase);
   const low = size.crownBase - STRAY_BELOW * depth;
   const far = STRAY_BEYOND * size.crownRadius;
   const keep = new Uint8Array(sk.count);
-  let shed = 0;
   for (let i = 0; i < sk.count; i++) {
     const p = sk.parent[i];
     const out = sk.order[i] > 0 && (sk.y[i] < low || Math.hypot(sk.x[i], sk.z[i]) > far);
     keep[i] = (p < 0 || keep[p]) && !out ? 1 : 0;
+  }
+  // (What is left bare by that goes too: a twig whose leaves were all on the wood shed past it is dead.)
+  const on: number[][] = [];
+  for (let c = 0; c < cl.count; c++) if (keep[cl.node[c]]) on.push([cl.node[c], cl.x[c], cl.y[c], cl.z[c], cl.radius[c]]);
+  const bears = leafy(sk.count, sk.parent, sk.x, sk.y, sk.z, on, keep);
+  let shed = 0;
+  for (let i = 0; i < sk.count; i++) {
+    if (cl.count > 0 && !bears[i]) keep[i] = 0;
     if (!keep[i]) shed++;
   }
   if (shed === 0) return { size, skeleton: sk, clumps: cl };

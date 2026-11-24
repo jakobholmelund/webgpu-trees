@@ -204,12 +204,16 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    lets it be (some missing, some broken short), with side shoots along
    their leafy parts; then smoothed and bowed. **Palms** grow a head of
    fronds on one stem.
-7. **Fitted to its size**: across so its leaves reach the crown radius, up
+7. **Dead twigs dropped**: once crowding clumps are thinned, every twig
+   that neither bears a clump, nor lies inside one, nor leads to one is
+   shed back to the wood that does. So no twig ends bare, and every clump
+   has wood leading to it (`test/borne.test.ts`).
+8. **Fitted to its size**: across so its leaves reach the crown radius, up
    so they reach its height and come down to its crown's base, and drawn in
    to the outline where that moved them out of it. The growing aims at all
    of it, so this is a few percent: up to a tenth across, and more up only
    for a tall narrow crown that did not grow to its top.
-8. **The wood's thickness** from the pipe model (Shinozaki et al. 1964): a
+9. **The wood's thickness** from the pipe model (Shinozaki et al. 1964): a
    branch's cross-section to the 2.4 carries all the twigs beyond it, the
    branches it has shed and the pipes its own length has outlived, so at a
    fork d^Δ = Σ dᵢ^Δ with Δ near 2.1 (measured trees: 1.8 to 2.3, Eloy
@@ -244,15 +248,18 @@ upper crowns to Rautiainen's exponents.
   leant up to 3 degrees and tinted.
 - **Three tiers, chosen on the graphics card.** A compute pass puts every
   tree in view on the list of the tier its size in the picture calls for:
-  near (its wood, and three dabs to a clump of leaves), mid (its limbs,
-  its clumps gathered into at most 56 broad dabs), far (16 dabs and a
-  stroke for its trunk). Each tier is one mesh holding every variant, drawn
+  near (all its wood, down to the twigs, and three dabs to a clump of
+  leaves, one more over any of its twigs they leave out), mid (its limbs
+  and branches, its clumps gathered into at most 56 broad dabs), far (16
+  dabs and a stroke for its trunk). Each tier is one mesh holding every variant, drawn
   once per variant by an indirect draw for as many trees as are on its
   list: nothing out of view costs a vertex. A tree passing between tiers is
   drawn by both, each in the pixels the other leaves.
 - **The realistic look** draws a near tree's clumps as leaf cards set in
-  the crown at angles of their own, facing out and up as leaves turn to the
-  light, turned a little to the eye so none is seen edge-on; lit as the sun
+  the crown at angles of their own, each spray growing from a twig (its
+  foot on one of the clump's twigs or the last of the wood leading to it),
+  facing out and up as leaves turn to the light, turned a little to the
+  eye so none is seen edge-on; lit as the sun
   lights them, with light through the leaves to an eye looking towards it.
   The sprays are drawn by arithmetic, eight of them (broad, oak, eucalyptus,
   willow, fir, pine, box, a round-leaved shrub): a species says which kind
@@ -270,6 +277,9 @@ On this Mac (Apple, 3200 x 2000, 4x MSAA), 30,000 trees over 2.4 km of 30
 species cost 2.4 to 3.4 ms of the graphics card's time a frame in the painted
 look and 4.5 to 7.2 ms in the realistic one, ground and sky included; the
 cull pass 0.02 ms. `await __treeLab.measure()` in the lab measures it.
+That was before the near tier drew its twigs: a near tree's wood is now
+some 9,600 triangles (1,500 before) and a mid tree's 700 (200), not yet
+measured on the graphics card.
 
 ## Left out, for now
 
