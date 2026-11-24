@@ -1298,12 +1298,15 @@ export function createTrees(options: TreesOptions): Trees {
     // (Its own colour: its species' green (its tree's tint, its own tone) going to straw as it dies, the young
     // ones paler.)
     const green = leaf.xyz.mul(T.r2.xyz).mul(float(1).add(own.sub(0.5).mul(leaf.w).mul(0.5)));
-    // (Past 1, dead and weathered: a skirt's old leaves gone from straw to grey-brown.)
+    // (Past 1, a fan palm's dead leaves: at 1 freshly dead, tan to ochre; to 2 weathered, as an old skirt is, a
+    // pale silvery grey-beige.)
     const deadK = clamp(aFrond.y, 0, 1);
+    const pastDead = step(float(1.001), aFrond.y);
     const weathered = clamp(aFrond.y.sub(1), 0, 1);
     const deadHere = deadCol.mul(float(0.9).add(own.mul(0.2)));
-    const greyBrown = vec3(dot(deadHere, vec3(0.2126, 0.7152, 0.0722))).mul(vec3(1.02, 0.93, 0.8)).mul(0.82);
-    let albedo = mix(green, mix(deadHere, greyBrown, weathered), deadK).mul(aFrond.z);
+    const fresh = deadHere.mul(vec3(0.95, 0.74, 0.46));
+    const silver = vec3(0.53, 0.485, 0.395).mul(float(0.9).add(own.mul(0.2)));
+    let albedo = mix(mix(green, deadHere, deadK), mix(fresh, silver, weathered), pastDead).mul(aFrond.z);
     const grey = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
     albedo = max(mix(vec3(grey), albedo, uStyle5.x), vec3(0));
     const lum = (c: Vec3): Float => dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -1324,6 +1327,10 @@ export function createTrees(options: TreesOptions): Trees {
     const behind = max(dot(seen, uSun).negate(), float(0)).mul(C.sunIn);
     const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(uStyle2.y).mul(C.cloud).mul(behind.mul(0.55).add(throughBent(seen, toEye).mul(thin)));
     colour = colour.add(through.mul(float(1).sub(deadK.mul(0.6))));
+    // (A fan palm's leaves are glossy: the sun's glint off them, where the eye sees its reflection.)
+    const fanLeaf = step(float(PALM_CELL.fan - 0.5), aUv.z).mul(float(1).sub(deadK));
+    const glint = pow(max(dot(normalize(uSun.negate().sub(seen.mul(dot(uSun.negate(), seen).mul(2)))), toEye), float(0)), float(18));
+    colour = colour.add(uSunTint.mul(glint.mul(0.22).mul(C.sunIn).mul(C.cloud).mul(fanLeaf).mul(float(1).sub(uStyle4.z))));
     m.positionNode = at;
     // (Into the air as a scale and an offset, so the pixel's picture can scale the colour first.)
     const airAdd = intoAir(vec3(0), at);
@@ -1555,7 +1562,11 @@ export function createTrees(options: TreesOptions): Trees {
         const latticeK = mix(lattice, stubs, vPalm.y);
         const palmPattern = select(vPalm.x.greaterThan(1.5).and(vPalm.y.lessThan(0.5)), float(0.86).add(smoothstep(float(-0.6), float(0.9), rings).mul(0.16)), float(0.7).add(smoothstep(float(-0.2), float(0.5), latticeK).mul(0.38)));
         // (Faded where its period nears a pixel, so it never shimmers far off.)
-        const fine = float(1).sub(smoothstep(float(0.25), float(0.8), fwidth(vBark.z.mul(select(vPalm.x.greaterThan(1.5), float(48 / 6.283), float(15 / 6.283))))));
+        // (A fan palm's rings, close to, would read as fine stripes on a painted stem: they come in only once
+        // they are a few pixels apart.)
+        const ringsPx = fwidth(vBark.z.mul(select(vPalm.x.greaterThan(1.5), float(48 / 6.283), float(15 / 6.283))));
+        const ringed = vPalm.x.greaterThan(1.5).and(vPalm.y.lessThan(0.5));
+        const fine = float(1).sub(smoothstep(float(0.25), float(0.8), ringsPx)).mul(select(ringed, smoothstep(float(0.06), float(0.2), ringsPx).mul(0.6), float(1)));
         const furrows = select(vPalm.x.greaterThan(0.5), mix(float(1), palmPattern, max(uStyle3.z, float(0.55)).mul(fine)), mix(float(1), float(0.68).add(smoothstep(float(-0.4), float(0.7), ridge).mul(0.42)), uStyle3.z));
         // (The moss: flat and soft where the bark is painted; where it is furrowed, in the furrows first and
         // in patches, a cheap wobble of the furrows' own coordinates.)

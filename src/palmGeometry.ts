@@ -12,7 +12,7 @@
 // Plain arithmetic, no three.
 
 import { Builder, type Pieces, type TierShape } from "./geometry.ts";
-import { FAN_SPREAD, type Frond, PALM_CELL, STEM_BARK, fanPoint, leafletProfile } from "./palm.ts";
+import { FAN_SPREAD, type Frond, PALM_CELL, STEM_BARK, fanPoint, leafletProfile, skirtOut, skirtWeathered } from "./palm.ts";
 import { FAN_CENTRE_V, FAN_RADIUS_UV, FAN_STALK_V, cellUv } from "./palmAtlas.ts";
 import { type GrownTree } from "./tree.ts";
 import { hash01 } from "./variants.ts";
@@ -205,9 +205,8 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
   };
   const tall = sk.top - sk.bottom;
   const cell = PALM_CELL.skirt;
-  // (A skirt's colour: dead leaves gone grey-brown, more so lower down, where they are older: `aFrond.y` over 1
-  // greys the species' dead colour (engine.ts).)
-  const GREY = 1.55;
+  // (A skirt's colour: its top's freshly dead leaves tan, the older below weathered to a pale silver-grey:
+  // `aFrond.y` from 1 (fresh) to 2 (weathered), engine.ts.)
   if (!T.shingles) {
     // Mid and far, one thatch from its top to its foot: two rings of panels, the outer turned against the inner,
     // its picture's hanging leaves run the whole length (its stalks left out), its foot their ragged tips.
@@ -218,14 +217,15 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
         const a0 = turn + (q / P) * Math.PI * 2;
         const span = ((Math.PI * 2) / P) * 1.45;
         const cols = 2;
-        const vr = Math.max(2, Math.min(5, Math.round(tall / 2)));
+        // (Its shoulder in its top tenth, finely; below, as it tapers.)
+        const steps = Math.max(2, Math.min(5, Math.round(tall / 2)));
+        const ks = [0, 0.04, 0.1, ...Array.from({ length: steps }, (_, j) => 0.1 + (0.9 * (j + 1)) / steps)];
         const grid: number[][] = [];
         const shade = 0.85 + 0.25 * hash01(q + layer * 31, v * 7 + 1);
         const u0 = 0.04 + 0.3 * hash01(q + layer * 7, v + 3);
-        for (let j = 0; j <= vr; j++) {
-          const fj = j / vr;
+        for (const fj of ks) {
           const y = sk.top - tall * fj;
-          const out = (sk.outTop + (sk.outBottom - sk.outTop) * fj) * (layer === 0 ? 1 : 0.8);
+          const out = skirtOut(sk, fj) * (layer === 0 ? 1 : 0.8);
           const { r, x: cx, z: cz } = radiusAt(Math.max(0, y));
           const rr = r + out;
           const line: number[] = [];
@@ -234,7 +234,7 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
             const p = [cx + Math.cos(a) * rr, Math.max(0.05, y), cz + Math.sin(a) * rr];
             const n = norm([Math.cos(a), 0.3, Math.sin(a)]);
             const uv = cellUv(cell, u0 + (0.62 * i) / cols, 0.66 - 0.65 * fj);
-            line.push(put(b, { own: hash01(q, layer * 17 + v), dead: GREY + 0.3 * fj, tone: shade * (1 - 0.25 * fj), flex: 0.3 + 0.4 * fj, length: tall }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, sk.top, cz], t: [0, -1, 0] }, v));
+            line.push(put(b, { own: hash01(q, layer * 17 + v), dead: 1 + skirtWeathered(fj, tall), tone: shade, flex: 0.3 + 0.4 * fj, length: tall }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, sk.top, cz], t: [0, -1, 0] }, v));
           }
           grid.push(line);
         }
@@ -265,7 +265,7 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
         const fj = j / vr;
         const y = top - rowH * fj;
         const kk = Math.min(1, k0 + (rowH / Math.max(tall, 1e-3)) * fj);
-        const out = sk.outTop + (sk.outBottom - sk.outTop) * kk;
+        const out = skirtOut(sk, kk);
         const { r, x: cx, z: cz } = radiusAt(Math.max(0, y));
         const rr = r + out * (0.72 + 0.28 * fj);
         const line: number[] = [];
@@ -276,7 +276,7 @@ function skirt(b: Builder, tree: GrownTree, T: PalmTier, v: number): void {
           // (The picture's leaves, not their stalks: those are under the row above.)
           const uv = cellUv(cell, u0 + (0.62 * i) / cols, 0.7 - 0.69 * fj);
           // (Older, lower down, greyer and darker.)
-          line.push(put(b, { own: hash01(q, row * 17 + v), dead: GREY + 0.3 * kk, tone: shade * (1 - 0.25 * kk), flex: 0.3 + 0.4 * fj, length: rowH }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, top, cz], t: [0, -1, 0] }, v));
+          line.push(put(b, { own: hash01(q, row * 17 + v), dead: 1 + skirtWeathered(kk, tall), tone: shade, flex: 0.3 + 0.4 * fj, length: rowH }, { p, n, s: fj, uv, cell, lateral: 0, foot: [cx, top, cz], t: [0, -1, 0] }, v));
         }
         grid.push(line);
       }

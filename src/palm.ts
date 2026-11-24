@@ -103,6 +103,26 @@ export const STEM_BARK = 0;
 export const STEM_PINEAPPLE = 2;
 export const STEM_BOOTS = 3;
 
+/**
+ * How far a skirt stands out from its stem's surface at a share `k` of the way down it (0 its top, 1 its foot):
+ * a rounded shoulder tucked in under the crown, widest a tenth of the way down, then tapering steadily, a
+ * carrot's, to its narrow foot.
+ */
+export function skirtOut(sk: Skirt, k: number): number {
+  const shoulder = 0.35 + 0.65 * Math.min(1, k / 0.1) * (2 - Math.min(1, k / 0.1));
+  const taper = Math.max(0, (k - 0.1) / 0.9);
+  return shoulder * (sk.outTop + (sk.outBottom - sk.outTop) * Math.pow(taper, 1.15));
+}
+
+/**
+ * How weathered a skirt's dead leaves are at a share `k` of the way down it, `tall` metres long: 0 freshly dead
+ * tan (its top metre or two: all of a skirt cut back short, the top tenth or so of a wild one), 1 old silver-grey.
+ */
+export function skirtWeathered(k: number, tall: number): number {
+  const t = Math.min(1, Math.max(0, (k * tall - 0.6) / 1.5));
+  return t * t * (3 - 2 * t);
+}
+
 /** A skirt of dead leaves hanging against the stem: from under the green crown down. */
 export interface Skirt {
   top: number;
@@ -413,7 +433,8 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
       fold: cls === "spear" ? 72 * DEG : dead ? (leaf === "fan" ? 60 * DEG : -55 * DEG) : form.fold * (cls === "young" ? 1.35 : 1) * (0.9 + 0.2 * rng.next()),
       plumose: dead || cls === "spear" ? 0 : plumose,
       droop: leaf === "fan" ? (cls === "young" ? 0.3 : cls === "spear" ? 0 : dead ? 1.4 : 0.8 + 0.5 * Math.max(0, age - 0.5)) * (sp.fanDroop ?? 1) : 0,
-      dead: dead ? 0.85 + 0.15 * rng.next() : cls === "old" ? Math.max(0, (age - 0.82) * 1.4) : 0,
+      // (A fan palm's freshly dead leaves, a brown tuft under its green: past 1, as a skirt's fresh top is.)
+      dead: dead ? (leaf === "fan" ? 1 + 0.06 * rng.next() : 0.85 + 0.15 * rng.next()) : cls === "old" ? Math.max(0, (age - 0.82) * 1.4) : 0,
       tone: cls === "spear" ? 1.3 : cls === "young" ? 1.12 : cls === "old" ? 0.95 : 1,
       flex: cls === "spear" ? 0.12 : cls === "young" ? 0.55 : cls === "mature" ? 1 : dead ? 1.5 : 1.2,
       own,
@@ -546,11 +567,13 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   }
   if (leaf === "fan" && (pruning === "natural" || pruning === "skirt")) {
     // (A fan palm's dead leaves hang in a skirt from under its green ones: in the wild to near the ground; cut back, a few metres.)
-    const top = knobLow - 0.05 * L;
+    // (From a little into the crown, under its hanging green leaves, so they overlap its fresh brown top.)
+    const top = knobLow + 0.04 * L;
     const longest = pruning === "natural" ? Math.max(0.15, sp.skirt ?? 0.6) * top : Math.min(0.3 * top, 0.9 * L);
-    // (Widest just under the crown, the dead leaves' own length out from the stem at most, tapering a little to its foot.)
-    const outTop = Math.min(0.45 * L + 0.15, 0.45 * R);
-    skirt = { top, bottom: Math.max(0.4, top - longest), outTop, outBottom: 0.65 * outTop };
+    // (Carrot-shaped: its shoulder flared about as wide as its lowest green leaves reach, the dead leaves hanging
+    // from their whole length, then tapering steadily to a narrow ragged foot: `skirtOut`.)
+    const outTop = Math.min(0.6 * L + 0.1, 0.48 * R);
+    skirt = { top, bottom: Math.max(0.4, top - longest), outTop, outBottom: Math.min(0.3 * outTop, 0.15 + 0.03 * L) };
   }
 
   // ---- The stem, ring by ring, to the top of the crown shaft. ----

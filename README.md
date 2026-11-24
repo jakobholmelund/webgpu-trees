@@ -339,8 +339,11 @@ deep narrow one lets them hang.
   photograph mipped down to a few pixels was a disc, and a crown of discs a
   lettuce. A skirt, near, is shingles of dead leaves round the stem, each row
   half over the one below; mid and far, one continuous thatch from under the
-  crown to its ragged foot. Its leaves are weathered from straw to grey-brown,
-  more so lower down. The stem wears its bark (a Canary palm's lattice, a fan
+  crown to its ragged foot. It is carrot-shaped: its shoulder, tucked under
+  the hanging green leaves, flares about as wide as they reach, then it tapers
+  steadily to a narrow foot. Its top metre or two is freshly dead, tan to
+  ochre; below, weathered pale silvery grey-beige. A skirt cut back short is
+  all fresh, a brown tuft under the green. A fan palm's leaves are glossy. The stem wears its bark (a Canary palm's lattice, a fan
   palm's rings), its boots and a pineapple's trimmed bases; where the look
   paints bark flat, their pattern is still drawn faintly. Its leaves' area is
   its fronds' own, which its box of light takes (`GrownTree.leafArea`).
