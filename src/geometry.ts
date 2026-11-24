@@ -31,6 +31,13 @@ export interface TierShape {
   turn: number;
   /** The most rings a piece of wood between two nodes is cut into: thick wood's, and thin's. */
   rings: [number, number];
+  /**
+   * A twig's (wood thinner than `TWIG`): its sides (2: a ribbon turned to the eye, `woodPieces`), the most rings
+   * to a piece of it, and the most it turns between two (degrees). Most of a near tree's wood is twigs, a pixel
+   * or two across even close to: near, a ribbon of two vertices a ring where its tube had four, and its rings
+   * every 20 degrees of its turning where they were every 14.
+   */
+  twig: { sides: number; rings: number; turn: number };
   /** Rounded wood: a collar where a limb leaves its parent, buttresses round a stem's foot. */
   round: boolean;
 }
@@ -40,9 +47,9 @@ export interface TierShape {
 // `keepThin`). Mid, the branches that are still a pixel or so across where a tree is handed to it, reaching
 // up into the leaves; its twigs would be under a pixel there, and only cost.)
 export const TIER_SHAPES: readonly TierShape[] = [
-  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0, sides: [16, 4], turn: 9, rings: [8, 3], round: true },
-  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.1, sides: [7, 3], turn: 18, rings: [3, 1], round: false },
-  { dabsPerClump: 0, dabSize: 1, gather: 16, woodFrom: 9, sides: [3, 3], turn: 30, rings: [1, 1], round: false },
+  { dabsPerClump: 3, dabSize: 1.0, gather: 0, woodFrom: 0, sides: [16, 4], turn: 9, rings: [8, 3], twig: { sides: 2, rings: 3, turn: 20 }, round: true },
+  { dabsPerClump: 0, dabSize: 1, gather: 56, woodFrom: 0.1, sides: [7, 3], turn: 18, rings: [3, 1], twig: { sides: 3, rings: 1, turn: 28.8 }, round: false },
+  { dabsPerClump: 0, dabSize: 1, gather: 16, woodFrom: 9, sides: [3, 3], turn: 30, rings: [1, 1], twig: { sides: 3, rings: 1, turn: 48 }, round: false },
 ];
 
 /** A run of one variant's pieces in a buffer: what one indirect draw draws. */
@@ -50,6 +57,11 @@ export interface Range {
   firstIndex: number;
   indexCount: number;
   baseVertex: number;
+  /**
+   * Wood's bands (`WOOD_BANDS`), thickest first: for each, the indices and the vertices from the run's first
+   * up to and with that band (the last band's are the run's own).
+   */
+  bands?: { indexCount: number; vertexCount: number }[];
 }
 
 /** Plain arrays for a buffer of pieces, and where each variant's run of them is. */
@@ -77,6 +89,35 @@ export class Builder {
   }
   end(): void {
     this.ranges.push({ firstIndex: this.start.index, indexCount: this.index.length - this.start.index, baseVertex: this.start.vertex });
+  }
+  /**
+   * End a variant whose triangles were put in bands (`bands[k]`, indices numbered from its first vertex) rather
+   * than in `index`: laid out band by band, and its vertices renumbered in the order they are first used, so a
+   * run of its first bands uses only the vertices at the start of its run.
+   */
+  endBands(bands: number[][]): void {
+    const from = this.start.vertex;
+    const count = this.vertices - from;
+    const order = new Int32Array(count).fill(-1);
+    let next = 0;
+    const cumulative: { indexCount: number; vertexCount: number }[] = [];
+    const laid: number[] = [];
+    for (const band of bands) {
+      for (const k of band) {
+        if (order[k] < 0) order[k] = next++;
+        laid.push(order[k]);
+      }
+      cumulative.push({ indexCount: laid.length, vertexCount: next });
+    }
+    // (Any vertex no triangle uses goes last.)
+    for (let k = 0; k < count; k++) if (order[k] < 0) order[k] = next++;
+    for (const [name, size] of Object.entries(this.sizes)) {
+      const a = this.floats[name];
+      const old = a.slice(from * size, (from + count) * size);
+      for (let k = 0; k < count; k++) for (let j = 0; j < size; j++) a[(from + order[k]) * size + j] = old[k * size + j];
+    }
+    for (const k of laid) this.index.push(k);
+    this.ranges.push({ firstIndex: this.start.index, indexCount: laid.length, baseVertex: from, bands: cumulative });
   }
   /** A vertex, numbered from the variant's first. */
   vertex(values: Record<string, number[]>): number {
@@ -278,8 +319,18 @@ const DEG = Math.PI / 180;
 /** Wood at least this thick (m) is thick: it turns by a tier's `turn` between rings, and thinner wood by `THIN_TURN` times that. */
 const THICK = 0.035;
 const THIN_TURN = 1.6;
-/** Wood thinner than this (m) is a twig, with a tier's least sides. */
-const TWIG = 0.02;
+/** Wood thinner than this (m) is a twig, with a tier's twig's sides and rings. */
+export const TWIG = 0.02;
+/** A twig's ribbon's half width, in its radii: as wide as the four-sided tube it was, on average over the ways that was turned (2 sqrt(2) / pi). */
+export const RIBBON_WIDE = (2 * Math.SQRT2) / Math.PI;
+/**
+ * The near tier's wood in bands by how thick it is (m, as grown): the trunk and wood at least the first, then
+ * wood thinner than each. Each variant's triangles are laid out band by band, thickest first, and its
+ * vertices in the order they are first used, so drawing a variant's first few bands draws only their
+ * vertices: the engine draws, for each tree, the bands that are a pixel's fraction or more across where it
+ * stands (engine.ts `WOOD_DEPTHS`); wood thinner than that the shader would shrink to nothing anyway.
+ */
+export const WOOD_BANDS: readonly number[] = [0.016, 0.006];
 /** How far a limb's tube, where it leaves its parent's, is turned towards the way its parent runs: it leaves in a curve, not at an angle. */
 const LEAVE = 0.35;
 /**
@@ -414,6 +465,7 @@ export function woodLines(tree: GrownTree, shape: TierShape): WoodLines {
     const r1 = R[i];
     const g1 = slope[i];
     const thick = Math.max(r0, r1) >= THICK;
+    const twig = Math.max(r0, r1) < TWIG;
     // (How far it turns along its length, and where: rings go at even steps of its turning, so where it bends
     // hardest, near a node it leaves at an angle, they come closest.)
     const FINE = 24;
@@ -431,8 +483,8 @@ export function woodLines(tree: GrownTree, shape: TierShape): WoodLines {
       before = way;
     }
     const turn = turned[FINE];
-    let k = Math.ceil(turn / (shape.turn * DEG * (thick ? 1 : THIN_TURN)) - 1e-9);
-    k = Math.min(Math.max(k, 1), thick ? shape.rings[0] : shape.rings[1]);
+    let k = Math.ceil(turn / ((thick ? shape.turn : twig ? shape.twig.turn : shape.turn * THIN_TURN) * DEG) - 1e-9);
+    k = Math.min(Math.max(k, 1), thick ? shape.rings[0] : twig ? Math.min(shape.rings[1], shape.twig.rings) : shape.rings[1]);
     const ts: number[] = [0];
     for (let q = 1, j = 1; q < k; q++) {
       const want = (turn * q) / k;
@@ -539,7 +591,8 @@ function mainChildren(sk: GrownTree["skeleton"]): Int32Array {
  */
 function sidesFor(shape: TierShape, r: number, trunk: number): number {
   const [most, least] = shape.sides;
-  if (r < TWIG) return least;
+  // (A tube: a twig drawn as a ribbon is not one.)
+  if (r < TWIG) return Math.max(3, Math.min(least, shape.twig.sides));
   return Math.max(least, Math.min(most, Math.round(least + 1 + (most - least - 1) * Math.min(1, r / trunk) ** 0.75)));
 }
 
@@ -653,28 +706,34 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
   trees.forEach((tree, v) => {
     b.begin();
     if (tree.palm) {
-      // (A palm's stem, as palm.ts shaped it; its fronds' rachises are its leaves' to draw: palmGeometry.ts.)
+      // (A palm's stem, as palm.ts shaped it, all of it in the first band; its fronds' rachises are its leaves'
+      // to draw: palmGeometry.ts.)
       palmStemInto(b, tree, shape, v);
-      b.end();
+      const all = b.index.splice(b.start.index);
+      b.endBands([all, ...WOOD_BANDS.map(() => [])]);
       return;
     }
     const sk = tree.skeleton;
     const W = woodLines(tree, shape);
+    // (Each band's triangles; a piece of tube goes in the band of the thicker of its two rings.)
+    const bands: number[][] = [[], ...WOOD_BANDS.map(() => [])];
+    const bandOf = (r: number) => WOOD_BANDS.reduce((k, e) => (r < e ? k + 1 : k), 0);
     const trunk = sk.radius[0] || tree.size.trunkRadius;
     const hf = flareHeight(tree.size, tree.buttress ?? 0);
     const ownOf = new Float64Array(sk.count).fill(0.5);
     const kidCount = new Uint16Array(sk.count);
     // (Children of a fair size: a stem dividing, not a stub or a twig leaving it.)
     for (let i = 0; i < sk.count; i++) if (sk.parent[i] >= 0 && sk.radius[i] >= 0.3 * sk.radius[sk.parent[i]]) kidCount[sk.parent[i]]++;
-    const stitch = (a: number, na: number, c: number, nc: number) => {
+    const stitch = (a: number, na: number, c: number, nc: number, r: number) => {
+      const into = bands[bandOf(r)];
       let i = 0;
       let j = 0;
       while (i < na || j < nc) {
         if (j >= nc || (i < na && (i + 1) / na <= (j + 1) / nc)) {
-          b.index.push(a + (i % na), c + (j % nc), a + ((i + 1) % na));
+          into.push(a + (i % na), c + (j % nc), a + ((i + 1) % na));
           i++;
         } else {
-          b.index.push(a + (i % na), c + (j % nc), c + ((j + 1) % nc));
+          into.push(a + (i % na), c + (j % nc), c + ((j + 1) % nc));
           j++;
         }
       }
@@ -701,6 +760,7 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
       let u: number[] = [];
       let last = -1;
       let lastSides = 0;
+      let lastR = 0;
       let lastKey = "";
       let end = { c: [0, 1, 0], d: [0, 1, 0], r: 0, attrs: { limb: [0, 0, 0], order: 0, along: 0 } };
       const startAlong = W.line[chain[0]]![8];
@@ -765,11 +825,77 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
           const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [barkAlong, order, ownAt(along), barkShare], aFrame: u, aAxis: d });
           if (first < 0) first = k;
         }
-        if (last >= 0) stitch(last, lastSides, first, sides);
+        if (last >= 0) stitch(last, lastSides, first, sides, Math.max(lastR, r));
         last = first;
         lastSides = sides;
+        lastR = r;
         end = { c, d, r, attrs: { limb, order, along } };
         return first;
+      };
+      // A tube's end closed: a rounded cap (a ring part way round and its tip), or on thin wood its tip alone.
+      const capTube = () => {
+        const { c, d, r, attrs } = end;
+        const w = cross(d, u);
+        let rim = last;
+        let rimSides = lastSides;
+        if (lastSides >= CAP_RING_SIDES) {
+          const cs = Math.cos(CAP_RING);
+          const sn = Math.sin(CAP_RING);
+          let first = -1;
+          for (let s = 0; s < lastSides; s++) {
+            const a = (s / lastSides) * Math.PI * 2;
+            const e = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
+            const dir = [e[0] * cs + d[0] * sn, e[1] * cs + d[1] * sn, e[2] * cs + d[2] * sn];
+            const k = b.vertex({ position: c, aRadial: [...dir, r], aNormal: dir, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
+            if (first < 0) first = k;
+          }
+          stitch(rim, rimSides, first, lastSides, r);
+          rim = first;
+        }
+        const tip = b.vertex({ position: c, aRadial: [...d, r], aNormal: d, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
+        for (let s = 0; s < rimSides; s++) bands[bandOf(r)].push(rim + s, tip, rim + ((s + 1) % rimSides));
+      };
+      // (A twig, near: a ribbon of two vertices a ring, turned to the eye in the shader (engine.ts), its own
+      // side of the centre line in `aRadial.x`, as wide as the four-sided tube it was (`RIBBON_WIDE`); no normal
+      // (`aNormal` 0: the shader rounds it, facing the eye in the middle and out to its sides at its edges).
+      // Its side is the wood's way crossed with the way to the eye, so its triangles, wound from its -1 side
+      // to its +1 and on along the wood, always face the eye.)
+      let inRibbon = false;
+      const ribbonRing = (c: number[], d: number[], r: number, limb: number[], order: number, along: number) => {
+        u = u.length ? norm(sub(u, scale(d, dot(u, d)))) : basis(d)[0];
+        if (!Number.isFinite(u[0]) || Math.hypot(u[0], u[1], u[2]) < 0.5) u = basis(d)[0];
+        const attrs = { aNormal: [0, 0, 0], aLimb: [...limb, v], aWood: [along, order, ownAt(along), 1], aFrame: u, aAxis: d };
+        const k = b.vertex({ position: c, aRadial: [-RIBBON_WIDE, 0, 0, r], ...attrs });
+        b.vertex({ position: c, aRadial: [RIBBON_WIDE, 0, 0, r], ...attrs });
+        if (last >= 0) bands[bandOf(Math.max(lastR, r))].push(last, last + 1, k, last + 1, k + 1, k);
+        last = k;
+        lastSides = 2;
+        lastR = r;
+        end = { c, d, r, attrs: { limb, order, along } };
+      };
+      // (Its end: a point a radius on.)
+      const ribbonTip = () => {
+        const { c, d, r, attrs } = end;
+        if (last < 0) return;
+        const tip = b.vertex({ position: [c[0] + d[0] * r, c[1] + d[1] * r, c[2] + d[2] * r], aRadial: [0, 0, 0, r], aNormal: [0, 0, 0], aLimb: [...attrs.limb, v], aWood: [attrs.along + r, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
+        bands[bandOf(r)].push(last, last + 1, tip);
+      };
+      // (A ring of the tube, or of its ribbon once it is a twig: a tube closed where its ribbon starts, and a
+      // ribbon a ribbon to its end.)
+      const put = (c: number[], d: number[], r: number, g: number, limb: number[], order: number, along: number, blend = false) => {
+        if (shape.twig.sides === 2 && (inRibbon || r < TWIG)) {
+          if (!inRibbon) {
+            inRibbon = true;
+            if (last >= 0) {
+              // (Closed with its tip, and its ribbon starting at its last ring, as thick as the ribbon is here,
+              // in the tip: the piece between that ring and this one is the ribbon's.)
+              capTube();
+              last = -1;
+              ribbonRing(end.c, end.d, r, end.attrs.limb, end.attrs.order, end.attrs.along);
+            }
+          }
+          ribbonRing(c, d, r, limb, order, along);
+        } else ring(c, d, r, g, limb, order, along, blend);
       };
       for (let q = 0; q < chain.length; q++) {
         const i = chain[q];
@@ -790,36 +916,17 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
             if (q === 0 && foot >= 0) {
               // (A stem's foot goes on a little into the ground, so it stands in it on a slope.)
               const deep = UNDERGROUND + UNDERGROUND_RADII * line[o + 6];
-              ring([c[0] - d[0] * deep, c[1] - d[1] * deep, c[2] - d[2] * deep], d, line[o + 6] * 1.15, 0, limb, sk.order[i], line[o + 8] - deep);
+              put([c[0] - d[0] * deep, c[1] - d[1] * deep, c[2] - d[2] * deep], d, line[o + 6] * 1.15, 0, limb, sk.order[i], line[o + 8] - deep);
             }
           }
-          ring(c, d, line[o + 6], line[o + 7], limb, sk.order[i], line[o + 8], q === 0 && parentLines.length > 0);
+          put(c, d, line[o + 6], line[o + 7], limb, sk.order[i], line[o + 8], q === 0 && parentLines.length > 0);
         }
         lastKey = key;
       }
-      // Its end closed: a rounded cap (a ring part way round and its tip), or on thin wood its tip alone.
-      const { c, d, r, attrs } = end;
-      const w = cross(d, u);
-      let rim = last;
-      let rimSides = lastSides;
-      if (lastSides >= CAP_RING_SIDES) {
-        const cs = Math.cos(CAP_RING);
-        const sn = Math.sin(CAP_RING);
-        let first = -1;
-        for (let s = 0; s < lastSides; s++) {
-          const a = (s / lastSides) * Math.PI * 2;
-          const e = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
-          const dir = [e[0] * cs + d[0] * sn, e[1] * cs + d[1] * sn, e[2] * cs + d[2] * sn];
-          const k = b.vertex({ position: c, aRadial: [...dir, r], aNormal: dir, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
-          if (first < 0) first = k;
-        }
-        stitch(rim, rimSides, first, lastSides);
-        rim = first;
-      }
-      const tip = b.vertex({ position: c, aRadial: [...d, r], aNormal: d, aLimb: [...attrs.limb, v], aWood: [attrs.along, attrs.order, ownAt(attrs.along), 1], aFrame: u, aAxis: d });
-      for (let s = 0; s < rimSides; s++) b.index.push(rim + s, tip, rim + ((s + 1) % rimSides));
+      if (inRibbon) ribbonTip();
+      else capTube();
     }
-    b.end();
+    b.endBands(bands);
   });
   return b.done();
 }

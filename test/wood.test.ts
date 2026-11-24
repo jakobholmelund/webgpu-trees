@@ -96,8 +96,12 @@ for (const sp of ALL_SPECIES) {
           edges.set(key, (edges.get(key) ?? 0) + 1);
         }
       }
+      // (A twig's ribbon, near, is open by nature: turned to the eye, it is all the eye sees of the twig. Its
+      // vertices have no normal.)
+      const nrm = P.attributes.aNormal.array;
+      const ribbon = (v: number) => nrm[3 * v] === 0 && nrm[3 * v + 1] === 0 && nrm[3 * v + 2] === 0;
       const rim = new Set<number>();
-      for (const [key, n] of edges) if (n === 1) for (const v of key.split(",")) rim.add(+v);
+      for (const [key, n] of edges) if (n === 1) for (const v of key.split(",")) if (!ribbon(+v)) rim.add(+v);
       // Each is where a tube starts: a stem's foot, under the ground, or a limb's start, inside its parent's wood.
       const starts: { at: number[]; parent: number }[] = [];
       for (let i = 0; i < sk.count; i++) {

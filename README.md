@@ -844,10 +844,12 @@ upper crowns to Rautiainen's exponents.
   the crown and of leaves outside it over the whole hand-over.
 - **The wood is drawn as wood**: a tube along a curve through the nodes
   (a cubic through each, running the way the wood runs there), its rings
-  at even steps of its turning (9 degrees on limbs, 14 on twigs, close to;
-  18 and 29 mid), as many-sided as it is thick (16 round the trunk, 4
-  round a twig), on through each node into its thickest child, which goes
-  straightest on. A limb starts inside its parent and bends out of it,
+  at even steps of its turning (9 degrees on limbs, 14 on thinner wood and
+  20 on twigs, close to; 18 and 29 mid), as many-sided as it is thick (16
+  round the trunk, 5 round wood just past a twig's 2 cm), on through each
+  node into its thickest child, which goes straightest on. Close to, a twig
+  is a ribbon turned to the eye, two vertices a ring, as wide as a round
+  twig and lit as one (see *What the wood costs*). A limb starts inside its parent and bends out of it,
   flaring where it leaves (its collar); a fork starts back along its
   parent, and the two part as one divides. Where a limb leaves, its
   surface is lit and furrowed as its parent's is, easing to its own: two
@@ -1349,10 +1351,54 @@ node tools/cost/course.ts c01 --lib ../old-checkout --mix-lib .
 On Riviera's 1st hole (2026-11-25), whole hole in view: a66c411 as the game
 had it 7.5k near cards, 876k vertices, 26.2 Mpx; 3afffb6 (finer clumps for
 the courses' sizes) 14.5k, 1,011k, 28.5 Mpx; fewer dabs to a finer clump
-8.2k, 985k, 26.0 Mpx. Near, the wood is most of the vertices (850k of the
+8.2k, 985k, 26.0 Mpx. Near, the wood was most of the vertices (850k of the
 985k: every twig, each vertex marching the light box as a dab's does), and
-the dabs most of the pixels (a near crown's dabs cover it 5 to 15 times).
+the dabs most of the pixels (a near crown's dabs cover it 5 to 15 times);
+with ribbon twigs and the near wood in bands, 729k (*What the wood costs*).
+Each tier's line ends with a rough guess at its time (ms, `MS`).
+`tools/cost/wood.ts c01` breaks a course's near wood down by how thick it is,
+how far off, how many pixels across, and how much of its own crown lies
+towards the eye.
 `test/cost.test.ts` holds a fitted tree's near cards under a bound.
+
+### What the wood costs
+
+Near, the wood was most of a tree's vertices, each marching the box of light
+as a dab's does: on Riviera's 1st tee (d8bd96b) 641k of the near tier's 677k
+vertices, 851k of all 985k. Broken down (`tools/cost/wood.ts`): two thirds
+of it twigs under 2 cm, 46% on the big trees 150 m and more off that are
+near only by their height, 68% under a pixel across and 21% under the
+quarter pixel below which the shader shrinks it to nothing (`KEEP_THIN`).
+None of it lies deep in its crown from every side (marched through its box
+of light from 26 ways, every piece sees out somewhere, from below if not
+above), so none is left out for that. So:
+
+- **A twig is a ribbon.** Wood under 2 cm, near, is a strip of two vertices
+  a ring, turned to the eye in the vertex shader (square to the wood and to
+  the eye), as wide as the four-sided tube it was on average over the ways
+  that was turned (`RIBBON_WIDE`), its normal facing the eye in its middle
+  and half way to its sides at its edges, so it is lit as a round twig. Where
+  a tube thins into a twig it is closed with its tip and the ribbon starts
+  there; a ribbon ends in a point. A twig's rings come every 20 degrees of
+  its turning, not 14 (`TierShape.twig`). A mid tree's wood is still tubes.
+- **The near wood is in bands by thickness** (`WOOD_BANDS`: 16 mm and up,
+  6 to 16, under 6, as grown), each variant's triangles laid out thickest
+  first and its vertices in the order they are first used. The cull pass puts
+  each near tree on one more list, its *depth*: the bands whose thickest is a
+  quarter pixel or more across where the tree comes nearest the eye (its
+  middle less its sphere's radius), and the near wood is drawn by one mesh a
+  depth, over the same buffers, each drawing its trees' first bands. Wood
+  thinner than a quarter pixel was already shrunk to nothing, so a band left
+  out was not to be seen: nothing pops.
+
+Riviera's 1st tee, counted (`tools/cost/course.ts`, d8bd96b to now): near wood
+641k to 384k vertices (c03 92k to 67k, c05 1,000k to 685k, c10 844k to
+600k); the counter's rough estimate of the trees' time 0.82 to 0.70 ms on
+c01 (see `MS` in `tools/cost/proxy.ts`: it counts vertices and
+pixels at what the grove measured a vertex of wood at, nothing of what a
+shader does with them). A course size's near wood over the fitted species,
+331k to 208k vertices (`test/cost.test.ts`). The cost is three near-wood draws
+a variant where there was one.
 
 ## Left out, for now
 

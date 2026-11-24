@@ -35,7 +35,7 @@ import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
 import { ALPHA_CUT, type DrawnMips, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
-import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
+import { type FixedCards, type Pieces, TIER_SHAPES, WOOD_BANDS, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
 import { BARK_SIZE, type ScanLook, barkSet, bloomShare, leafSet, loadBark, loadLeaves, flowerColorCode, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
 import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, PINE_MIPS, SPRAY_COLS, drawSprayRow, needleOf, needledCards, pineMip } from "./sprays.ts";
@@ -55,6 +55,19 @@ type Vec4 = THREE.Node<"vec4">;
 type UInt = THREE.Node<"uint">;
 
 const TIERS = 3;
+/**
+ * How many bands of the near tier's wood a tree may be drawn with (geometry.ts `WOOD_BANDS`: the thickest, and
+ * one more for each edge), and so how many lists the near wood is drawn from: a near tree is on the list of
+ * the bands it needs (the cull pass), after the tiers' own.
+ */
+const WOOD_DEPTHS = WOOD_BANDS.length + 1;
+const LISTS = TIERS + WOOD_DEPTHS;
+/**
+ * Wood thinner than the first (px across) is shrunk to nothing, and drawn whole from the second: a twig thinner
+ * than half a pixel shows only as a line blinking in and out between pixels as the eye moves. A band of the
+ * near wood whose thickest is under the first where its tree comes nearest the eye is not drawn at all.
+ */
+const KEEP_THIN = [0.25, 0.6] as const;
 /** The least of the sky a stand leaves anywhere (engine.ts `standOn`). */
 const STAND_SKY = 0.22;
 /** Rows (vec4) a tree has in the shaders' list of trees. */
@@ -440,7 +453,7 @@ export function createTrees(options: TreesOptions): Trees {
   const variantData = new Float32Array(Math.max(1, V) * 8);
   plan.variants.forEach((v, i) => {
     const g = grown[i].size;
-    variantData.set([g.height, g.crownBase, g.crownRadius, g.trunkRadius, starts[i] * TIERS, counts[i], v.species, lobes[i]?.length ?? 0], i * 8);
+    variantData.set([g.height, g.crownBase, g.crownRadius, g.trunkRadius, starts[i] * LISTS, counts[i], v.species, lobes[i]?.length ?? 0], i * 8);
   });
   // Four rows a species: its leaves' colour (linear) and how much it varies; its bark's, and how pale it
   // goes up the trunk; the colour of light through its leaves, and its stiffness; how fast its crown
@@ -520,13 +533,14 @@ export function createTrees(options: TreesOptions): Trees {
   lightTex.unpackAlignment = 1;
   lightTex.needsUpdate = true;
 
-  // The lists: for each variant, a run of places for each tier, as many as it has trees.
-  const visibleAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, N * TIERS)), 1);
-  const visibleW = storage(visibleAttr, "uint", Math.max(1, N * TIERS));
-  const visibleR = storage(visibleAttr, "uint", Math.max(1, N * TIERS)).toReadOnly();
-  // How many trees each tier of each variant has this frame (tier-major: tier * V + variant).
-  const countAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, V * TIERS)), 1);
-  const countStore = storage(countAttr, "uint", Math.max(1, V * TIERS)).toAtomic();
+  // The lists: for each variant, a run of places for each tier, as many as it has trees, and for each depth of
+  // the near tier's wood (`WOOD_DEPTHS`).
+  const visibleAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, N * LISTS)), 1);
+  const visibleW = storage(visibleAttr, "uint", Math.max(1, N * LISTS));
+  const visibleR = storage(visibleAttr, "uint", Math.max(1, N * LISTS)).toReadOnly();
+  // How many trees each list of each variant has this frame (list-major: list * V + variant).
+  const countAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, V * LISTS)), 1);
+  const countStore = storage(countAttr, "uint", Math.max(1, V * LISTS)).toAtomic();
 
   // ---- The pieces, and their draws. ----
 
@@ -595,8 +609,8 @@ export function createTrees(options: TreesOptions): Trees {
   });
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
-  const makeArgs = (sets: Pieces[]) => {
-    const a = new Uint32Array(Math.max(1, TIERS * V) * 5);
+  const makeArgs = (sets: Pieces[], lists = TIERS) => {
+    const a = new Uint32Array(Math.max(1, lists * V) * 5);
     sets.forEach((set, t) =>
       set.ranges.forEach((r, v) => {
         a.set([r.indexCount, 0, r.firstIndex, r.baseVertex, 0], (t * V + v) * 5);
@@ -605,7 +619,11 @@ export function createTrees(options: TreesOptions): Trees {
     return new THREE.IndirectStorageBufferAttribute(a, 5);
   };
   const dabArgs = makeArgs(dabSets);
-  const woodArgs = makeArgs(woodSets);
+  const woodArgs = makeArgs(woodSets, LISTS);
+  // (The near wood's depths: each draws its variant's first bands, thickest first, for the trees on its list.)
+  woodSets[0].ranges.forEach((r, v) => {
+    for (let d = 0; d < WOOD_DEPTHS; d++) woodArgs.array.set([r.bands?.[d]?.indexCount ?? r.indexCount, 0, r.firstIndex, r.baseVertex, 0], ((TIERS + d) * V + v) * 5);
+  });
   const strokeArgs = makeArgs(strokeSets);
   const sheetArgs = makeArgs(sheetSets);
   const frondArgs = makeArgs(frondSets);
@@ -699,7 +717,18 @@ export function createTrees(options: TreesOptions): Trees {
           const slot = atomicAdd(countStore.element(uint(t * V).add(v)), uint(1));
           visibleW.element(base.add(n.mul(t)).add(slot)).assign(id);
         };
-        If(near.greaterThan(0), () => put(0));
+        If(near.greaterThan(0), () => {
+          put(0);
+          // (And on the list of its wood's depth: the bands whose thickest is a pixel's fraction across or more
+          // where it comes nearest the eye.)
+          const vrow0 = variantsR.element(v.mul(2));
+          const pxPerR = r1.w.div(vrow0.w).mul(2).mul(uPxPerM).div(max(dist.sub(radius), float(0.1)));
+          let depth: Float = float(0);
+          for (const e of WOOD_BANDS) depth = depth.add(step(float(KEEP_THIN[0]), pxPerR.mul(e)));
+          const d = uint(depth);
+          const slot = atomicAdd(countStore.element(uint(TIERS * V).add(d.mul(V)).add(v)), uint(1));
+          visibleW.element(base.add(n.mul(uint(TIERS).add(d))).add(slot)).assign(id);
+        });
         If(near.lessThan(1).and(far.greaterThan(0)), () => put(1));
         If(far.lessThan(1), () => put(2));
       });
@@ -709,24 +738,26 @@ export function createTrees(options: TreesOptions): Trees {
   // The counts go into the draws' arguments, and are cleared for the next frame.
   const finish = Fn(() => {
     const k = instanceIndex;
-    If(k.lessThan(uint(TIERS * V)), () => {
+    If(k.lessThan(uint(LISTS * V)), () => {
       const c = atomicLoad(countStore.element(k));
-      dabArgsStore.element(k.mul(5).add(1)).assign(c);
       woodArgsStore.element(k.mul(5).add(1)).assign(c);
-      strokeArgsStore.element(k.mul(5).add(1)).assign(c);
-      sheetArgsStore.element(k.mul(5).add(1)).assign(c);
-      frondArgsStore.element(k.mul(5).add(1)).assign(c);
+      If(k.lessThan(uint(TIERS * V)), () => {
+        dabArgsStore.element(k.mul(5).add(1)).assign(c);
+        strokeArgsStore.element(k.mul(5).add(1)).assign(c);
+        sheetArgsStore.element(k.mul(5).add(1)).assign(c);
+        frondArgsStore.element(k.mul(5).add(1)).assign(c);
+      });
       atomicStore(countStore.element(k), uint(0));
     });
-  })().compute(Math.max(1, TIERS * V));
+  })().compute(Math.max(1, LISTS * V));
 
   // ---- What every tree's shaders share: which tree, its fit, its wind, its light. ----
 
-  /** The tree this instance of variant `v` in tier `t` is, and its rows. */
-  const treeOf = (t: number, v: Float) => {
+  /** The tree this instance of variant `v` in tier `t` is (drawn from list `list`, the tier's own by default), and its rows. */
+  const treeOf = (t: number, v: Float, list = t) => {
     const vrow0 = variantsR.element(uint(v).mul(2));
     const vrow1 = variantsR.element(uint(v).mul(2).add(1));
-    const id = visibleR.element(uint(vrow1.x).add(uint(vrow1.y).mul(t)).add(instanceIndex));
+    const id = visibleR.element(uint(vrow1.x).add(uint(vrow1.y).mul(list)).add(instanceIndex));
     const r0 = treesR.element(id.mul(TREE_ROWS));
     const r1 = treesR.element(id.mul(TREE_ROWS).add(1));
     const r2 = treesR.element(id.mul(TREE_ROWS).add(2));
@@ -1822,32 +1853,42 @@ export function createTrees(options: TreesOptions): Trees {
     return n.depth(layer) as unknown as Vec4;
   };
 
-  const woodMaterial = (t: number) => {
+  /** The wood of tier `t`, drawn for the trees on list `list` (the near tier's: a depth of its bands, `WOOD_DEPTHS`). */
+  const woodMaterial = (t: number, list = t) => {
     const m = new THREE.MeshBasicNodeMaterial({ fog: sceneFog });
     const aRadial = attribute<"vec4">("aRadial", "vec4");
     const aLimb = attribute<"vec4">("aLimb", "vec4");
     const aWood = attribute<"vec4">("aWood", "vec4");
     // (Which way the surface faces: out from the centre line, tipped where the wood swells, at a collar or a buttress.)
     const aNormal = attribute<"vec3">("aNormal", "vec3");
-    const T = treeOf(t, aLimb.w);
+    const T = treeOf(t, aLimb.w, list);
     const fit = fitOf(T);
     const centre = fit.point(positionGeometry);
     const limb = fit.point(aLimb.xyz);
     const onLimb = select(aWood.y.greaterThan(0.5), float(1), float(0));
     const moved = centre.add(windAt(T, centre, limb, onLimb));
-    const radial = fit.radial(aRadial.xyz);
-    // (A twig thinner than half a pixel in the picture is shrunk away: it shows only as a line blinking in and
-    // out between pixels as the eye moves. The trunk and limbs never are.)
-    const r0 = aRadial.w.mul(fit.wood);
     const atCentre = toWorld(T, moved);
+    // (A near twig is a ribbon (geometry.ts `ribbonRing`, no normal): turned to the eye, square to the wood as
+    // fitted, its two sides out along that. Lit as a round twig is: facing the eye in its middle, and half
+    // way out to its sides at its edges.)
+    const ribbon = t === 0 ? float(1).sub(step(float(0.25), dot(aNormal, aNormal))) : float(0);
+    const eyeT = normalize(dirToTree(T, cameraPosition.sub(atCentre)));
+    const axisT = fit.point(positionGeometry.add(attribute<"vec3">("aAxis", "vec3").mul(0.05))).sub(centre);
+    const across = cross(axisT, eyeT);
+    const side = across.div(max(length(across), float(1e-6)));
+    const radial = t === 0 ? mix(fit.radial(aRadial.xyz), side.mul(aRadial.x), ribbon) : fit.radial(aRadial.xyz);
+    const radialDir = t === 0 ? mix(normalize(fit.radial(aRadial.xyz)), normalize(side.mul(sign(aRadial.x)).add(eyeT.mul(0.01))), ribbon) : normalize(fit.radial(aRadial.xyz));
+    const facing = t === 0 ? mix(fit.radial(aNormal), normalize(side.mul(sign(aRadial.x)).add(eyeT)), ribbon) : fit.radial(aNormal);
+    // (A twig thinner than half a pixel in the picture is shrunk away (`KEEP_THIN`). The trunk and limbs never are.)
+    const r0 = aRadial.w.mul(fit.wood);
     const pxAcross = r0.mul(2).mul(uPxPerM).div(max(length(cameraPosition.sub(atCentre)), float(0.1)));
     // (A pine drawn with cushion cards keeps its shoots inside its cushions: its wood thinner than CUSHION_TWIG
     // is not drawn, which crossed over them as sticks; its limbs, the dark fan under its canopy, are.)
     const inCushion = scanned ? T.srow(8).x.mul(float(1).sub(smoothstep(float(CUSHION_TWIG[0]), float(CUSHION_TWIG[1]), r0))) : float(0);
-    const keepThin = smoothstep(float(0.25), float(0.6), pxAcross).mul(float(1).sub(inCushion));
+    const keepThin = smoothstep(float(KEEP_THIN[0]), float(KEEP_THIN[1]), pxAcross).mul(float(1).sub(inCushion));
     const surface = moved.add(radial.mul(r0.mul(keepThin)));
     const at = toWorld(T, surface);
-    const nWorld = dirToWorld(T, fit.radial(aNormal));
+    const nWorld = dirToWorld(T, facing);
     const C = crownAt(T, at, nWorld, dot(positionGeometry, vec3(0.731, 1.37, 0.513)).fract());
     const bark = T.srow(1);
     // (Paler up the trunk where the species' bark is: a eucalyptus's, a plane's.)
@@ -1891,7 +1932,7 @@ export function createTrees(options: TreesOptions): Trees {
     const facesUp = smoothstep(float(0.3), float(0.85), nWorld.y);
     const away = smoothstep(float(0.2), float(-0.6), dot(normalize(vec2(nWorld.x, nWorld.z).add(vec2(1e-4, 0))), normalize(vec2(uSun.x, uSun.z).add(vec2(1e-4, 0)))));
     const low = float(1).sub(smoothstep(float(0.1), float(1.6), surface.y));
-    const groove = smoothstep(float(0.99), float(0.91), length(aRadial.xyz)).mul(low);
+    const groove = smoothstep(float(0.99), float(0.91), length(aRadial.xyz)).mul(low).mul(float(1).sub(ribbon));
     const mossAmount = clamp(facesUp.mul(mix(float(0.45), float(1), away)).add(low.mul(mix(float(0.3), float(1), away)).mul(0.75)).add(groove.mul(0.8)), 0, 1)
       .mul(smoothstep(float(0.025), float(0.07), thick))
       .mul(uThrough.w.mul(T.srow(3).w).mul(1.6));
@@ -1914,7 +1955,7 @@ export function createTrees(options: TreesOptions): Trees {
       const vE = varying(nWorld, "vWoodE");
       // (Which way round the wood the point is, for laying the bark: out from the centre line, not the way the
       // surface faces, which turns aside on a buttress's flank and up on a flare, and drew the bark across them.)
-      const vR = varying(dirToWorld(T, normalize(fit.radial(aRadial.xyz))), "vWoodR");
+      const vR = varying(dirToWorld(T, radialDir), "vWoodR");
       const vU = varying(toW(aFrame), "vWoodU");
       const vD = varying(toW(aAxis), "vWoodD");
       // (The radius its bark is laid round: over a stem's root flare the stem's own above it, a share of the
@@ -2123,15 +2164,26 @@ export function createTrees(options: TreesOptions): Trees {
       meshes.push({ mesh, tier: t, wood: true });
     }
     if (woodSets[t].index.length > 0) {
-      const g = geometryOf(woodSets[t], woodArgs, t);
-      const m = woodMaterial(t);
-      const mesh = new THREE.Mesh(g, m);
-      mesh.frustumCulled = false;
-      mesh.name = m.name;
-      group.add(mesh);
-      geometries.push(g);
-      materials.push(m);
-      meshes.push({ mesh, tier: t, wood: true });
+      // (Near, one mesh a depth of its bands, each drawing its trees' first bands from the same buffers.)
+      const shared = t === 0 ? geometryOf(woodSets[t], woodArgs, TIERS) : null;
+      for (let d = 0; d < (t === 0 ? WOOD_DEPTHS : 1); d++) {
+        const g = shared ? new THREE.BufferGeometry() : geometryOf(woodSets[t], woodArgs, t);
+        if (shared) {
+          for (const [name, a] of Object.entries(shared.attributes)) g.setAttribute(name, a);
+          g.setIndex(shared.index);
+          g.setIndirect(woodArgs, offsetsFor(TIERS + d));
+          g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+        }
+        const m = woodMaterial(t, shared ? TIERS + d : t);
+        const mesh = new THREE.Mesh(g, m);
+        mesh.frustumCulled = false;
+        mesh.name = `${m.name}${shared ? `-depth${d}` : ""}`;
+        group.add(mesh);
+        geometries.push(g);
+        materials.push(m);
+        meshes.push({ mesh, tier: t, wood: true });
+      }
+      if (shared) geometries.push(shared);
     }
   }
 

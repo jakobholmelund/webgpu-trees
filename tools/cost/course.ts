@@ -13,12 +13,10 @@
 // --species   also a line for each species' near tier: trees, cards a tree, and cards in all
 // --json      the numbers as JSON
 
-import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ViewCost, TIERS, loadLib, pxOf, teeView, variantCosts, vertsOf, viewCost } from "./proxy.ts";
-import type { TreeInstance } from "../../src/variants.ts";
-import type { TreeSpecies } from "../../src/species.ts";
+import { type ViewCost, TIERS, loadLib, msOf, pxOf, variantCosts, vertsOf, viewCost } from "./proxy.ts";
+import { type Mix, loadCourse } from "./load.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
@@ -37,51 +35,7 @@ const within = Number(option("--within") ?? 150);
 
 const lib = await loadLib(libDir);
 const mixLib = mixDir === libDir ? lib : await loadLib(mixDir);
-const mix = await import(join(gameDir, "src/webgpu/treemix.ts"));
-
-/** A species by its id (`MORE_SPECIES`) or a starter's name, as the game's treelib.ts finds it. */
-function speciesNamed(l: typeof lib, id: string): TreeSpecies {
-  const s = l.MORE_SPECIES[id] ?? l.STARTER_SPECIES.find((x) => x.name === id);
-  if (!s) throw new Error(`no species "${id}"`);
-  return structuredClone(s) as TreeSpecies;
-}
-
-// (As the game has them: src/terrain.ts.)
-const MARGIN = 115;
-const EDGE_HIDE_M = 14;
-
-function holesOf(text: string) {
-  const out: { num: number; tee: [number, number]; pin: [number, number] }[] = [];
-  const re = /num:\s*(\d+),[\s\S]*?tee:\s*\(([-\d.]+),\s*([-\d.]+)\),\s*pin:\s*\(([-\d.]+),\s*([-\d.]+)\)/g;
-  for (let m; (m = re.exec(text)); ) out.push({ num: +m[1], tee: [+m[2], +m[3]], pin: [+m[4], +m[5]] });
-  return out;
-}
-
-function vegetationOf(text: string) {
-  const out: { kind: number; x: number; z: number; height: number; crownRadius: number; crownBase: number; trunkRadius: number }[] = [];
-  const re = /species:"(\w+)",pos:\(([-\d.e]+),([-\d.e]+)\)[^()]*?trunk_radius_m:([-\d.e]+),height_m:([-\d.e]+),crown_radius_m:([-\d.e]+),crown_base_m:([-\d.e]+)/g;
-  for (let m; (m = re.exec(text)); ) {
-    const sp = m[1].toLowerCase();
-    out.push({ kind: sp === "conifer" ? 1 : sp === "shrub" ? 2 : 0, x: +m[2], z: +m[3], trunkRadius: +m[4], height: +m[5], crownRadius: +m[6], crownBase: +m[7] });
-  }
-  return out;
-}
-
-/** The ground's height (base heightmap, bilinear; the detail patches left out). */
-function groundOf(dir: string, w: number, d: number, spacing: number) {
-  const buf = readFileSync(join(dir, "base.r32"));
-  const h = new Float32Array(buf.buffer, buf.byteOffset, w * d);
-  return (x: number, z: number) => {
-    const gx = Math.min(w - 1.001, Math.max(0, x / spacing));
-    const gz = Math.min(d - 1.001, Math.max(0, z / spacing));
-    const ix = Math.floor(gx);
-    const iz = Math.floor(gz);
-    const fx = gx - ix;
-    const fz = gz - iz;
-    const at = (a: number, b: number) => h[b * w + a];
-    return (at(ix, iz) * (1 - fx) + at(ix + 1, iz) * fx) * (1 - fz) + (at(ix, iz + 1) * (1 - fx) + at(ix + 1, iz + 1) * fx) * fz;
-  };
-}
+const mix = (await import(join(gameDir, "src/webgpu/treemix.ts"))) as Mix;
 
 interface CourseResult {
   id: string;
@@ -94,46 +48,14 @@ interface CourseResult {
 
 const results: CourseResult[] = [];
 for (const id of ids.length ? ids : ["c01"]) {
-  const dir = join(gameDir, "public/courses", id);
-  if (!existsSync(join(dir, "vegetation.ron"))) throw new Error(`${dir}: no vegetation.ron`);
-  const course = readFileSync(join(dir, "course.ron"), "utf8");
-  const [, w, d] = course.match(/size:\s*\((\d+),\s*(\d+)\)/)!.map(Number);
-  const spacing = Number(course.match(/spacing_m:\s*([\d.]+)/)![1]);
-  const extent = [(w - 1) * spacing, (d - 1) * spacing];
-  const hole = holesOf(readFileSync(join(dir, "holes.ron"), "utf8")).find((h) => h.num === holeNum)!;
-  const veg = vegetationOf(readFileSync(join(dir, "vegetation.ron"), "utf8"));
-  const ground = groundOf(dir, w, d, spacing);
-  const flora = mix.FLORAS[mix.COURSE_FLORA[id] ?? "denmark"] as { trees: [string, number][]; shrubs: [string, number][] };
-  const make = (l: typeof lib) => ({ trees: flora.trees.map(([s, weight]) => ({ species: speciesNamed(l, s), weight })), shrubs: flora.shrubs.map(([s, weight]) => ({ species: speciesNamed(l, s), weight })) });
-  const grownPool = make(lib);
-  const choosePool = make(mixLib);
-  const species = [...grownPool.trees, ...grownPool.shrubs].map((e) => e.species);
-  // (The hole's region, terrain.ts `regionForHole`, and the trees its edge hides left out: treelib.ts `gameTrees`.)
-  const x0 = Math.max(0, Math.floor(Math.min(hole.tee[0], hole.pin[0]) - MARGIN));
-  const z0 = Math.max(0, Math.floor(Math.min(hole.tee[1], hole.pin[1]) - MARGIN));
-  const x1 = Math.min(Math.floor(extent[0]), Math.ceil(Math.max(hole.tee[0], hole.pin[0]) + MARGIN));
-  const z1 = Math.min(Math.floor(extent[1]), Math.ceil(Math.max(hole.tee[1], hole.pin[1]) + MARGIN));
-  const list: TreeInstance[] = [];
-  for (const t of veg) {
-    if (t.x < x0 || t.x > x1 || t.z < z0 || t.z > z1) continue;
-    if (Math.min(t.x - x0, x1 - t.x, t.z - z0, z1 - t.z) < EDGE_HIDE_M) continue;
-    // (As the game hands them over, f32s.)
-    const [x, z, height, crownRadius, crownBase, trunkRadius] = Float32Array.of(t.x, t.z, t.height, t.crownRadius, t.crownBase, t.trunkRadius);
-    const pool = t.kind === 2 ? choosePool.shrubs : choosePool.trees;
-    const first = t.kind === 2 ? choosePool.trees.length : 0;
-    const row = mix.chooseSpecies(pool, x, z, height, crownRadius, crownBase, t.kind);
-    list.push({ x, y: ground(x, z), z, species: first + row, height, crownRadius, crownBase, trunkRadius: t.kind === 2 ? NaN : trunkRadius });
-  }
-  const plan = lib.planVariants(lib.packTrees(list), species, lib.DEFAULT_VARIANT_OPTIONS, list.map(() => undefined), list.map(() => undefined));
-  const grown = plan.variants.map((v) => lib.growTree(v.pruning ? { ...species[v.species], pruning: v.pruning } : species[v.species], v.size, v.seed, v.standing === "open" ? undefined : v.stand));
+  const { list, plan, grown, species, view, hole } = loadCourse(lib, mixLib, mix, gameDir, id, holeNum);
   const costs = variantCosts(lib, grown);
-  const view = teeView(hole.tee, hole.pin, ground);
-  const all = viewCost(plan, costs, grown, species, view);
-  const near = viewCost(plan, costs, grown, species, view, (i) => Math.hypot(list[i].x - hole.tee[0], list[i].z - hole.tee[1]) <= within);
+  const all = viewCost(plan, costs, grown, species, view, undefined, lib.WOOD_BANDS);
+  const near = viewCost(plan, costs, grown, species, view, (i) => Math.hypot(list[i].x - hole.tee[0], list[i].z - hole.tee[1]) <= within, lib.WOOD_BANDS);
   const bySpecies: CourseResult["bySpecies"] = {};
   // (Each species' near tier: the trees it draws near, and their cards.)
   species.forEach((s, k) => {
-    const only = viewCost(plan, costs, grown, species, view, (i) => list[i].species === k);
+    const only = viewCost(plan, costs, grown, species, view, (i) => list[i].species === k, lib.WOOD_BANDS);
     const vs = plan.variants.map((v, j) => (v.species === k ? j : -1)).filter((j) => j >= 0);
     const clumps = vs.reduce((a, j) => a + grown[j].clumps.count * plan.variants[j].trees, 0) / Math.max(1, vs.reduce((a, j) => a + plan.variants[j].trees, 0));
     bySpecies[s.name] = { trees: only.trees[0], cards: only.cards[0], clumps, woodVerts: only.woodVerts[0], px: pxOf(only, 0) };
@@ -148,9 +70,9 @@ if (flag("--json")) {
   for (const r of results) {
     console.log(`${r.id} hole ${holeNum}: ${r.trees} trees, ${r.variants} variants  [lib ${libDir}${mixDir !== libDir ? `, mix ${mixDir}` : ""}]`);
     for (const [label, c] of [["in view", r.all], [`within ${within} m`, r.near]] as const) {
-      const tiers = Array.from({ length: TIERS }, (_, t) => `${["near", "mid", "far"][t]} ${c.trees[t]} trees ${f(c.cards[t], 1e3, 1)}k cards ${f(vertsOf(c, t), 1e3, 0)}k verts (wood ${f(c.woodVerts[t], 1e3, 0)}k) ${f(pxOf(c, t), 1e6, 2)} Mpx (dabs ${f(c.cardPx[t], 1e6, 2)})`);
+      const tiers = Array.from({ length: TIERS }, (_, t) => `${["near", "mid", "far"][t]} ${c.trees[t]} trees ${f(c.cards[t], 1e3, 1)}k cards ${f(vertsOf(c, t), 1e3, 0)}k verts (wood ${f(c.woodVerts[t], 1e3, 0)}k) ${f(pxOf(c, t), 1e6, 2)} Mpx (dabs ${f(c.cardPx[t], 1e6, 2)}, wood ${f(c.woodPx[t], 1e6, 2)})  ~${msOf(c, t).toFixed(3)} ms`);
       const tot = (k: keyof ViewCost) => c[k].reduce((a, b) => a + b, 0);
-      console.log(`  ${label.padEnd(14)} total ${f(tot("cards"), 1e3, 1)}k cards ${f(vertsOf(c), 1e3, 0)}k verts ${f(pxOf(c), 1e6, 2)} Mpx\n      ${tiers.join("\n      ")}`);
+      console.log(`  ${label.padEnd(14)} total ${f(tot("cards"), 1e3, 1)}k cards ${f(vertsOf(c), 1e3, 0)}k verts ${f(pxOf(c), 1e6, 2)} Mpx  ~${msOf(c).toFixed(3)} ms (wood ~${msOf(c, undefined, "wood").toFixed(3)})\n      ${tiers.join("\n      ")}`);
     }
     if (flag("--species")) for (const [name, s] of Object.entries(r.bySpecies)) if (s.trees > 0) console.log(`    ${name.padEnd(22)} near ${String(s.trees).padStart(4)} trees  ${(s.cards / s.trees).toFixed(0).padStart(5)} cards/tree  ${(s.cards / 1e3).toFixed(1).padStart(6)}k cards  ${(s.woodVerts / s.trees / 1e3).toFixed(1).padStart(5)}k wood verts/tree  ${(s.px / 1e6).toFixed(2).padStart(6)} Mpx  (${s.clumps.toFixed(0)} clumps/tree on the hole)`);
   }
