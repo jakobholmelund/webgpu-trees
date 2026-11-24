@@ -18,6 +18,14 @@
 /** The alpha a mark's outline is taken at. */
 export const ALPHA_CUT = 0.5;
 
+/** Some cells' mips drawn for themselves (`coverageMips`). */
+export interface DrawnMips {
+  /** Mip 1, 2, ...: each the whole atlas at that mip's size; past the last, the cells are averaged on from it. */
+  levels: readonly Pixels[];
+  /** Which cells, row by row, are taken from them. */
+  cells: readonly boolean[];
+}
+
 /** One picture: RGBA8, rows of `width` texels. */
 export interface Pixels {
   data: Uint8Array;
@@ -50,8 +58,12 @@ export function coverage(alpha: ArrayLike<number>, width: number, height: number
  * much further from the full-size share towards the share of its outline with the gaps between its leaves
  * closed (a needled bough far off is a bough's shape, not a lace of needles). One for every cell, or a cell's
  * own, row by row (a pine's tufts close up, a broad leaf's spray does not).
+ *
+ * `drawn` gives some cells' mips as pictures of their own (a pine's tufts drawn for each mip, sprays.ts
+ * `pineMip`): `levels[l - 1]` is the whole atlas's mip `l` (only its `cells` are read), taken as it is where
+ * it has at least as much at or over the cut as the full-size cell, and its alpha scaled up to that where not.
  */
-export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: number | readonly number[] = 0): Pixels[] {
+export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: number | readonly number[] = 0, drawn?: DrawnMips): Pixels[] {
   const levels: Pixels[] = [px];
   const base = alphaOf(px);
   const kept = coverage(base, px.width, px.height, cell, cut);
@@ -88,6 +100,21 @@ export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: nu
       }
     }
     size = size / 2;
+    // (A cell whose mip is drawn for itself: that picture, its colour and alpha, in place of the averaged one.)
+    const own = drawn?.levels[level - 1];
+    const ownCells = own && own.width === nw && own.height === nh && size >= 1 && Number.isInteger(size) ? drawn!.cells : null;
+    if (own && ownCells) {
+      const cols = nw / size;
+      for (let j = 0; j < nh; j++) {
+        const rowCell = Math.floor(j / size) * cols;
+        for (let i = 0; i < nw; i++) {
+          if (!ownCells[rowCell + Math.floor(i / size)]) continue;
+          const o = j * nw + i;
+          for (let ch = 0; ch < 4; ch++) data[o * 4 + ch] = own.data[o * 4 + ch];
+          nextAlpha[o] = own.data[o * 4 + 3] / 255;
+        }
+      }
+    }
     // (Each cell's scale: the alpha its share `want` of texels is at or over, brought to the cut.)
     const scaleOf = new Float32Array(Math.max(1, want.length)).fill(1);
     const cellsAlign = size >= 2 && Number.isInteger(size) && nw % size === 0 && nh % size === 0;
@@ -99,7 +126,7 @@ export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: nu
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const k = r * cols + c;
-          const target = want[k] ?? 0;
+          const target = (ownCells?.[k] ? kept[k] : want[k]) ?? 0;
           if (target <= 0) continue;
           hist.fill(0);
           for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) hist[Math.min(bins - 1, Math.floor(nextAlpha[(r * size + j) * nw + c * size + i] * bins))]++;
@@ -113,6 +140,8 @@ export function coverageMips(px: Pixels, cell: number, cut = ALPHA_CUT, fill: nu
           }
           const at = Math.max(b / bins, 1 / 255);
           scaleOf[k] = Math.min(8, Math.max(0.25, cut / at));
+          // (A drawn cell is scaled up to its share, never down: its spokes are what keep its outline.)
+          if (ownCells?.[k]) scaleOf[k] = Math.max(1, scaleOf[k]);
         }
       }
       for (let j = 0; j < nh; j++) {

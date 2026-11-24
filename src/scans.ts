@@ -254,10 +254,10 @@ export const SCAN_LOOKS: Readonly<Record<string, ScanLook>> = {
   "Monterey pine": { bark: "montereyPine", leaves: "pine", leafCm: 34, spray: "tufts", needleCm: 12, brush: 1.8, cushion: "pineClumpDark", cushionCards: 1, cushionSize: 1.2 },
   // (Its shoot: a stout twig and a brush of needles 20–30 cm long, grey-green and stiff: its tufts laid from its own
   // shoot pictures, `tuftPicture`, the brush two thirds of the picture.)
-  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25, brush: 1.3, tuftPicture: true, tuftShoot: 1.6, tuftFrom: 0.3, tuftFan: 3 },
+  "Torrey pine": { bark: "torreyPine", leaves: "torreyPine", leafCm: 48, spray: "tufts", needleCm: 25, brush: 1.3, tuftPicture: true, tuftShoot: 1.6, tuftFrom: 0.3, tuftFan: 5 },
   // (Its own bark of broad flat plates.)
   "Aleppo pine": { bark: "aleppoPine", leaves: "pine", leafCm: 26, spray: "tufts", needleCm: 8, brush: 1.2, cushion: "pineClumpLight" },
-  "Stone pine": { bark: "stonePine", barkScale: 1, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "stonePineCushion", cushionFar: "stonePineCanopy" },
+  "Stone pine": { bark: "stonePine", barkScale: 1, leaves: "pine", leafCm: 32, spray: "tufts", needleCm: 14, brush: 2, cushion: "stonePineCushion", cushionFar: "stonePineCanopy", cushionCards: 6, cushionSize: 1.6 },
   "Canary date palm": { bark: "palmLattice", leaves: "frond", leafCm: 450, spray: "whole" },
   "Mexican fan palm": { bark: "palmRings", leaves: "blade", leafCm: 60, spray: "fan" },
   "California fan palm": { bark: "palmRings", barkScale: 1.3, leaves: "blade", leafCm: 70, spray: "fan" },

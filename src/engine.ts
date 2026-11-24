@@ -33,12 +33,12 @@ import { leafAtlasPixels, leafCell } from "./leaves.ts";
 import { LIGHT_CELLS, type LightVolume, SIGMA_MAX, bakeLight, dirToFit, fitToWorld, leafAreaIndex, packLightAtlas, sunThrough, worldToCrownFit } from "./light.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
 import { LEAF_SHARE, LEAF_SIZE_OF, MARK_CELL, MARK_KINDS, PAINTERLY_COLS, PAINTERLY_DENSITIES, PAINTERLY_ROWS, PAINTERLY_VARIANTS, SCULPTED_COLS, SCULPTED_ROWS, SHEET_CELL, SHEET_COLS, SHEET_ROWS, painterlyAtlasPixels, sculptedAtlasPixels, sheetAtlasPixels } from "./marks.ts";
-import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
+import { ALPHA_CUT, type DrawnMips, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { PAINTED_LEAF_SHARE, loadPaintedMarks } from "./paintedMarks.ts";
 import { BARK_SIZE, type ScanLook, barkSet, bloomShare, leafSet, loadBark, loadLeaves, flowerColorCode, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
-import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
+import { BIG_CARD, BIG_CARDS, CARD_V, FAR_CARD, FAR_CARDS, NEAR_CARDS, PINE_MIPS, SPRAY_COLS, drawSprayRow, needleOf, needledCards, pineMip } from "./sprays.ts";
 import { clothed, growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
 import { palmPieces } from "./palmGeometry.ts";
@@ -2294,6 +2294,9 @@ export function createTrees(options: TreesOptions): Trees {
           // The cards: each species' row drawn from its leaves' photographs (sprays.ts).
           const C = cardCell;
           const px: Pixels = { data: new Uint8Array(SPRAY_COLS * C * cardRows * C * 4), width: SPRAY_COLS * C, height: cardRows * C };
+          // (A pine's needled cards' first mips, drawn for themselves (sprays.ts `pineMip`), and which cells they are.)
+          const drawnLevels: Pixels[] = [];
+          const drawnCells: boolean[] = [];
           for (const [row, sp] of usedSpecies.entries()) {
             const l = looks[sp];
             const set = leafSet(l.leaves);
@@ -2307,6 +2310,20 @@ export function createTrees(options: TreesOptions): Trees {
             if (disposed) return false;
             // (Its big card a mid card's width: a clump's, half again.)
             drawSprayRow(px, row, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7, 1 - species[sp].openness, cushions, far);
+            // (A pine's tufts drawn again for its first mips, each needle as wide as a texel there and as many
+            // fewer: averaged down, they were a disc a few dozen metres off, a broad leaf's blot.)
+            const needled = needledCards(l, cushions, far);
+            drawnCells.push(...needled);
+            if (needled.some(Boolean)) {
+              for (let i = 0; i < PINE_MIPS && C >> (i + 1) >= 1; i++) {
+                // (A mip at a time, so a page keeps drawing between them.)
+                await new Promise((done) => setTimeout(done, 0));
+                if (disposed) return false;
+                const m = pineMip(i + 1, C, { set, ...sheet }, l, 1.45 * species[sp].clumpSize, sp * 101 + 7, 1 - species[sp].openness, cushions, far);
+                const into = (drawnLevels[i] ??= { data: new Uint8Array((px.width >> (i + 1)) * (px.height >> (i + 1)) * 4), width: px.width >> (i + 1), height: px.height >> (i + 1) });
+                into.data.set(m.data, row * m.width * m.height * 4);
+              }
+            }
             // (A row at a time, so a page keeps drawing between them.)
             await new Promise((done) => setTimeout(done, 0));
           }
@@ -2323,7 +2340,8 @@ export function createTrees(options: TreesOptions): Trees {
             const big = looks[sp].cushion ? 0 : PINE_BIG_FILL;
             return Array.from({ length: SPRAY_COLS }, (_, c) => (c < NEAR_CARDS ? near : big));
           });
-          const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, fills), 1);
+          const drawn: DrawnMips | undefined = drawnLevels.length > 0 ? { levels: drawnLevels, cells: drawnCells } : undefined;
+          const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, fills, drawn), 1);
           // (Shaders are built when first drawn: those built already are given the new cards, the rest read them.)
           for (const n of atlasNodes) n.value = cards;
           cardsTex = cards;

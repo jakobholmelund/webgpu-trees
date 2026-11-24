@@ -365,9 +365,10 @@ bare limb stands over its dome of leaves in any variant a course grows
 as their clump is hung (`FixedCards.lift`), not from the wood under it.
 
 What the grower cannot do yet, so those rows come as close as their data
-allows: a lean that carries its crown with it (Torrey, Aleppo; a host leans a
-tree at most 3 degrees; `lean` bends the trunk and stands the crown over its
-foot).
+allows: several trunks from one foot (a sycamore's, a coast live oak's). A
+species may lean (`lean`: the trunk leans from its foot and turns upright near its
+crown's base, so the crown stands over its foot; the Torrey pine's, the California sycamore's), and a
+host leans a tree at most 3 degrees besides.
 
 ## Palms
 
@@ -520,11 +521,14 @@ grows as it did):
   wood under each: a Monterey cypress on a headland, an old Scots pine's
   plates, a Torrey pine's tufts on bare limbs. A small or narrow crown, lit
   through, is in pads 0.9 at most.
-- **`lean`**: how far a tree of one stem leans at its foot (degrees), its
-  trunk easing back upright by its crown (or its fork) so its crown stands
-  near over its foot, each tree its own way: a California sycamore's. A tall
-  bole under a narrow crown leans less (no further aside than 0.3 of its
-  crown's radius), and none in a stand.
+- **`lean`**: how far a tree's trunk leans (degrees), grown so: from its foot,
+  holding most of its lean up its bole and turning upright near its crown's
+  base (or its fork), its crown grown upright from there, near over its foot,
+  each tree its own way (from its seed on a stream of its own, so a lean bends
+  the tree it is and grows no other): a Torrey pine's on the bluffs, a
+  California sycamore's. A tall bole under a narrow crown leans less (no further
+  aside than 0.3 of its crown's radius; a column, under 0.35 of its depth wide,
+  not at all), and none in a stand.
 - **`clusters`**: how far its leaves gather into a few bunches hanging at its
   branches' ends, with sky between them: each branch off a great limb keeps
   its leaves only on its last shoots, the bunch bigger and hanging a little
@@ -1169,10 +1173,41 @@ spoil). Where the owner gave a picture again at 2048 pixels, that one is used.
   Corsican pine's from its own shoots too, a stout twig in a brush of long stiff needles (the picture two
   needles long, `tuftShoot`). A Torrey pine's long stiff grey-green brushes from its own: its picture is
   mostly brush (`tuftShoot` 1.6), so it is cut where its brush begins (`tuftFrom` 0.3, its bare twig left
-  to the card's own wood) and laid three to a tuft, fanned 0.55 rad apart about the brush's foot
+  to the card's own wood) and laid five to a tuft, fanned 0.55 rad apart about the brush's foot
   (`tuftFan`), each a little longer or shorter, over the pine's own drawn needles, a little longer than
   them: one flat-laid picture was a narrow tassel, a broad leaf's blot from the tee, and a fan of pictures
   alone a fan palm's leaf from under the crown; the drawn needles give the brush its edge of needle tips.
+- **A pine's tufts drawn for each mip** (`pineMip`, `coverageMips`' `drawn`). From the tee a pine read as a
+  broad leaf: averaged down, each needle a quarter of a texel wide was a quarter of an alpha, under the cut, so
+  the mips kept only a tuft's dense heart, and the coverage the mips keep (Castaño) went to filling that heart
+  out into a disc, a broad leaf's blot. Now a pine's needled cards (`needledCards`: its near cards, and its big
+  and far ones unless they are photographs; not a pine whose tufts are one shoot picture each) have their first
+  four mips drawn for themselves: the row drawn again at full size with each needle as wide as that mip's texel
+  and kept by chance as often as it is narrower than that, so a tuft covers about what its needles do but in
+  spokes a texel wide with sky between, then averaged down (Cook et al. 2007, *Stochastic simplification of
+  aggregate detail*: fewer elements, each bigger, the same cover). Their alpha is scaled up to the full-size
+  share where it falls short, never down; past the fourth mip they are averaged on as before. A Torrey pine's
+  fanned shoot pictures, the few big lobes of a palmate leaf a few dozen metres off, are left out of its mips
+  from the second on, its drawn needles half again as many in their place. Each tuft's needles are lit as a
+  brush is from above (`TUFT_UP_LIGHT`): those pointing up lighter, those hanging darker, the inner half of each
+  needle darker (`TUFT_HEART`), a dark heart and lit tips rather than one flat tone. At the third and fourth
+  mips (a near card from the tee) a tuft's outline at the cut is a fifth to a quarter longer for its area than
+  averaged, its cover within a tenth of what it was (Torrey 10.7 to 13.7 at the third, Stone 11.0 to 13.5,
+  Monterey 10.1 to 12.8, Aleppo 14.2 to 16.5; `test/pineMips.test.ts`, `test/silhouette.ts`). No more texture
+  or shader work on the graphics card: the same atlas and mips, only their pictures differ. The page draws each
+  pine's row four times more once its leaves come, some 60 ms a level at 512 texels a card (a quarter of that
+  at 256), a mip at a time between frames.
+- **A lean** (`TreeSpecies.lean`). A Torrey pine on the bluffs leans (MORPHOLOGY.md 19, the owner's
+  reference): grown leaning 16 degrees its own way from its foot, turning upright near its crown's base, so its
+  crown stands over its foot and keeps to its box, which a ball meets (the grower's `lean`, merged with the
+  California sycamore's: one lean, grown into the trunk).
+- **Scots and stone pines against their references.** A Scots pine forks at its crown's base into two or three
+  heavy orange sub-leaders in seven trees of ten (MORPHOLOGY.md 5), on a straighter, thicker stem, olive where
+  lit. Its references' crown is flat-topped, the photographed tree's (`test/outlines.json`, a solitary Dutch
+  tree of no stated age) widest just over its crown's base and round-topped, a middle-aged tree's; the outline
+  test holds it to that (9.4% off, 11.7% before), and Rautiainen et al.'s upper-crown shape (t 1.47, measured 1.35), so its top stays round. A stone pine forks lower (two thirds of its crown
+  base) into three thick stems, a trunk 1.4 m through (1.24 before), its crown shallower and its cushions six smaller ones to a
+  clump, a smoother umbrella.
 - **Where one bark gives way to the next** is laid round the tree's own axis and up its height, eased
   pixel by pixel: laid round each tube and along it, and eased once a vertex, a forked stem's or a
   clump's stems took the pattern up afresh where they part, and a sycamore's or a birch's foot bark
@@ -1254,7 +1289,7 @@ spoil). Where the owner gave a picture again at 2048 pixels, that one is used.
   baked for the tree as grown, not stretched with its fit.
 - Impostors for the farthest trees.
 - A fan palm's skirt of dead fronds; multi-stemmed trees (a sycamore's, a
-  live oak's); leaning trunks.
+  live oak's).
 - In a wood: crowns that press into each other's shapes (each is still its
   kind's outline, lifted or lopsided), the light that comes in under an
   edge's crowns to the trees behind it, and the undergrowth, which is the

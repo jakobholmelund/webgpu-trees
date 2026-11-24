@@ -175,8 +175,10 @@ const STEM_JOIN_FALL = 0.5;
 const STEM_EASE_LEAST = 0.45;
 /** A trunk is not forked this close under breast height or over it (m): measured, it is one trunk or its stems. */
 const FORK_CLEAR_BH = 0.3;
-/** How a leaning trunk eases upright (`lean`): its slope falls as (1 - its height over the height it is upright by) to this power. */
-const LEAN_EASE = 1.5;
+/** How a leaning trunk turns upright (`lean`): its slope falls as 1 - (its height over the height it is upright by) to this power, so the higher, the longer it holds its lean. */
+const LEAN_HOLD = 2.5;
+/** Salts a tree's seed for which way it leans. */
+const LEAN_SALT = 0x6c65616e;
 /** ... and goes aside by then no further than this share of its crown's radius. */
 const LEAN_OUT = 0.3;
 /** How far a forked stem sways, at crooked 1, as a share of its height to the fork: a sinuous or leaning stem. */
@@ -587,7 +589,7 @@ export function growTree(species: TreeSpecies, size: TreeSize, seed: number, sta
       break;
     case "broadleaf":
     case "shrub":
-      hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift, form);
+      hung = budGrow(species, sz, rng.fork(), wood, clumpR, st, lift, form, leanWay(seed));
       break;
     case "palm":
       // (A palm is grown as a palm: palm.ts.)
@@ -911,25 +913,41 @@ function cone(axis: V3, angle: number, azimuth: number): V3 {
 // Broadleaves and shrubs: growing by buds, in the light.
 
 /**
- * A leaning trunk (`lean`): as far as its species says at its foot, its own way round (from `rng`, drawn only
- * when it leans), easing back upright by `to` metres up (its fork, or where its limbs leave it), a curve; so
- * its crown stands near over its foot: no further aside by then than LEAN_OUT of its crown's radius `R` (a tall
- * bole under a narrow crown leans less). Its slope (x, z per metre up) at a height, and how far it has gone
- * aside by then. Not in a stand (`inStand`), where its neighbours draw it up.
+ * A leaning trunk (`lean`): as far as its species says, its own way round (`way`, `leanWay`), nearly all the way
+ * up to `to` metres (its fork, or where its limbs leave it) and turning upright only near there, so a coastal
+ * Torrey pine's or a sycamore's stem reads as leaning from the tee and its crown, grown upright from its top,
+ * stands near over its foot: no further aside by then than LEAN_OUT of its crown's radius `R` (a tall bole under
+ * a narrow crown leans less, and a column, under NARROW of its `depth` wide, not at all). Its slope (x, z per metre up) at a height, and how far it has gone aside by then.
+ * Not in a stand (`inStand`), where its neighbours draw it up.
  */
-function leanOf(sp: TreeSpecies, inStand: boolean, rng: Random, to: number, R: number): { slope: (y: number) => [number, number]; at: (y: number) => [number, number] } {
+function leanOf(sp: TreeSpecies, inStand: boolean, way: number, to: number, R: number, depth: number): { slope: (y: number) => [number, number]; at: (y: number) => [number, number] } {
   const h = Math.max(0.01, to);
-  const t = (sp.lean ?? 0) > 0 && !inStand ? Math.min(Math.tan(Math.min(35, sp.lean ?? 0) * DEG), (LEAN_OUT * R * (LEAN_EASE + 1)) / h) : 0;
+  const p = LEAN_HOLD;
+  // (A crown narrow for its depth, a tree drawn up straight, leans less, as its canopy is lifted less; a column not at all.)
+  const wide = Math.min(1, Math.max(0, (R / Math.max(0.01, depth) - NARROW) / (LIFT_WIDE - NARROW)));
+  // (Slope t·(1 - (y/h)^p): aside by h, t·h·p/(p + 1).)
+  const t = (sp.lean ?? 0) > 0 && !inStand ? wide * Math.min(Math.tan(Math.min(35, sp.lean ?? 0) * DEG), (LEAN_OUT * R * (p + 1)) / (p * h)) : 0;
   if (t === 0) return { slope: () => [0, 0], at: () => [0, 0] };
-  const a = rng.range(0, 2 * Math.PI);
-  const ease = (y: number) => Math.max(0, 1 - y / h);
+  const a = way;
   return {
-    slope: (y) => [t * ease(y) ** LEAN_EASE * Math.cos(a), t * ease(y) ** LEAN_EASE * Math.sin(a)],
+    slope: (y) => {
+      const s = t * Math.max(0, 1 - Math.min(1, Math.max(0, y) / h) ** p);
+      return [s * Math.cos(a), s * Math.sin(a)];
+    },
     at: (y) => {
-      const d = (t * h * (1 - ease(Math.min(y, h)) ** (LEAN_EASE + 1))) / (LEAN_EASE + 1);
+      const u = Math.min(1, Math.max(0, y) / h);
+      const d = t * h * (u - u ** (p + 1) / (p + 1));
       return [d * Math.cos(a), d * Math.sin(a)];
     },
   };
+}
+
+/**
+ * Which way a tree leans (`lean`), from its own seed alone, on its own stream: the rest of its growing draws
+ * as it would upright, so a lean bends the tree it is and does not grow another.
+ */
+function leanWay(seed: number): number {
+  return new Random(hashSeed(seed) ^ LEAN_SALT).next() * 2 * Math.PI;
 }
 
 /**
@@ -981,7 +999,7 @@ class Lobes {
  * or down by the species' bend, with a lateral bud at every one (by the golden angle); and a branch that
  * gathers too little light for its wood is shed (Takenaka). Nothing grows out of the crown's outline.
  */
-function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, liftTo = size.crownBase, form: TreeForm = { stems: 1, fork: 1, clump: false, join: 0 }): Hung {
+function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: number, stand?: Stand, liftTo = size.crownBase, form: TreeForm = { stems: 1, fork: 1, clump: false, join: 0 }, way = 0): Hung {
   const { height: H, crownRadius: R, crownBase: base } = size;
   const depth = Math.max(0.01, H - base);
   const crown = Math.cbrt(R * R * depth);
@@ -1422,7 +1440,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
       lBud[at] = 0;
       // (A leaning tree's trunk, `lean`, leans under its fork, easing upright to it.)
-      const leaning = leanOf(sp, liveAt !== null, rng, yLow, R);
+      const leaning = leanOf(sp, liveAt !== null, way, yLow, R, depth);
       const steps = Math.max(1, Math.ceil(yLow / TRUNK_STEP));
       for (let k = 1; k <= steps; k++) {
         const y = (yLow * k) / steps;
@@ -1560,7 +1578,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
     let wx = 0;
     let wz = 0;
     // (A leaning stem, `lean`, easing upright by where its limbs leave it.)
-    const leaning = leanOf(sp, liveAt !== null, rng, Math.max(L, yLo), R);
+    const leaning = leanOf(sp, liveAt !== null, way, Math.max(L, yLo), R, depth);
     for (const lv of levels) {
       const j = rng.onSphere();
       wx = 0.6 * wx + 0.08 * sp.crooked * j[0];
