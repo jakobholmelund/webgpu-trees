@@ -376,7 +376,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
   // Set against the owner's reference pictures: a parkland oak's broad dome on heavy limbs, the limbs seen
   // through it (open 0.45), dark green; its bark grey-brown. Wider than it is tall, as the pictures have it and
   // TSO says: 27 m across on 18 m (r/H 0.75; TSO's open-grown 18–24 m tall and 20–30 m across), its clumps
-  // bigger to fill so wide a dome.
+  // bigger to fill so wide a dome; its trunk 1.4 m through, as Hemery's open-grown oaks have for such a crown.
   {
     name: "Oak",
     latin: "Quercus robur",
@@ -385,7 +385,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     height: 18,
     crownRadius: 13.5,
     crownBase: 2.5,
-    trunkRadius: 0.45,
+    trunkRadius: 0.7,
     shape: "hemispherical",
     crownPeak: 0.15,
     crownRound: 2.0,
@@ -462,7 +462,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
   // Set against the owner's reference pictures: an open-grown blue gum, "broadly rounded" (secondary, in
   // docs/MORPHOLOGY.md), 20 m across (the top of 10–20 m), its bole a metre and more through, most of them
   // forked low into a V of ascending limbs, few leading; its crown from 6 m (an open-grown live crown of
-  // 0.6–0.8), widest a third of the way up, fuller (open 0.4, its bunches less apart).
+  // 0.6–0.8), widest near halfway up and broad-shouldered, fuller (open 0.4, its bunches less apart).
   {
     name: "Eucalyptus",
     latin: "Eucalyptus globulus",
@@ -473,8 +473,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     crownBase: 6,
     trunkRadius: 0.6,
     shape: "hemispherical",
-    crownPeak: 0.35,
-    crownRound: 2.2,
+    crownPeak: 0.45,
+    crownRound: 2.6,
     lobes: 0.65,
     foliageDepth: 0.3,
     openness: 0.4,
@@ -494,7 +494,7 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     whorlsPerMetre: 0,
     branchiness: 0.55,
     scaffolds: 6,
-    limbAngle: [30, 65],
+    limbAngle: [35, 75],
     limbCurve: 6,
     limbCurveBack: -12,
     zigzag: 5,
@@ -632,9 +632,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // UF/IFAS ST-244 (European beech): 50–75 ft tall, 40–60 ft spread. A dense dome, leaves only on its
   // outside, low-branched when open-grown; smooth grey bark.
   // Set against the owner's reference pictures: an open-grown beech's broad dome, widest low, skirted nearly to
-  // the ground (crown from 1.5 m), 24 m across on 18 m (r/H 0.67: UF's 60 ft spread on a 50 ft tree, 0.6, and
+  // the ground at its rim (crown from 1.5 m), its limbs seen sweeping out under it (canopyLift 0.3), 24 m across on 18 m (r/H 0.67: UF's 60 ft spread on a 50 ft tree, 0.6, and
   // the 15–25 m open-grown spread of MORPHOLOGY.md), its many limbs spreading wide and low; silver-grey bark
-  // (EUAT, #9A9A91 to #B5B5AC). Its branches grown all round its limbs: two-ranked, every branch lay in its
+  // (EUAT, #9A9A91 to #B5B5AC), its trunk 1.4 m through (Hemery's open-grown beech for a 24 m crown). Its
+  // branches grown all round its limbs: two-ranked, every branch lay in its
   // limb's plane and the crown came out a stack of shelves (its sprays' flat fans are its leaves').
   beech: {
     name: "Beech",
@@ -644,7 +645,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     height: 18,
     crownRadius: 12,
     crownBase: 1.5,
-    trunkRadius: 0.55,
+    trunkRadius: 0.7,
     shape: "hemispherical",
     crownPeak: 0.2,
     crownRound: 3,
@@ -665,6 +666,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     branchiness: 1,
     scaffolds: 9,
     limbAngle: [40, 105],
+    canopyLift: 0.3,
     zigzag: 12,
     leafKind: "broad",
     clumpSize: 2,
@@ -681,7 +683,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // drooping twigs (some of them hang in tresses), light yellow-green; white bark, dark and fissured at its
   // foot.
   // Set against the owner's reference pictures: 12 m across (the top of 6–12 m, MORPHOLOGY.md) on 18 m (15–25 m),
-  // its black rugged base up to 1–3 m (WT: the lowest 0.5–3 m; scans.ts); fuller, and its twigs hanging in
+  // its black rugged base up to 1–3 m (WT: the lowest 0.5–3 m; scans.ts), 0.6 m through (Hemery); full (open 0.3), and its twigs hanging in
   // curtains (weep 0.45: "pendulous, hanging 150–180 degrees ... in long whip-like curtains"), its top open.
   silverBirch: {
     name: "Silver birch",
@@ -691,10 +693,10 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     height: 18,
     crownRadius: 6,
     crownBase: 2.5,
-    trunkRadius: 0.24,
+    trunkRadius: 0.3,
     shape: "spherical",
     foliageDepth: 0.3,
-    openness: 0.4,
+    openness: 0.3,
     stems: 1,
     stemShare: 0.3,
     stemRange: [2, 4],
@@ -705,14 +707,14 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     leader: 0.6,
     whorl: 0,
     whorlsPerMetre: 0,
-    branchiness: 0.75,
+    branchiness: 0.9,
     boleStubs: 0.7,
     limbAngle: [35, 60],
     limbCurve: 5,
     limbCurveBack: -35,
     zigzag: 15,
     leafKind: "small",
-    clumpSize: 1,
+    clumpSize: 1.2,
     clumpSpread: 0.35,
     leafColor: "#7b9a48",
     leafVariation: 0.3,
@@ -1415,8 +1417,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
   // Set against the owner's reference pictures: a broad low dome (spread "often greater than height", VT),
   // its limbs reclining at its rim (FEIS), dark glossy green (#2F4A2A at 50–150 m); its bark the grey of its
   // broad ridges (VT: mature ridges #7E7A73), not near black. 22 m across on 12 m (r/H 0.92: spread 10–30 m);
-  // a massive short trunk, most dividing at 1.2–2.4 m (FEIS) into three or four heavy limbs, seen under its
-  // raised rim and through its crown (open 0.5, its leaves a shell, canopyLift 0.3).
+  // a massive short trunk, dividing at 2 m and more (FEIS: 1.2–2.4 m) into its heavy limbs, or forked near the
+  // ground into two or three leaning trunks, seen under its raised rim and through its crown (open 0.5, its
+  // leaves a shell, canopyLift 0.5).
   coastLiveOak: {
     name: "Coast live oak",
     latin: "Quercus agrifolia",
@@ -1424,17 +1427,17 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     architecture: "broadleaf",
     height: 12,
     crownRadius: 11,
-    crownBase: 1.5,
+    crownBase: 2,
     trunkRadius: 0.65,
     shape: "hemispherical",
     lobes: 0.3,
     foliageDepth: 0.35,
     openness: 0.5,
     stems: 1,
-    forkShare: 0.55,
-    fork: 1,
-    forkSpread: 0.15,
-    forkStems: 3,
+    forkShare: 0.4,
+    fork: 0.45,
+    forkSpread: 0.3,
+    forkStems: 2,
     forkStemsMost: 3,
     stemShare: 0.1,
     stemRange: [2, 3],
@@ -1462,7 +1465,7 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     barkPale: 0.15,
     stiffness: 0.8,
     crownRound: 2.2,
-    canopyLift: 0.3,
+    canopyLift: 0.5,
   },
   // California Native Plant Society, San Diego (Platanus racemosa): 40+ ft tall, 30 ft spread, often several
   // trunks; Virginia Tech Dendrology: 40–100 ft. Crooked and open, pale mottled bark; Riviera has many.
