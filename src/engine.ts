@@ -37,7 +37,7 @@ import { ALPHA_CUT, type Pixels, coverageMips } from "./mips.ts";
 import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type FixedCards, type Pieces, TIER_SHAPES, cardPieces, dabPieces, sheetPieces, woodPieces } from "./geometry.ts";
 import { BARK_SIZE, type ScanLook, barkSet, leafSet, loadBark, loadLeaves, nearCardHalf, scanLookOf, setScanBase, upperColorCode } from "./scans.ts";
-import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow } from "./sprays.ts";
+import { BIG_CARD, NEAR_CARDS, SPRAY_COLS, drawSprayRow, needleOf } from "./sprays.ts";
 import { growTree } from "./grow.ts";
 import { PALM_ATLAS, PALM_ATLAS_CELL, PALM_PICTURES, drawnPalmAtlas, emptyPalmAtlas, layPicture, layStarburst } from "./palmAtlas.ts";
 import { palmPieces } from "./palmGeometry.ts";
@@ -71,7 +71,9 @@ const PIECE_BAND = 0.3;
 /** How far a pine card's alpha is left soft rather than sharpened at the cut, and how steep it is then about the cut. */
 const PINE_SOFT = 0.7;
 /** How far a pine's near cards and its big card close over the gaps between their needles a mip (`coverageMips`). */
-const PINE_NEAR_FILL = 0;
+const PINE_NEAR_FILL = 0.18;
+/** A pine's needles as long as this (m) or longer keep their near cards' gaps open as they are mipped. */
+const PINE_SHORT = 0.15;
 /** How many near cards to a pine's clump, as `FixedCards.fill`: this, and this much more for a dense one (openness 0). */
 const PINE_FILL = 0.45;
 const PINE_FILL_DENSE = 0.8;
@@ -841,6 +843,8 @@ export function createTrees(options: TreesOptions): Trees {
   // (The realistic look's cards with photographs: a row of cards for each species here, its three near ones
   // and its big one (sprays.ts); until the photographs come, its kind's two drawn sprays in their places.)
   const cardRows = Math.max(1, usedSpecies.length);
+  /** A card's cell in the photographs' atlas (texels square). */
+  const cardCell = scanOpts?.leafCell ?? (cardRows <= 6 ? 512 : 256);
   const uCardGrid = uniform(new THREE.Vector2(SPRAY_COLS, cardRows));
   const drawnCards = (): THREE.DataTexture => {
     const drawn = leafAtlasPixels();
@@ -1278,8 +1282,12 @@ export function createTrees(options: TreesOptions): Trees {
           const uv = sheetUv(vUv, under);
           const tex = markTex(marks, uv);
           // (A pine's needles: their outline only part sharpened, so a tuft's rim of needle tips, finer than a
-          // pixel a few dozen metres off, stays a soft fringe and not the hard edge of a leaf.)
-          const mark = vec4(tex.rgb, vPine ? mix(crisp(tex), clamp(tex.a.sub(0.5).mul(PINE_RIM).add(0.5), 0, 1), vPine.mul(PINE_SOFT)) : crisp(tex));
+          // pixel a few dozen metres off, stays a soft fringe and not the hard edge of a leaf. Only while a pixel
+          // is a few of the card's texels: further off its needles are averaged into its mip, and left soft
+          // there the tufts were a pale lace the sky showed through.)
+          const perPixel = max(fwidth(vUv.x), fwidth(vUv.y)).mul(cells.x).mul(cardCell);
+          const soft = vPine ? vPine.mul(PINE_SOFT).mul(float(1).sub(smoothstep(float(1.5), float(5), perPixel))) : null;
+          const mark = vec4(tex.rgb, soft ? mix(crisp(tex), clamp(tex.a.sub(0.5).mul(PINE_RIM).add(0.5), 0, 1), soft) : crisp(tex));
           Discard(mark.a.lessThan(uAlphaCut));
           let base: Vec3 = vTop && vUnder ? mix(vTop, vUnder, under) : vCol;
           base = base.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w));
@@ -1933,7 +1941,7 @@ export function createTrees(options: TreesOptions): Trees {
             uBarkOn.value = 1;
           }
           // The cards: each species' row drawn from its leaves' photographs (sprays.ts).
-          const C = scanOpts?.leafCell ?? (cardRows <= 6 ? 512 : 256);
+          const C = cardCell;
           const px: Pixels = { data: new Uint8Array(SPRAY_COLS * C * cardRows * C * 4), width: SPRAY_COLS * C, height: cardRows * C };
           for (const [row, sp] of usedSpecies.entries()) {
             const l = looks[sp];
@@ -1950,7 +1958,13 @@ export function createTrees(options: TreesOptions): Trees {
           // (A pine's cards close up over the gaps between their needles as they are mipped down, its big card
           // more: far off a tuft is a tuft's shape and a branch of them a mass of tufts, not a lace of needles
           // the sky shows through.)
-          const fills = usedSpecies.flatMap((sp) => (looks[sp].spray === "tufts" ? [PINE_NEAR_FILL, PINE_NEAR_FILL, PINE_NEAR_FILL, PINE_BIG_FILL] : [0, 0, 0, 0]));
+          // (Its near cards close up only as far as its needles are short: a long-needled pine's tufts are big
+          // enough to keep their spikes, a short-needled one's are a lace of small ones.)
+          const fills = usedSpecies.flatMap((sp) => {
+            if (looks[sp].spray !== "tufts") return [0, 0, 0, 0];
+            const near = PINE_NEAR_FILL * Math.min(1, Math.max(0, 1 - needleOf(looks[sp]) / PINE_SHORT));
+            return [near, near, near, PINE_BIG_FILL];
+          });
           const cards = atlasTexture(coverageMips(px, C, ALPHA_CUT, fills), 1);
           // (Shaders are built when first drawn: those built already are given the new cards, the rest read them.)
           for (const n of atlasNodes) n.value = cards;

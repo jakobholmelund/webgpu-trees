@@ -144,9 +144,12 @@ test("a dense species' big card is closed: leaves behind its own fill its gaps; 
   assert.equal(coverOf(look, false, 0.3), coverOf(look, false, 0.9));
 });
 
-test("a pine's tufts are drawn needle by needle, round its picture's brush", () => {
+test("a pine's tufts are drawn needle by needle, at its shoots' ends, a dense pine's branch more of them", () => {
   const look: ScanLook = { bark: "pine", leaves: "plain", leafCm: 25, spray: "tufts" };
-  // (Its near card and its big card both hold needles: more than its plain picture alone would cover.)
+  // (Its near card and its big card both hold needles, though its picture is a plain leaf; a branch of them is
+  // mostly sky, more crowded on a dense pine.)
   assert.ok(coverOf(look, false, 0) > 0.02);
-  assert.ok(coverOf(look, true, 0) > 0.02);
+  assert.ok(coverOf(look, true, 0) > 0.01);
+  assert.ok(coverOf(look, true, 0) < 0.25);
+  assert.ok(coverOf(look, true, 0.9) > coverOf(look, true, 0));
 });

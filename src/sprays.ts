@@ -43,6 +43,8 @@ const TUFT_BUNDLES = 18;
 const TUFT_BUNDLE_SPREAD = 0.1;
 /** The share of a tuft's needles that stand loose between its bundles. */
 const TUFT_LOOSE = 0.3;
+/** The shortest a pine's shoot that puts out more, in its needles' lengths. */
+const PINE_SHOOT = 2.2;
 /** A pine's needle when its look gives none: this share of its brush (`leafCm`). */
 const NEEDLE_OF_BRUSH = 0.45;
 const UNDER_TONE = 0.55;
@@ -124,7 +126,8 @@ function needleTuft(L: Layer, x: number, y: number, ang: number, len: number, rn
   const n = Math.round(Math.min(TUFT_MOST, Math.max(TUFT_LEAST, len * TUFT_NEEDLES)));
   const bundles = Math.max(7, Math.min(TUFT_BUNDLES, Math.round(n / 5)));
   const stretch = len * TUFT_STRETCH;
-  const w = Math.max(0.55, len * 0.012);
+  // (A needle at least most of a texel wide: thinner, a branch's card of them is a lace, little of it at the cut.)
+  const w = Math.max(0.7, len * 0.012);
   const ca = Math.cos(ang);
   const sa = Math.sin(ang);
   const needles: { bx: number; by: number; dx: number; dy: number; front: number; t: number }[] = [];
@@ -448,11 +451,12 @@ function nearSpray(look: ScanLook, extent: number, rnd: () => number, density = 
  * pine's branch is a candelabrum of separate tufts with sky between, not a mat of needles, which read as a
  * broad leaf's mass; a dense pine's (`density`) more crowded, an open one's sparser.
  */
-function pineShoots(reach: number, N: number, density: number, rnd: () => number): { twigs: Twig[]; leaves: LeafAt[] } {
+export function pineShoots(reach: number, N: number, density: number, rnd: () => number): { twigs: Twig[]; leaves: LeafAt[] } {
   const twigs: Twig[] = [];
   const leaves: LeafAt[] = [];
-  // (A shoot shorter than this ends in a tuft and puts out no more.)
-  const least = N * 1.3;
+  // (A shoot shorter than this ends in a tuft and puts out no more: a year's shoot is some twice its needles
+  // long, and its tufts were a mat of needles where its shoots were shorter.)
+  const least = N * PINE_SHOOT;
   const keep = 0.55 + 0.45 * Math.min(1, Math.max(0, density));
   const shoot = (x: number, y: number, a: number, len: number, r: number, depth: number) => {
     const pts = grow(x, y, a, len, (UP - a) * 0.35, rnd, 6, 0.06);
