@@ -147,6 +147,7 @@ const SHAPES: Record<(typeof KINDS)[number], { rim: number; fill: number; len: [
  * the middle filled with leaves pointing every way, some of the rim's laid again over them.
  */
 function cluster(kind: (typeof KINDS)[number], seed: number, scale: number): Leaf[] {
+  if (kind === "needle") return bough(seed, scale);
   const sh = SHAPES[kind];
   const rnd = rng(seed);
   const many = scale < 1 ? 0.75 / (scale * scale) : 1;
@@ -192,6 +193,54 @@ function cluster(kind: (typeof KINDS)[number], seed: number, scale: number): Lea
   shuffle(rimLeaves);
   const over = rimLeaves.splice(0, Math.floor(rimLeaves.length / 3));
   return [...back, ...rimLeaves, ...shuffle(middle), ...over];
+}
+
+/**
+ * A conifer's spray, as painters of stylized firs lay one: a bough across the mark, arching and drooping at
+ * its ends, its needles hanging from it in a fringe, longer below than above, so a crown of them is tiers of
+ * level boughs with ragged undersides. A darker fan of needles under it is its body. (`scale` below 1: two
+ * smaller boughs, one over the other, for a gathered dab.)
+ */
+function bough(seed: number, scale: number): Leaf[] {
+  const rnd = rng(seed);
+  const leaves: Leaf[] = [];
+  const sprays = scale < 1 ? [0.5, -0.05] : [0.38];
+  const s = scale < 1 ? 0.62 : 1;
+  for (const y0 of sprays) {
+    const reach = REACH * 0.9 * (scale < 1 ? 0.95 : 1);
+    const axis = (x: number) => y0 - 0.22 * s * (x / reach) ** 2;
+    // (Its body: broad dark blades along the bough, hanging a little.)
+    for (let k = 0; k < 5; k++) {
+      const x = (k / 4 - 0.5) * reach * 1.2;
+      const side = Math.sign(x) || (rnd() < 0.5 ? -1 : 1);
+      const len = (0.62 + rnd() * 0.2) * s * (1 - 0.35 * Math.abs(x / reach));
+      leaves.push({ x, y: axis(x) + 0.06 * s, ang: -Math.PI / 2 + side * (0.25 + rnd() * 0.4), len, wid: len * 0.42, p: 0.45, q: 1, bend: 0, tone: 0.64 + rnd() * 0.06, own: rnd(), sprig: 0 });
+    }
+    // (The needles: off both sides of the bough, those below hanging down and out, those above short and up.)
+    const count = Math.round(64 * s);
+    for (let k = 0; k < count; k++) {
+      const x = (rnd() * 2 - 1) * reach;
+      const out = x / reach;
+      const below = rnd() < 0.72;
+      const ang = below ? -Math.PI / 2 + out * 0.9 + (rnd() - 0.5) * 0.5 : Math.PI / 2 - out * 1.1 + (rnd() - 0.5) * 0.6;
+      // (Longest in the middle of the bough, shorter to its tip; above it, a short brush.)
+      const len = (below ? 0.3 + 0.5 * (1 - Math.abs(out) ** 2) * (0.4 + 0.6 * rnd()) : 0.1 + rnd() * 0.14) * s;
+      const y = axis(x);
+      // (Kept inside the cell.)
+      const tipY = y + Math.sin(ang) * len;
+      const fit = tipY < -REACH ? (y + REACH) / (y - tipY) : 1;
+      leaves.push({ x, y, ang, len: len * fit, wid: len * fit * 0.09, p: 0.35, q: 1, bend: (rnd() - 0.5) * 0.15, tone: 0.8 + rnd() * 0.2, own: rnd(), sprig: 0 });
+    }
+    // (The bough's tip: a few needles on along it, so it ends in a point.)
+    for (const side of [-1, 1]) {
+      const x = side * reach * 0.82;
+      for (let k = 0; k < 4; k++) {
+        const len = (0.12 + rnd() * 0.08) * s;
+        leaves.push({ x, y: axis(x), ang: (side > 0 ? 0 : Math.PI) - side * (0.25 + rnd() * 0.5), len, wid: len * 0.1, p: 0.35, q: 1, bend: 0, tone: 0.85 + rnd() * 0.15, own: rnd(), sprig: 0 });
+      }
+    }
+  }
+  return leaves;
 }
 
 /** Write one cell's layer into an atlas at column `col`, row `row` (row 0 is v = 0). */

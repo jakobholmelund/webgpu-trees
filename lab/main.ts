@@ -729,6 +729,8 @@ async function start() {
     if (typeof p === "string") return p;
     // (The list may be longer or shorter than before: the trees are made again from it, never re-read.)
     applyPreset(p);
+    // (A preset handed in is all of it, its look too, whatever the address said.)
+    if (p.look) state.look = p.look;
     refreshLook();
     chosen.row = Math.min(chosen.row, species.length - 1);
     rebuildSpecies();

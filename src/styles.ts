@@ -84,10 +84,10 @@ export const REAL_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 3, rou
  * (no bands), wrapping well round them, a cluster's leaves each a little their own tone, the lit side warm
  * and the shade cool, the colour a step richer than the species', a bright rim against the sun.
  */
-export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.4, dabScale: 1.3, through: 0.55, wrap: 0.5, strokes: 0.55, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.45, sprigs: 0, bright: 1.7 };
+export const PAINTERLY_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0.15, jitter: 0.4, dabScale: 1.4, through: 0.7, wrap: 0.5, strokes: 0.55, selfShade: 0.2, fullLight: 0.7, bark: 0, lobe: 0.8, bulge: 0.1, warm: 0.6, cool: 0.6, chroma: 1.35, rim: 0.6, sprigs: 0, bright: 1.7 };
 
 /** The sculpted look's style: clay lobes, lit smooth and soft, each dab a little ball on its lobe, a few sprigs. */
-export const SCULPTED_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0, jitter: 0.08, dabScale: 1.5, through: 0.3, wrap: 0.35, strokes: 0.25, selfShade: 0.25, fullLight: 0.8, bark: 0, lobe: 0.85, bulge: 0.45, warm: 0.45, cool: 0.5, chroma: 1.25, rim: 0.25, sprigs: 0.06, bright: 1.5 };
+export const SCULPTED_STYLE: TreeStyle = { ...DEFAULT_STYLE, steps: 0, bands: 4, round: 0, jitter: 0.08, dabScale: 1.5, through: 0.3, wrap: 0.35, strokes: 0.25, selfShade: 0.25, fullLight: 0.8, bark: 0, lobe: 0.85, bulge: 0.45, warm: 0.45, cool: 0.5, chroma: 1.25, rim: 0.25, sprigs: 0.14, bright: 1.5 };
 
 /** Each look's own style, which `trees.style` starts as. */
 export const LOOK_STYLES: Readonly<Record<TreeLook, TreeStyle>> = { stylized: DEFAULT_STYLE, painterly: PAINTERLY_STYLE, sculpted: SCULPTED_STYLE, real: REAL_STYLE };

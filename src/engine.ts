@@ -19,7 +19,7 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, Loop, atan, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, Loop, atan, fwidth, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
 import { makeLeafAtlas } from "./leaves.ts";
 import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
@@ -127,7 +127,6 @@ function markAtlas(which: "painterly" | "sculpted"): THREE.DataTexture {
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
-  tex.anisotropy = 4;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
@@ -153,7 +152,7 @@ export function createTrees(options: TreesOptions): Trees {
   const real = look === "real";
   // (Every look but the realistic one lays its leaves as dabs lit over the crown's lobes, as far as its style's
   // `lobe` says: the painted look's says not at all.)
-  const lobed = !real;
+  const lobed = !real && look !== "stylized";
   const style: TreeStyle = { ...LOOK_STYLES[look] };
   // (A lobed look's crowns gathered into lobes, which their dabs are lit over: lobes.ts.)
   const lobeShape = LOOK_LOBES[look];
@@ -169,14 +168,15 @@ export function createTrees(options: TreesOptions): Trees {
   plan.placements.forEach((p, i) => {
     treeData.set([p.x, p.y, p.z, p.yaw, p.size.height, p.size.crownBase, p.size.crownRadius, p.size.trunkRadius, p.tint[0], p.tint[1], p.tint[2], p.own, p.leanX, p.leanZ, p.mirror, p.variant], i * 16);
   });
-  // Two rows a variant: its size as grown; where its lists start, how long each is, and its species.
+  // Two rows a variant: its size as grown; where its lists start, how long each is, its species, and how many
+  // lobes its crown has (a lobed look's).
   const counts = plan.variants.map((v) => v.trees);
   const starts: number[] = [];
   counts.reduce((sum, n, v) => ((starts[v] = sum), sum + n), 0);
   const variantData = new Float32Array(Math.max(1, V) * 8);
   plan.variants.forEach((v, i) => {
     const g = grown[i].size;
-    variantData.set([g.height, g.crownBase, g.crownRadius, g.trunkRadius, starts[i] * TIERS, counts[i], v.species, 0], i * 8);
+    variantData.set([g.height, g.crownBase, g.crownRadius, g.trunkRadius, starts[i] * TIERS, counts[i], v.species, lobes[i]?.length ?? 0], i * 8);
   });
   // Four rows a species: its leaves' colour (linear) and how much it varies; its bark's, and how pale it
   // goes up the trunk; the colour of light through its leaves, and its stiffness; how fast its crown
@@ -496,7 +496,9 @@ export function createTrees(options: TreesOptions): Trees {
     // (A lobed look's dabs are lit pixel by pixel, over their lobe: what the vertex hands on for it.)
     let lobeLight: { shade: Vec4; lit: Vec4; rim: Vec3; q: Vec3; eye: Vec3; form: Vec3; corner: Vec3 } | null = null;
     // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
-    const sprig = look === "sculpted" && t === 0 ? step(float(1).sub(uStyle5.z), own) : float(0);
+    // (Only on the upper half of its lobe, as sprigs stand on the tops of clay masses: from below they would
+    // show as scraps.)
+    const sprig = look === "sculpted" && t === 0 && lobed ? step(float(1).sub(uStyle5.z), own).mul(step(attribute<"vec4">("aLobe", "vec4").y, positionGeometry.y)) : float(0);
 
     if (!stroke) {
       // Where the dab's centre is, in the wind.
@@ -527,8 +529,8 @@ export function createTrees(options: TreesOptions): Trees {
           const best = vec4(lobeAt, lobeR).toVar();
           const nearest = float(1e9).toVar();
           const ray = normalize(at.sub(cameraPosition));
-          Loop(MAX_LOBES, ({ i }) => {
-            const L = lobesR.element(uint(aLimb.w).mul(MAX_LOBES).add(uint(i)));
+          Loop({ start: uint(0), end: uint(T.vrow1.w), type: "uint", condition: "<" }, ({ i }) => {
+            const L = lobesR.element(uint(aLimb.w).mul(MAX_LOBES).add(i));
             If(L.w.greaterThan(0), () => {
               const c = toWorld(T, fit.point(L.xyz).add(blown));
               const r = L.w.mul(fit.size);
@@ -583,7 +585,7 @@ export function createTrees(options: TreesOptions): Trees {
         // (The rim of a lobe, against the light: the sun through its thin edge, more the more the eye looks
         // towards the sun, and the sky's light round it.)
         const against = float(0.3).add(smoothstep(float(-0.3), float(0.9), dot(toEye.negate(), uSun)).mul(0.9));
-        const rimCol = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(against.mul(C.cloud).mul(sqrt(C.sunIn))).add(albedo.mul(uShadeTint).mul(0.35)).mul(uStyle5.y).mul(1.6);
+        const rimCol = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(against.mul(C.cloud).mul(sqrt(C.sunIn))).add(albedo.mul(uShadeTint).mul(0.35)).mul(uStyle5.y).mul(3);
         const shadeAir = intoAir(shade, at);
         const litAir = intoAir(lit, at);
         const rimAir = intoAir(rimCol, at).sub(intoAir(vec3(0), at));
@@ -611,6 +613,11 @@ export function createTrees(options: TreesOptions): Trees {
       const upCam = cameraWorldMatrix.mul(vec4(0, 1, 0, 0)).xyz;
       const flutter = sin(uTime.mul(5.3).add(own.mul(40))).mul(0.08).mul(clamp(uWind.z.div(6), 0.1, 1.5));
       let ang: Float = own.mul(6.283).add(flutter);
+      if (look === "painterly") {
+        // (A painterly conifer's sprays are boughs: kept level, give or take a little, hanging their needles.)
+        const needle = select(T.srow(3).z.equal(float(LEAF_KIND_ROWS.indexOf("needle"))), float(1), float(0));
+        ang = mix(ang, own.sub(0.5).mul(0.5).add(flutter), needle);
+      }
       if (lobeAt && look === "sculpted") {
         // (A sprig stands up out of its lobe, as the eye sees it: its picture's up turned away from the lobe's middle.)
         const out = at.sub(lobeAt);
@@ -667,8 +674,8 @@ export function createTrees(options: TreesOptions): Trees {
       const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
       const cell = real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
       const cells = real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
-      const vCell = varying(cell, "vTreeCell");
-      const vSpin = varying(aDab.xy, "vTreeUv");
+      // (Where in the atlas each corner is: linear across the dab, so worked out once a corner.)
+      const vUv = varying(cell.add(aDab.xy.mul(0.5).add(0.5)).div(cells), "vTreeUv");
       if (lobeLight) {
         const L = lobeLight;
         const vShade = varying(L.shade, "vTreeShade");
@@ -682,8 +689,13 @@ export function createTrees(options: TreesOptions): Trees {
         const leafy = look === "painterly" || look === "sculpted" ? 1 : 0;
         m.colorNode = Fn(() => {
           handOver(vShares);
-          const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
-          const mark = texture(atlas, cuv);
+          const tex = texture(atlas, vUv);
+          // (Its outline kept crisp however near: where a texel covers more than a pixel, the edge's ramp drawn
+          // over one pixel, not over however many a texel spans. Smaller, as the mips have it, so a far crown keeps
+          // the coverage it should.)
+          const sharp = clamp(tex.a.sub(0.5).div(clamp(fwidth(tex.a), float(1e-3), float(1))).add(0.5), 0, 1);
+          const texels = max(fwidth(vUv.x).mul(atlas.image.width), fwidth(vUv.y).mul(atlas.image.height));
+          const mark = vec4(tex.rgb, mix(tex.a, sharp, smoothstep(float(1.2), float(0.6), texels)));
           Discard(mark.a.lessThan(uAlphaCut));
           const eye = normalize(vEye);
           // (A point on a ball seen from the eye, from where it is across the ball's disc in its radii; held
@@ -700,18 +712,17 @@ export function createTrees(options: TreesOptions): Trees {
           const raw = clamp(smoothstep(uStyle2.z.negate(), uStyle3.y, dot(n, uSun)).mul(vShade.w).add(vLit.w).add(ownLeaf), 0, 1);
           const bands = max(uStyle.y, float(1));
           const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
-          const edge = pow(float(1).sub(max(dot(n, eye), float(0))), float(3));
+          const edge = pow(float(1).sub(max(dot(n, eye), float(0))), float(2));
           let col = mix(vShade.xyz, vLit.xyz, lit).add(vRim.mul(edge));
           // (A sprig is a little lighter than the clay it stands on.)
-          col = col.mul(float(1).add(mark.b.mul(0.3)));
+          col = col.mul(float(1).add(mark.b.mul(0.45)));
           return vec4(col.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
         })();
       } else {
         const vCol = varying(colour, "vTreeCol");
         m.colorNode = Fn(() => {
           handOver(vShares);
-          const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
-          const mark = texture(atlas, cuv);
+          const mark = texture(atlas, vUv);
           Discard(mark.a.lessThan(uAlphaCut));
           return vec4(vCol.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
         })();
