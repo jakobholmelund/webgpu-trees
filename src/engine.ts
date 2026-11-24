@@ -78,7 +78,7 @@ const PINE_NEAR_FILL = 0.18;
 const PINE_SHORT = 0.15;
 /** How many near cards to a pine's clump, as `FixedCards.fill`: this, and this much more for a dense one (openness 0). */
 const PINE_FILL = 0.45;
-const PINE_FILL_DENSE = 0.8;
+const PINE_FILL_DENSE = 1.2;
 const PINE_BIG_FILL = 0.3;
 const PINE_RIM = 1.5;
 /** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
@@ -404,7 +404,7 @@ export function createTrees(options: TreesOptions): Trees {
     return l.spray === "whole" || l.spray === "fan" ? { half, fill: 1, most: 2, big: 0, bigSize: 1, hang: 0 } : l.spray === "tufts"
         ? // (A pine's shoots, each a few tufts with air between: as many to a clump as it is dense, and no big
           // card under them, whose picture a clump wide, close to, was a lump, a broad leaf's.)
-          { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 24, big: 0, bigSize: 1, hang: 0, rise: 0.8 }
+          { half, fill: PINE_FILL + PINE_FILL_DENSE * (1 - species[v.species].openness), most: 36, big: 0, bigSize: 1, hang: 0, rise: 0.8 }
         : l.spray === "sprays"
         ? // (Needles and scales in whole sprays leave more air between them: three big cards under them.)
           { half, fill: 0.5, most: 36, big: 3, bigSize: 1.3, hang: l.hang ?? 0 }
