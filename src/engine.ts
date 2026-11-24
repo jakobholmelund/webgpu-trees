@@ -19,9 +19,12 @@
 // frame to the next.
 
 import * as THREE from "three/webgpu";
-import { Fn, If, atan, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
+import { Fn, If, Loop, atan, atomicAdd, atomicLoad, atomicStore, attribute, bitXor, cameraPosition, cameraWorldMatrix, clamp, cos, cross, dot, exp, float, floor, instanceIndex, length, max, min, mix, mod, normalize, positionGeometry, pow, screenCoordinate, select, shiftRight, sin, smoothstep, sqrt, step, storage, texture, uint, uniform, uniformArray, varying, vec2, vec3, vec4, Discard } from "three/tsl";
 import { makeDabAtlas } from "./dabs.ts";
 import { makeLeafAtlas } from "./leaves.ts";
+import { crownLobes, lobeCount, withLobes } from "./lobes.ts";
+import { PAINTERLY_COLS, PAINTERLY_ROWS, SCULPTED_COLS, SCULPTED_ROWS, painterlyAtlasPixels, sculptedAtlasPixels } from "./marks.ts";
+import { LOOK_LOBES, LOOK_STYLES, type TreeLook, type TreeStyle } from "./styles.ts";
 import { type Pieces, TIER_SHAPES, cardPieces, dabPieces, woodPieces } from "./geometry.ts";
 import { growTree } from "./grow.ts";
 import { LEAF_KIND_ROWS, type TreeSpecies } from "./species.ts";
@@ -35,52 +38,8 @@ type Vec4 = THREE.Node<"vec4">;
 type UInt = THREE.Node<"uint">;
 
 const TIERS = 3;
-
-/** How the trees are drawn, apart from what they are. Change it at any time: it is read each frame. */
-export interface TreeStyle {
-  /** How far a crown's light is laid in flat bands, as paint is, 0 (smooth) to 1 (bands only). */
-  steps: number;
-  /** How many bands of light, from shade to sun. */
-  bands: number;
-  /** How round each clump of leaves is lit, 0 (as the crown's outside faces) to 1 (each clump a ball of its own). */
-  round: number;
-  /** How much one dab differs in tone from the next, 0..1. */
-  jitter: number;
-  /** How big the dabs are, beside what covers their clump: 1 as grown. */
-  dabScale: number;
-  /** How much sunlight comes through the leaves to an eye looking towards the sun, 0..1. */
-  through: number;
-  /** How far the light wraps round past the side of a clump facing away from the sun, 0..1. */
-  wrap: number;
-  /** How strongly the brush's strokes show in a dab, 0..1. */
-  strokes: number;
-  /**
-   * How far a crown shades itself, 0..1: 1, as much as the light lost through its leaves makes it (Monsi and
-   * Saeki); 0, not at all, every leaf facing the sun as lit as the crown's outside. A painter keeps less of it
-   * than there is.
-   */
-  selfShade: number;
-  /** How square to the sun a leaf must face to take all of it: 0.65 lights a form as a painter does, 1 as the sun does. */
-  fullLight: number;
-  /** How furrowed the bark is, 0 (smooth, a painted trunk) to 1. */
-  bark: number;
-  /** How far a realistic tree's near leaf cards turn towards the eye, 0..1: none at all shows some edge-on as slivers. */
-  faceEye: number;
-}
-
-export const DEFAULT_STYLE: TreeStyle = { steps: 0.75, bands: 3, round: 0.45, jitter: 0.35, dabScale: 1, through: 0.5, wrap: 0.35, strokes: 0.6, selfShade: 0.5, fullLight: 0.65, bark: 0, faceEye: 0.35 };
-
-/** The realistic look's style: light as the sun gives it, the crown's shade, light through the leaves, furrowed bark. */
-// (selfShade a half, as the painted look's: the crown's own shade taken in full, through a whole leafy
-// shell, leaves out the light the leaves scatter to one another, and a sunlit crown comes out dark.)
-export const REAL_STYLE: TreeStyle = { steps: 0, bands: 3, round: 0.3, jitter: 0.15, dabScale: 1, through: 0.8, wrap: 0.3, strokes: 1, selfShade: 0.45, fullLight: 0.9, bark: 1, faceEye: 0.35 };
-
-/**
- * How the trees are drawn, chosen when they are made (the pieces differ, not only the light): `stylized`,
- * crowns laid in dabs of paint; `real`, near crowns of leaf cards set in the crown, each a spray of the
- * species' leaves, and far ones of the same sprays.
- */
-export type TreeLook = "stylized" | "real";
+/** The most lobes a crown is lit as (styles.ts LOOK_LOBES keeps under it). */
+const MAX_LOBES = 32;
 
 /** At what size in the picture each tier takes over, and how far trees are drawn at all. Read each frame. */
 export interface TreeDetail {
@@ -112,7 +71,7 @@ export interface TreesOptions {
   world?: TreeWorld;
   /** Grow trees some other way than this library's (see `growTree`). */
   grow?: (species: TreeSpecies, size: TreeSize, seed: number) => GrownTree;
-  /** The look (`stylized` unless given). `style` starts as the look's (DEFAULT_STYLE or REAL_STYLE). */
+  /** The look (`stylized` unless given). `style` starts as the look's (`LOOK_STYLES`). */
   look?: TreeLook;
 }
 
@@ -159,6 +118,21 @@ export interface Trees {
   dispose(): void;
 }
 
+/** The painterly or the sculpted look's marks (marks.ts), as a texture: worked out once a page, then shared. */
+const markPixels: Partial<Record<"painterly" | "sculpted", { data: Uint8Array; width: number; height: number }>> = {};
+function markAtlas(which: "painterly" | "sculpted"): THREE.DataTexture {
+  const px = (markPixels[which] ??= which === "painterly" ? painterlyAtlasPixels() : sculptedAtlasPixels());
+  const tex = new THREE.DataTexture(px.data, px.width, px.height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function linear(hex: string): THREE.Color {
   return new THREE.Color(hex);
 }
@@ -177,7 +151,13 @@ export function createTrees(options: TreesOptions): Trees {
   group.name = "trees";
   const look: TreeLook = options.look ?? "stylized";
   const real = look === "real";
-  const style: TreeStyle = { ...(real ? REAL_STYLE : DEFAULT_STYLE) };
+  // (Every look but the realistic one lays its leaves as dabs lit over the crown's lobes, as far as its style's
+  // `lobe` says: the painted look's says not at all.)
+  const lobed = !real;
+  const style: TreeStyle = { ...LOOK_STYLES[look] };
+  // (A lobed look's crowns gathered into lobes, which their dabs are lit over: lobes.ts.)
+  const lobeShape = LOOK_LOBES[look];
+  const lobes = lobed ? grown.map((g) => crownLobes(g, Math.min(MAX_LOBES, lobeCount(g, lobeShape.share, lobeShape.least, lobeShape.most)))) : [];
   const detail: TreeDetail = { ...DEFAULT_DETAIL };
   const show = { near: true, mid: true, far: true, wood: true, leaves: true };
 
@@ -220,6 +200,11 @@ export function createTrees(options: TreesOptions): Trees {
   const treesR = storage(treeAttr, "vec4", treeData.length / 4).toReadOnly();
   const variantsR = storage(variantAttr, "vec4", variantData.length / 4).toReadOnly();
   const speciesR = storage(speciesAttr, "vec4", speciesData.length / 4).toReadOnly();
+  // (A lobed look's lobes, MAX_LOBES places a variant: centre (its own frame) and radius, 0 where there is none.)
+  const lobeData = new Float32Array(Math.max(1, V) * MAX_LOBES * 4);
+  lobes.forEach((list, v) => list.slice(0, MAX_LOBES).forEach((l, i) => lobeData.set([l.x, l.y, l.z, l.radius], (v * MAX_LOBES + i) * 4)));
+  const lobeAttr = new THREE.StorageBufferAttribute(lobeData, 4);
+  const lobesR = storage(lobeAttr, "vec4", lobeData.length / 4).toReadOnly();
 
   // The lists: for each variant, a run of places for each tier, as many as it has trees.
   const visibleAttr = new THREE.StorageBufferAttribute(new Uint32Array(Math.max(1, N * TIERS)), 1);
@@ -234,7 +219,7 @@ export function createTrees(options: TreesOptions): Trees {
   // (The realistic look's near and mid leaves are cards set in the crown; far off, both looks' are dabs.)
   // (Mid trees too: gathered into broad billboards, the leaf sprays smeared into blots; two large cards a
   // clump keep a crown of leaves at a cost the mid tier can carry.)
-  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8) : real && t === 1 ? cardPieces(grown, 2, 1.45) : dabPieces(grown, s)));
+  const dabSets: Pieces[] = TIER_SHAPES.map((s, t) => (real && t === 0 ? cardPieces(grown, 12, 0.8) : real && t === 1 ? cardPieces(grown, 2, 1.45) : lobed ? withLobes(dabPieces(grown, s), lobes) : dabPieces(grown, s)));
   const strokeSets: Pieces[] = TIER_SHAPES.map((s) => dabPieces(grown, s, "stroke"));
   const woodSets: Pieces[] = TIER_SHAPES.map((s) => woodPieces(grown, s));
   const makeArgs = (sets: Pieces[]) => {
@@ -269,6 +254,10 @@ export function createTrees(options: TreesOptions): Trees {
   const uStyle2 = uniform(new THREE.Vector4());
   /** selfShade, fullLight, bark, faceEye. */
   const uStyle3 = uniform(new THREE.Vector4(0.5, 0.65, 0, 0.35));
+  /** lobe, bulge, warm, cool. */
+  const uStyle4 = uniform(new THREE.Vector4(0, 0, 0, 0));
+  /** chroma, rim, sprigs, bright. */
+  const uStyle5 = uniform(new THREE.Vector4(1, 0, 0, 1));
   /** Below this a dab's texel is not drawn: next to nothing with alpha to coverage, half without it. */
   const uAlphaCut = uniform(0.02);
 
@@ -487,7 +476,7 @@ export function createTrees(options: TreesOptions): Trees {
     Discard(s.lessThan(shares.x).or(s.greaterThanEqual(shares.y)));
   };
 
-  const atlas = real ? makeLeafAtlas() : makeDabAtlas();
+  const atlas = real ? makeLeafAtlas() : look === "painterly" ? markAtlas("painterly") : look === "sculpted" ? markAtlas("sculpted") : makeDabAtlas();
 
   // ---- The dabs. ----
 
@@ -502,15 +491,62 @@ export function createTrees(options: TreesOptions): Trees {
     const T = treeOf(t, aLimb.w);
     const fit = fitOf(T);
     const own = aDab.w;
-    let colour: Vec3;
+    let colour: Vec3 = vec3(0);
     let position: Vec3;
+    // (A lobed look's dabs are lit pixel by pixel, over their lobe: what the vertex hands on for it.)
+    let lobeLight: { shade: Vec4; lit: Vec4; rim: Vec3; q: Vec3; eye: Vec3; form: Vec3; corner: Vec3 } | null = null;
+    // (Which picture in the atlas a sculpted dab takes: a sprig, or one of three discs.)
+    const sprig = look === "sculpted" && t === 0 ? step(float(1).sub(uStyle5.z), own) : float(0);
 
     if (!stroke) {
       // Where the dab's centre is, in the wind.
-      const centre = fit.point(positionGeometry);
+      let centre = fit.point(positionGeometry);
       const limb = fit.point(aLimb.xyz);
       const onLimb = select(aLimb.y.lessThan(-0.5), float(0), float(1));
-      const at = toWorld(T, centre.add(windAt(T, centre, limb, onLimb)));
+      const blown = windAt(T, centre, limb, onLimb);
+      // (Its lobe's centre, carried by the same wind as the dab, and how far it reaches: lobes.ts.)
+      const aLobe = lobed ? attribute<"vec4">("aLobe", "vec4") : null;
+      const lobeAt = aLobe ? toWorld(T, fit.point(aLobe.xyz).add(blown)) : null;
+      const lobeR = aLobe ? max(aLobe.w.mul(fit.size), float(0.05)) : null;
+      // (A sprig stands on its lobe's skin, out from its middle, where it shows.)
+      if (aLobe && look === "sculpted") {
+        const lc = fit.point(aLobe.xyz);
+        const out = centre.sub(lc);
+        const onSkin = lc.add(out.div(max(length(out), float(1e-3))).mul(aLobe.w.mul(fit.size).mul(0.92)));
+        centre = mix(centre, onSkin, sprig);
+      }
+      const at = toWorld(T, centre.add(blown));
+      // (The lobe it is lit by: the one whose ball the eye's ray through it meets first, as solid masses hide
+      // one another; its own, nearest, where the ray meets none (a leaf standing out of the crown's outline).
+      // Lobes overlap, and lit each by its own the dabs of two lobes would interleave in a patchwork.)
+      let frontAt: Vec3 | null = null;
+      let frontR: Float | null = null;
+      if (lobeAt && lobeR) {
+        // (Statements, so a function of their own: TSL keeps a loop only inside one.)
+        const front = Fn(() => {
+          const best = vec4(lobeAt, lobeR).toVar();
+          const nearest = float(1e9).toVar();
+          const ray = normalize(at.sub(cameraPosition));
+          Loop(MAX_LOBES, ({ i }) => {
+            const L = lobesR.element(uint(aLimb.w).mul(MAX_LOBES).add(uint(i)));
+            If(L.w.greaterThan(0), () => {
+              const c = toWorld(T, fit.point(L.xyz).add(blown));
+              const r = L.w.mul(fit.size);
+              const oc = c.sub(cameraPosition);
+              const along = dot(oc, ray);
+              const miss = dot(oc, oc).sub(along.mul(along));
+              const enter = along.sub(sqrt(max(r.mul(r).sub(miss), float(0))));
+              If(miss.lessThan(r.mul(r)).and(enter.lessThan(nearest)), () => {
+                nearest.assign(enter);
+                best.assign(vec4(c, r));
+              });
+            });
+          });
+          return best;
+        })();
+        frontAt = front.xyz;
+        frontR = max(front.w, float(0.05));
+      }
 
       // Which way it faces: the crown's outside here, turned towards its clump's face and its own place on
       // the clump as far as `round` says (the crown's form first, then its clumps'); lit as one stroke of
@@ -525,35 +561,65 @@ export function createTrees(options: TreesOptions): Trees {
       const nClump = card ? normalize(mix(seen, dirToWorld(T, fit.normal(aNormal.xyz)), uStyle.z)) : dirToWorld(T, fit.normal(normalize(aNormal.xyz.add(aOffset.xyz.mul(0.6)))));
       const nLit = card ? nClump : normalize(mix(C.form, nClump, uStyle.z));
       const jit = own.sub(0.5).mul(uStyle.w);
-      const raw = clamp(sunOn(C, nLit, uStyle2.z).add(jit.mul(0.35)), 0, 1);
-      const bands = max(uStyle.y, float(1));
-      const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
       const leaf = T.srow(0);
       const tone = float(1).add(jit.mul(leaf.w).mul(0.6));
-      const albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
+      let albedo = leaf.xyz.mul(T.r2.xyz).mul(tone).mul(vec3(float(1).add(jit.mul(0.06)), 1, float(1).sub(jit.mul(0.1))));
       // (Deep in the crown the leaves see little sky as well as little sun: the crown's own shade.)
       const sky = C.sky.mul(mix(float(1), float(0.7), aNormal.w));
       // (The sun through the leaves, to an eye looking towards it: strongest where little crown lies between.)
       const toward = pow(max(dot(toEye.negate(), uSun), float(0)), float(4));
-      const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
-      colour = albedo.mul(mix(uShadeTint.mul(sky), uSunTint, lit)).add(through);
-      if (card) {
-        // (A leaf seen from the side away from the sun is lit through: a thin leaf passes on about as much
-        // light as it sends back, greener and warmer (throughTint), by how squarely the sun is behind it.)
-        const behind = max(dot(nLit, uSun).negate(), float(0)).mul(C.sunIn).mul(C.cloud);
-        colour = colour.add(albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(behind.mul(uStyle2.y).mul(0.75)));
+      if (lobed) {
+        // (Its colour as rich as the style says: away from its own grey, or towards it.)
+        const grey = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
+        albedo = max(mix(vec3(grey), albedo, uStyle5.x), vec3(0));
+        const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
+        // (The light turned warm and the shade cool, as a painter lays them, each keeping about its brightness:
+        // a yellow-green where the sun falls, a teal blue-green where only the sky does. The host's tints
+        // stay in charge; the style turns them.)
+        const lum = (c: Vec3): Float => dot(c, vec3(0.2126, 0.7152, 0.0722));
+        const hueOf = (hue: Vec3, by: Float): Vec3 => mix(albedo, hue.mul(lum(albedo).div(lum(hue))), by);
+        const shade = hueOf(vec3(0.07, 0.4, 0.62), uStyle4.w.mul(0.8)).mul(uShadeTint).mul(sky).add(through);
+        const lit = hueOf(vec3(0.6, 0.85, 0.12), uStyle4.z.mul(0.7)).mul(uSunTint).mul(uStyle5.w).add(through);
+        // (The rim of a lobe, against the light: the sun through its thin edge, more the more the eye looks
+        // towards the sun, and the sky's light round it.)
+        const against = float(0.3).add(smoothstep(float(-0.3), float(0.9), dot(toEye.negate(), uSun)).mul(0.9));
+        const rimCol = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(against.mul(C.cloud).mul(sqrt(C.sunIn))).add(albedo.mul(uShadeTint).mul(0.35)).mul(uStyle5.y).mul(1.6);
+        const shadeAir = intoAir(shade, at);
+        const litAir = intoAir(lit, at);
+        const rimAir = intoAir(rimCol, at).sub(intoAir(vec3(0), at));
+        // (Its corner and where it is on its lobe's ball as the eye sees it: the corner's offset from the lobe's
+        // centre, square to the eye, in the lobe's radii. Across the dab this runs linearly, so the pixel's own
+        // place on the ball comes out of it exactly.)
+        lobeLight = { shade: vec4(shadeAir, C.sunIn.mul(C.cloud)), lit: vec4(litAir, jit.mul(0.35)), rim: rimAir, q: vec3(0), eye: toEye, form: nLit, corner: vec3(0) };
+      } else {
+        const raw = clamp(sunOn(C, nLit, uStyle2.z).add(jit.mul(0.35)), 0, 1);
+        const bands = max(uStyle.y, float(1));
+        const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
+        const through = albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(toward.mul(uStyle2.y).mul(sqrt(C.sunIn)).mul(0.9));
+        colour = albedo.mul(mix(uShadeTint.mul(sky), uSunTint, lit)).add(through);
+        if (card) {
+          // (A leaf seen from the side away from the sun is lit through: a thin leaf passes on about as much
+          // light as it sends back, greener and warmer (throughTint), by how squarely the sun is behind it.)
+          const behind = max(dot(nLit, uSun).negate(), float(0)).mul(C.sunIn).mul(C.cloud);
+          colour = colour.add(albedo.mul(T.srow(2).xyz).mul(uSunTint).mul(behind.mul(uStyle2.y).mul(0.75)));
+        }
+        colour = intoAir(colour, at);
       }
-      colour = intoAir(colour, at);
 
       // The corner: turned to face the eye, and spun to an angle of its own (with a flutter in the wind).
       const right = cameraWorldMatrix.mul(vec4(1, 0, 0, 0)).xyz;
       const upCam = cameraWorldMatrix.mul(vec4(0, 1, 0, 0)).xyz;
       const flutter = sin(uTime.mul(5.3).add(own.mul(40))).mul(0.08).mul(clamp(uWind.z.div(6), 0.1, 1.5));
-      const ang = own.mul(6.283).add(flutter);
+      let ang: Float = own.mul(6.283).add(flutter);
+      if (lobeAt && look === "sculpted") {
+        // (A sprig stands up out of its lobe, as the eye sees it: its picture's up turned away from the lobe's middle.)
+        const out = at.sub(lobeAt);
+        ang = mix(ang, atan(dot(out, upCam), dot(out, right)).sub(1.5708).add(flutter), sprig);
+      }
       const ca = cos(ang);
       const sa = sin(ang);
       const corner = vec2(ca.mul(aDab.x).sub(sa.mul(aDab.y)), sa.mul(aDab.x).add(ca.mul(aDab.y)));
-      const size = aDab.z.mul(fit.size).mul(uStyle2.x);
+      const size = aDab.z.mul(fit.size).mul(uStyle2.x).mul(mix(float(1), float(0.7), sprig));
       if (card) {
         // (Its twig runs along `aTangent`, fitted and turned as the tree is, and kept square to its face.)
         const aTangent = attribute<"vec4">("aTangent", "vec4");
@@ -563,7 +629,13 @@ export function createTrees(options: TreesOptions): Trees {
         const sway = vec2(aDab.x, aDab.y).add(vec2(flutter.mul(0.5), flutter));
         position = at.add(across.mul(sway.x.mul(size))).add(twig.mul(sway.y.mul(size)));
       } else {
-        position = at.add(right.mul(corner.x.mul(size))).add(upCam.mul(corner.y.mul(size)));
+        const cornerW = right.mul(corner.x).add(upCam.mul(corner.y));
+        position = at.add(cornerW.mul(size));
+        if (lobeLight && frontAt && frontR) {
+          const d = position.sub(frontAt);
+          lobeLight.q = d.sub(toEye.mul(dot(d, toEye))).div(frontR);
+          lobeLight.corner = cornerW;
+        }
       }
     } else {
       // The trunk's stroke stands upright from the ground into the crown, turned about its own axis to the
@@ -581,25 +653,71 @@ export function createTrees(options: TreesOptions): Trees {
     }
     m.positionNode = position;
 
-    const vCol = varying(colour, "vTreeCol");
     const vShares = varying(sharesFor(t, T), "vTreeShares");
     if (!stroke) {
-      // (Which picture in the atlas: one of four brush marks; or, for the realistic look, one of the two sprays
-      // of the species' kind of leaf, four columns by two rows, `leafCell` in leaves.ts.)
+      // (Which picture in the atlas: one of four brush marks; for the realistic look, one of the two sprays of
+      // the species' kind of leaf, four columns by two rows, `leafCell` in leaves.ts; for the painterly look,
+      // one of three clusters of its kind of leaf near, the cluster of smaller leaves for a gathered dab
+      // (marks.ts); for the sculpted, one of three discs or a sprig.)
       const kind = T.srow(3).z;
       const realCell = vec2(mod(kind, float(2)).mul(2).add(step(float(0.5), own)), floor(kind.div(2)));
-      const vCell = varying(real ? realCell : vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2))), "vTreeCell");
+      const paintedCell = vec2(mod(floor(own.mul(4)), float(2)), floor(floor(own.mul(4)).div(2)));
+      const painterlyCell = vec2(t === 0 ? floor(own.mul(2.999)) : float(3), kind);
+      const disc = floor(own.mul(7.31).fract().mul(2.999));
+      const sculptedCell = mix(vec2(mod(disc, float(2)), floor(disc.div(2))), vec2(1, 1), sprig);
+      const cell = real ? realCell : look === "painterly" ? painterlyCell : look === "sculpted" ? sculptedCell : paintedCell;
+      const cells = real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : look === "painterly" ? vec2(PAINTERLY_COLS, PAINTERLY_ROWS) : look === "sculpted" ? vec2(SCULPTED_COLS, SCULPTED_ROWS) : vec2(2, 2);
+      const vCell = varying(cell, "vTreeCell");
       const vSpin = varying(aDab.xy, "vTreeUv");
-      m.colorNode = Fn(() => {
-        handOver(vShares);
-        // (The leaf atlas: four columns, two kinds of leaf to a row; leaves.ts `leafCell`.)
-        const cells = real ? vec2(4, Math.ceil(LEAF_KIND_ROWS.length / 2)) : vec2(2, 2);
-        const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
-        const mark = texture(atlas, cuv);
-        Discard(mark.a.lessThan(uAlphaCut));
-        return vec4(vCol.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
-      })();
+      if (lobeLight) {
+        const L = lobeLight;
+        const vShade = varying(L.shade, "vTreeShade");
+        const vLit = varying(L.lit, "vTreeLit");
+        const vRim = varying(L.rim, "vTreeRim");
+        const vQ = varying(L.q, "vTreeLobe");
+        const vEye = varying(L.eye, "vTreeEye");
+        const vForm = varying(L.form, "vTreeForm");
+        const vCorner = varying(L.corner, "vTreeCorner");
+        // (Whether its marks are leaves, whose own number lights each leaf its own way.)
+        const leafy = look === "painterly" || look === "sculpted" ? 1 : 0;
+        m.colorNode = Fn(() => {
+          handOver(vShares);
+          const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
+          const mark = texture(atlas, cuv);
+          Discard(mark.a.lessThan(uAlphaCut));
+          const eye = normalize(vEye);
+          // (A point on a ball seen from the eye, from where it is across the ball's disc in its radii; held
+          // just inside the disc's edge, where a dab reaches past its lobe's outline.)
+          const ball = (q: Vec3): Vec3 => {
+            const l2 = dot(q, q);
+            const qs = q.mul(min(float(1), float(0.995).div(sqrt(max(l2, float(1e-6))))));
+            return normalize(qs.add(eye.mul(sqrt(max(float(1).sub(dot(qs, qs)), float(0))))));
+          };
+          const nLobe = ball(vQ);
+          const nBulge = ball(vCorner.div(0.9));
+          const n = normalize(mix(mix(normalize(vForm), nLobe, uStyle4.x), nBulge, uStyle4.y));
+          const ownLeaf = mark.g.sub(0.5).mul(uStyle.w).mul(0.5 * leafy);
+          const raw = clamp(smoothstep(uStyle2.z.negate(), uStyle3.y, dot(n, uSun)).mul(vShade.w).add(vLit.w).add(ownLeaf), 0, 1);
+          const bands = max(uStyle.y, float(1));
+          const lit = mix(raw, floor(raw.mul(bands).add(0.5)).div(bands), uStyle.x);
+          const edge = pow(float(1).sub(max(dot(n, eye), float(0))), float(3));
+          let col = mix(vShade.xyz, vLit.xyz, lit).add(vRim.mul(edge));
+          // (A sprig is a little lighter than the clay it stands on.)
+          col = col.mul(float(1).add(mark.b.mul(0.3)));
+          return vec4(col.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
+        })();
+      } else {
+        const vCol = varying(colour, "vTreeCol");
+        m.colorNode = Fn(() => {
+          handOver(vShares);
+          const cuv = vCell.add(vSpin.mul(0.5).add(0.5)).div(cells);
+          const mark = texture(atlas, cuv);
+          Discard(mark.a.lessThan(uAlphaCut));
+          return vec4(vCol.mul(mix(float(1), mark.r.mul(1.12), uStyle2.w)), mark.a);
+        })();
+      }
     } else {
+      const vCol = varying(colour, "vTreeCol");
       m.colorNode = Fn(() => {
         handOver(vShares);
         return vec4(vCol, 1);
@@ -817,6 +935,8 @@ export function createTrees(options: TreesOptions): Trees {
       uStyle.value.set(style.steps, style.bands, style.round, style.jitter);
       uStyle2.value.set(style.dabScale, style.through, style.wrap, style.strokes);
       uStyle3.value.set(style.selfShade, style.fullLight, style.bark, style.faceEye);
+      uStyle4.value.set(style.lobe, style.bulge, style.warm, style.cool);
+      uStyle5.value.set(style.chroma, style.rim, style.sprigs, style.bright);
       uAlphaCut.value = (renderer.samples ?? 0) > 1 ? 0.02 : 0.5;
       for (const { mesh, tier, wood } of meshes) {
         mesh.visible = (tier === 0 ? show.near : tier === 1 ? show.mid : show.far) && (wood ? show.wood : show.leaves);
@@ -841,7 +961,7 @@ export function createTrees(options: TreesOptions): Trees {
       // apart from any geometry: none of them is freed unless disposed by name.)
       cull.dispose();
       finish.dispose();
-      for (const a of [treeAttr, variantAttr, speciesAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs]) a.dispose();
+      for (const a of [treeAttr, variantAttr, speciesAttr, lobeAttr, visibleAttr, countAttr, dabArgs, woodArgs, strokeArgs]) a.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       atlas.dispose();
