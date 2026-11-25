@@ -210,6 +210,10 @@ for (const name of NAMES) {
     console.log(`${name}: ${plan.variants.length} variants for ${plan.placements.length} trees, stretched at most ${worst.toFixed(2)} one way beside the other (51ee946: 6.9 to 9.6 here)`);
     // (As many shapes as its spread needs, up to MOST_SHAPES: beyond them, as near as they come.)
     assert.ok(worst <= 1.45, `a tree's crown stretched ${worst.toFixed(2)} times one way beside the other`);
+    // (Each grown about once: its shapes vary it, and more seeds a shape only cost its making, a frozen game while a
+    // hole loads. No more trees grown than its shapes and as many as its fewest two shapes would have from three seeds each.)
+    const shapes = new Set(plan.variants.map((v) => `${v.standing}|${v.size.height}|${v.size.crownRadius}|${v.size.crownBase}`)).size;
+    assert.ok(plan.variants.length <= shapes + 6, `${plan.variants.length} variants for ${shapes} shapes`);
     // (With room for as many shapes as it needs, never more than FIT_STRETCH.)
     const sizes = survey(name, 90);
     const list: TreeInstance[] = sizes.map((z, i) => ({ x: (i % 20) * 60, y: 0, z: Math.floor(i / 20) * 60, species: 0, ...z }));

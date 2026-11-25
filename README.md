@@ -848,7 +848,9 @@ upper crowns to Rautiainen's exponents.
   for each way of standing (`mostShapes`), a palm's two: a palm takes many
   times a broadleaf's time to grow, and its head is its fronds whatever its
   crown's numbers. Each shape is grown once a seed (up to two by default,
-  one more for every eight of its trees, `SEED_TREES`), at the shape's
+  one more for every eight of its trees, `SEED_TREES`; and in a class of
+  many shapes about as many trees grown as its fewest shapes would have
+  with all their seeds, one a shape at the least: its shapes vary it), at the shape's
   size (see *How a tree grows*), in the light its trees' neighbours leave
   them. Leaves hang in clumps at the twigs, never in the air. A species
   whose trees differ in form at the foot (`forkShare`, `stemShare`) is grown
@@ -868,10 +870,13 @@ upper crowns to Rautiainen's exponents.
   a bare spike, the top of its crown floating over them; a stone pine of 33 m
   was its 12 m variant's cushions stacked into a tower; a blue gum's crown was
   squashed to a thin lid, its limbs pressed into loops. On Riviera's 1st hole
-  that is 180 variants where there were 83 (`node tools/cost/course.ts c01`):
-  the trees' frame cost the same (the counter's near tier 0.47 to 0.45 ms),
-  their making some three times as long, which `stretch` and `mostShapes`
-  trade.
+  that is 102 variants where there were 83 (`node tools/cost/course.ts c01`),
+  each of its shapes grown about once; the trees' frame costs the same (the
+  counter's near tier 0.47 to 0.45 ms), and with the growing and laying made
+  faster (the same trees to the bit), making them takes no longer than before:
+  `createTrees` for its 1st hole 3.5 to 3.2 s painted, 4.1 to 3.5 s
+  realistic; for its 5th, 3.5 to 3.7 s and 4.2 to 3.9 s (this Mac, in the
+  browser). `stretch` and `mostShapes` trade the fit against the time.
 - **Every tree is fitted to its own numbers.** Up the tree in two
   stretches (the trunk to its crown's base, the crown to its top), across
   to its crown radius, and the wood thickened to its trunk radius apart

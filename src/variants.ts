@@ -474,7 +474,12 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
         const varied = formsVary(sp);
         // (And a seed more only for every `SEED_TREES` of its trees (`FORM_TREES`, of a species whose forms vary): a
         // shape of a few trees is one or two trees. The forms are spread over the shapes too, `spreadSeed`.)
-        const seeds = Math.max(1, Math.min(varied ? Math.max(options.seeds, FORM_SEEDS) : options.seeds, Math.ceil(inShape.length / (varied ? FORM_TREES : SEED_TREES))));
+        // (And a class of many shapes is varied by them: its seeds a shape shared out so it has about as many trees
+        // grown as its fewest shapes would have with all their seeds, and one a shape at the least. Its shapes are
+        // there for its trees' fit; grown again from more seeds each, a hole of Riviera took three times as long.)
+        const nominal = varied ? Math.max(options.seeds, FORM_SEEDS) : options.seeds;
+        const shared = Math.max(1, Math.ceil((fewest * nominal) / centres.length));
+        const seeds = Math.max(1, Math.min(nominal, shared, Math.ceil(inShape.length / (varied ? FORM_TREES : SEED_TREES))));
         for (let k = 0; k < seeds; k++) {
           // (An open tree's seed as it always was; an edge or interior tree's its own; another set's mixed.)
           const base = (s * 7919 + (c + 16 * which) * 104729 + k * 1299709 + 17 + Math.imul(Math.round(options.seed ?? 0), 0x2545f491)) >>> 0;
