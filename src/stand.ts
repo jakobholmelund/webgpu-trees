@@ -109,6 +109,14 @@ export function standLight(stand: Stand, size: TreeSize, x: number, y: number, z
 
 /** The elevations of the sky's bands a place's light is reckoned in (radians), and each band's share of a uniform sky. */
 const BANDS = [0, 22.5, 45, 67.5, 90].map((d) => (d * Math.PI) / 180);
+// (Worked out once: each sector's way round, each band's bounds as sin² and its middle ray's elevation. `standShare`
+// is asked for every few voxels of every crown grown in a stand, and these were most of its time.)
+const SECTOR_UX = Float64Array.from({ length: STAND_SECTORS }, (_, s) => Math.cos(((s + 0.5) / STAND_SECTORS) * 2 * Math.PI));
+const SECTOR_UZ = Float64Array.from({ length: STAND_SECTORS }, (_, s) => Math.sin(((s + 0.5) / STAND_SECTORS) * 2 * Math.PI));
+const BAND_LO = Float64Array.from({ length: BANDS.length - 1 }, (_, b) => Math.sin(BANDS[b]) ** 2);
+const BAND_HI = Float64Array.from({ length: BANDS.length - 1 }, (_, b) => Math.sin(BANDS[b + 1]) ** 2);
+const BAND_COS = Float64Array.from({ length: BANDS.length - 1 }, (_, b) => Math.cos(0.5 * (BANDS[b] + BANDS[b + 1])));
+const BAND_SIN = Float64Array.from({ length: BANDS.length - 1 }, (_, b) => Math.sin(0.5 * (BANDS[b] + BANDS[b + 1])));
 
 /**
  * Of the sky that would reach a place in a tree's crown were it standing alone, the share its stand leaves
@@ -136,21 +144,19 @@ export function standShare(stand: Stand, size: TreeSize, k: number, shell: numbe
   let alone = 0;
   let left = 0;
   for (let s = 0; s < STAND_SECTORS; s++) {
-    const az = ((s + 0.5) / STAND_SECTORS) * 2 * Math.PI;
-    const ux = Math.cos(az);
-    const uz = Math.sin(az);
+    const ux = SECTOR_UX[s];
+    const uz = SECTOR_UZ[s];
     const closed = Math.min(1, Math.max(0, stand.enclosure - stand.lopsided * ux));
     const d = Math.max(WALL_NEAREST * size.crownRadius, wall - (x * ux + z * uz));
     // (The wall's top as seen from here, as sin² of its elevation: the share of the sky below it.)
     const below = (rise * rise) / (rise * rise + d * d);
-    for (let b = 0; b < BANDS.length - 1; b++) {
-      const lo = Math.sin(BANDS[b]) ** 2;
-      const hi = Math.sin(BANDS[b + 1]) ** 2;
-      const e = 0.5 * (BANDS[b] + BANDS[b + 1]);
+    for (let b = 0; b < BAND_LO.length; b++) {
+      const lo = BAND_LO[b];
+      const hi = BAND_HI[b];
       // (Through its own crown along the band's middle ray: the leafy length it crosses, the crown's ellipsoid.)
-      const dx = (Math.cos(e) * ux) / rx;
-      const dy = Math.sin(e) / ry;
-      const dz = (Math.cos(e) * uz) / rx;
+      const dx = (BAND_COS[b] * ux) / rx;
+      const dy = BAND_SIN[b] / ry;
+      const dz = (BAND_COS[b] * uz) / rx;
       const qa = dx * dx + dy * dy + dz * dz;
       const qb = px * dx + py * dy + pz * dz;
       const disc = qb * qb - qa * c0;

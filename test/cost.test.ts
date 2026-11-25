@@ -23,8 +23,12 @@ const named = (name: string): TreeSpecies => [...Object.values(MORE_SPECIES), ..
 
 /** The species on Riviera's and Torrey Pines' first holes, and Walton Heath's oak: the round's narrow and small ones. */
 const FITTED = ["Stone pine", "Coast live oak", "Oak", "Torrey pine", "California sycamore", "Monterey cypress", "Eucalyptus"];
-/** The most near cards a fitted tree of these may take, on average over its seeds: its kind's clumps' (a66c411: 340 at the most), with room (3afffb6: 690). */
-const MOST_CARDS = 400;
+/**
+ * The most near cards a fitted tree of these may take, on average over its seeds: its kind's clumps' (a66c411: 340 at
+ * the most), with room (3afffb6: 690). Riviera's corners (courseSizes.ts `cornersOf`) are wider for their height than
+ * any percentile: a sycamore 4 m tall on a crown 5.5 m round took 502 at 51ee946.
+ */
+const MOST_CARDS = 520;
 const SEEDS = [1, 2];
 
 test("a tree at a course's size takes no more near cards than its kind's clumps would lay over its crown", () => {
@@ -42,9 +46,10 @@ test("a tree at a course's size takes no more near cards than its kind's clumps 
       assert.ok(cards <= MOST_CARDS, `${name} ${f.key} (${f.height} m, r ${f.crownRadius}): ${cards} near cards, over ${MOST_CARDS}`);
     }
   }
-  // (All of them, the sizes taken together: within a tenth of a66c411's 4,850, before the round that made the
-  // clumps finer; 3afffb6, after it, drew 8,460 here.)
-  assert.ok(total <= 5300, `${total} near cards over the fitted sizes`);
+  // (All of them, the sizes taken together: with Riviera's whole course and its corners (2026-11-25), 11,770 at
+  // 51ee946, and no more than a twentieth over it. Over the first holes' sizes alone, within a tenth of a66c411's
+  // 4,850, before the round that made the clumps finer; 3afffb6, after it, drew 8,460.)
+  assert.ok(total <= 12_350, `${total} near cards over the fitted sizes`);
 });
 
 test("a finer clump takes fewer dabs, by its area, and never none; a clump of its kind's size takes them all", () => {
@@ -86,8 +91,9 @@ test("a tree at a course's size draws its near wood in two-fifths fewer vertices
       }
     }
   }
-  // (d8bd96b, every twig a four-sided tube: 330,950 over the fitted sizes; ribbons, 207,700.)
-  assert.ok(total <= 215_000, `${total} near wood vertices over the fitted sizes`);
+  // (d8bd96b, every twig a four-sided tube: 330,950 over the fitted sizes as they were; ribbons, 207,700. With Riviera's
+  // whole course and its corners, 526,900 at 51ee946: no more than a twentieth over it.)
+  assert.ok(total <= 553_000, `${total} near wood vertices over the fitted sizes`);
 });
 
 test("the near wood lies in bands, thickest first, each thinner than the edge before it, its vertices after the thicker bands'", () => {

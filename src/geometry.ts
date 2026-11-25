@@ -72,7 +72,13 @@ export interface Pieces {
 }
 
 export class Builder {
-  readonly floats: Record<string, number[]> = {};
+  /**
+   * Each attribute's numbers so far, as doubles (rounded to floats only by `done`), in typed arrays that grow as
+   * they fill: the near wood lays some millions of numbers a course, and as arrays of numbers, each vertex an object
+   * of arrays, laying them was half its time. `filled[k]` is how many of `floats[k]` are laid.
+   */
+  readonly floats: Record<string, Float64Array> = {};
+  readonly filled: Record<string, number> = {};
   readonly index: number[] = [];
   readonly ranges: Range[] = [];
   vertices = 0;
@@ -80,9 +86,34 @@ export class Builder {
   start = { index: 0, vertex: 0 };
   // (Not a parameter property: node runs this file's tests by stripping its types, which those are not.)
   readonly sizes: Record<string, number>;
+  /** The attributes by number (`slot`), for laying numbers without looking them up by name. */
+  private readonly names: string[];
+  private readonly data: Float64Array[];
+  private readonly at: number[];
   constructor(sizes: Record<string, number>) {
     this.sizes = sizes;
-    for (const k of Object.keys(sizes)) this.floats[k] = [];
+    this.names = Object.keys(sizes);
+    this.data = this.names.map((k) => new Float64Array(1024 * sizes[k]));
+    this.at = this.names.map(() => 0);
+    this.names.forEach((k, i) => {
+      Object.defineProperty(this.floats, k, { get: () => this.data[i], enumerable: true });
+      Object.defineProperty(this.filled, k, { get: () => this.at[i], enumerable: true });
+    });
+  }
+  /** An attribute's number, for `putAt`. */
+  slot(k: string): number {
+    return this.names.indexOf(k);
+  }
+  /** Room in an attribute's numbers for `more` of them. */
+  private room(i: number, more: number): Float64Array {
+    let a = this.data[i];
+    const need = this.at[i] + more;
+    if (need > a.length) {
+      const b = new Float64Array(Math.max(need, 2 * a.length));
+      b.set(a.subarray(0, this.at[i]));
+      this.data[i] = a = b;
+    }
+    return a;
   }
   begin(): void {
     this.start = { index: this.index.length, vertex: this.vertices };
@@ -101,32 +132,59 @@ export class Builder {
     const order = new Int32Array(count).fill(-1);
     let next = 0;
     const cumulative: { indexCount: number; vertexCount: number }[] = [];
-    const laid: number[] = [];
+    const index = this.index;
+    const first = index.length;
     for (const band of bands) {
-      for (const k of band) {
+      for (let j = 0; j < band.length; j++) {
+        const k = band[j];
         if (order[k] < 0) order[k] = next++;
-        laid.push(order[k]);
+        index.push(order[k]);
       }
-      cumulative.push({ indexCount: laid.length, vertexCount: next });
+      cumulative.push({ indexCount: index.length - first, vertexCount: next });
     }
     // (Any vertex no triangle uses goes last.)
     for (let k = 0; k < count; k++) if (order[k] < 0) order[k] = next++;
-    for (const [name, size] of Object.entries(this.sizes)) {
-      const a = this.floats[name];
+    this.names.forEach((_, i) => {
+      const size = this.sizes[this.names[i]];
+      const a = this.data[i];
       const old = a.slice(from * size, (from + count) * size);
-      for (let k = 0; k < count; k++) for (let j = 0; j < size; j++) a[(from + order[k]) * size + j] = old[k * size + j];
-    }
-    for (const k of laid) this.index.push(k);
-    this.ranges.push({ firstIndex: this.start.index, indexCount: laid.length, baseVertex: from, bands: cumulative });
+      for (let k = 0; k < count; k++) {
+        const to = (from + order[k]) * size;
+        const at = k * size;
+        for (let j = 0; j < size; j++) a[to + j] = old[at + j];
+      }
+    });
+    this.ranges.push({ firstIndex: this.start.index, indexCount: index.length - first, baseVertex: from, bands: cumulative });
   }
   /** A vertex, numbered from the variant's first. */
-  vertex(values: Record<string, number[]>): number {
-    for (const k in values) this.floats[k].push(...values[k]);
+  vertex(values: Record<string, ArrayLike<number>>): number {
+    for (const k in values) {
+      const i = this.names.indexOf(k);
+      const from = values[k];
+      const to = this.room(i, from.length);
+      let n = this.at[i];
+      for (let j = 0; j < from.length; j++) to[n++] = from[j];
+      this.at[i] = n;
+    }
+    return this.vertices++ - this.start.vertex;
+  }
+  /** One attribute's numbers (by its `slot`) for the vertex being laid (then `next`): as `vertex` lays them, without an object of arrays. */
+  putAt(i: number, x: number, y: number, z: number, w?: number): void {
+    const to = this.room(i, 4);
+    let n = this.at[i];
+    to[n++] = x;
+    to[n++] = y;
+    to[n++] = z;
+    if (w !== undefined) to[n++] = w;
+    this.at[i] = n;
+  }
+  /** The vertex whose attributes were `putAt`, numbered from the variant's first. */
+  next(): number {
     return this.vertices++ - this.start.vertex;
   }
   done(): Pieces {
     const attributes: Pieces["attributes"] = {};
-    for (const k of Object.keys(this.sizes)) attributes[k] = { array: new Float32Array(this.floats[k]), size: this.sizes[k] };
+    this.names.forEach((k, i) => (attributes[k] = { array: Float32Array.from(this.data[i].subarray(0, this.at[i])), size: this.sizes[k] }));
     return { attributes, index: new Uint32Array(this.index), ranges: this.ranges };
   }
 }
@@ -147,10 +205,16 @@ const CORNERS = [
  */
 export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "leaves" | "stroke" = "leaves", skip?: readonly boolean[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aLimb: 4 });
+  const [P, DAB, NORMAL, OFFSET, LIMB] = ["position", "aDab", "aNormal", "aOffset", "aLimb"].map((k) => b.slot(k));
   const quad = (c: number[], size: number, own: number, n: number[], depth: number, off: number[], kind: number, limb: number[], variant: number) => {
     let f = -1;
     for (const [cx, cy] of CORNERS) {
-      const k = b.vertex({ position: c, aDab: [cx, cy, size, own], aNormal: [...n, depth], aOffset: [...off, kind], aLimb: [...limb, variant] });
+      b.putAt(P, c[0], c[1], c[2]);
+      b.putAt(DAB, cx, cy, size, own);
+      b.putAt(NORMAL, n[0], n[1], n[2], depth);
+      b.putAt(OFFSET, off[0], off[1], off[2], kind);
+      b.putAt(LIMB, limb[0], limb[1], limb[2], variant);
+      const k = b.next();
       if (f < 0) f = k;
     }
     b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);
@@ -165,7 +229,12 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
     if (part === "stroke") {
       // (The trunk, far off: one upright stroke from the ground into the crown.)
       if (shape.woodFrom >= 1) {
-        const top = tree.size.crownBase + (tree.size.height - tree.size.crownBase) * 0.25;
+        // (From its lowest leaves: a crown kept to the top of its size's, a stone pine's or one its stand has
+        // lifted, has its trunk bare up to it.)
+        let low = tree.size.height;
+        for (let c = 0; c < cl.count; c++) low = Math.min(low, cl.y[c] - cl.radius[c]);
+        const from = Math.max(tree.size.crownBase, low < tree.size.height ? low : tree.size.crownBase);
+        const top = from + (tree.size.height - from) * 0.25;
         quad([0, top / 2, 0], top / 2, 0.5, [trunkHalfWidth(tree), 0, 0], 0, [0, 0, 0], 1, [0, -1, 0], v);
       }
     } else if (skip?.[v]) {
@@ -374,7 +443,18 @@ export interface WoodLines {
   from: Int32Array;
 }
 
+/** Each grown tree's wood lines, by tier: the near cards, the near wood and the clumps' shoots all ask for the same ones. */
+const LINES = new WeakMap<GrownTree, Map<TierShape, WoodLines>>();
+
 export function woodLines(tree: GrownTree, shape: TierShape): WoodLines {
+  let byShape = LINES.get(tree);
+  if (!byShape) LINES.set(tree, (byShape = new Map()));
+  let lines = byShape.get(shape);
+  if (!lines) byShape.set(shape, (lines = linesOf(tree, shape)));
+  return lines;
+}
+
+function linesOf(tree: GrownTree, shape: TierShape): WoodLines {
   const sk = tree.skeleton;
   const n = sk.count;
   const R = sk.radius;
@@ -703,6 +783,7 @@ export function flareBark(lines: readonly Float64Array[], y0: number, hf: number
  */
 export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Pieces {
   const b = new Builder({ position: 3, aRadial: 4, aNormal: 3, aLimb: 4, aWood: 4, aFrame: 3, aAxis: 3 });
+  const [P, RADIAL, NORMAL, LIMB, WOOD, FRAME, AXIS] = ["position", "aRadial", "aNormal", "aLimb", "aWood", "aFrame", "aAxis"].map((k) => b.slot(k));
   trees.forEach((tree, v) => {
     b.begin();
     if (tree.palm) {
@@ -807,22 +888,44 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
         const barkShare = bark ? Math.min(1, bark.radius / Math.max(r, 1e-4)) : 1;
         const sides = sidesFor(shape, r, trunk) + (swells ? BUTTRESS_SIDES : 0);
         let first = -1;
+        // (Its numbers laid one by one (`Builder.put`), each worked out as before, without arrays a vertex.)
+        const own = ownAt(along);
         for (let s = 0; s < sides; s++) {
           const a = (s / sides) * Math.PI * 2;
           const cs = Math.cos(a);
           const sn = Math.sin(a);
-          const e = [u[0] * cs + w[0] * sn, u[1] * cs + w[1] * sn, u[2] * cs + w[2] * sn];
-          const round = [-u[0] * sn + w[0] * cs, -u[1] * sn + w[1] * cs, -u[2] * sn + w[2] * cs];
-          const [m, mA, mH] = swells ? lobe(a, h) : [1, 0, 0];
+          const e0 = u[0] * cs + w[0] * sn;
+          const e1 = u[1] * cs + w[1] * sn;
+          const e2 = u[2] * cs + w[2] * sn;
+          const r0 = -u[0] * sn + w[0] * cs;
+          const r1 = -u[1] * sn + w[1] * cs;
+          const r2 = -u[2] * sn + w[2] * cs;
+          let m = 1;
+          let mA = 0;
+          let mH = 0;
+          if (swells) [m, mA, mH] = lobe(a, h);
           // (The surface's normal: out, tipped back where it swells along the wood and round where it swells round it.)
           const slopeAlong = g * m + r * mH * d[1];
-          let nrm = norm([e[0] - round[0] * (mA / m) - d[0] * slopeAlong, e[1] - round[1] * (mA / m) - d[1] * slopeAlong, e[2] - round[2] * (mA / m) - d[2] * slopeAlong]);
+          const q0 = e0 - r0 * (mA / m) - d[0] * slopeAlong;
+          const q1 = e1 - r1 * (mA / m) - d[1] * slopeAlong;
+          const q2 = e2 - r2 * (mA / m) - d[2] * slopeAlong;
+          const ql = Math.hypot(q0, q1, q2) || 1;
+          let n0 = q0 / ql;
+          let n1 = q1 / ql;
+          let n2 = q2 / ql;
           if (blend) {
-            const at = leaving([c[0] + e[0] * r, c[1] + e[1] * r, c[2] + e[2] * r], r);
-            if (at && at.w > 0) nrm = norm(add(scale(nrm, 1 - at.w), scale(at.n, at.w)));
+            const at = leaving([c[0] + e0 * r, c[1] + e1 * r, c[2] + e2 * r], r);
+            if (at && at.w > 0) [n0, n1, n2] = norm(add(scale([n0, n1, n2], 1 - at.w), scale(at.n, at.w)));
           }
           const barkAlong = bark ? bark.along(along, a) : along;
-          const k = b.vertex({ position: c, aRadial: [e[0] * m, e[1] * m, e[2] * m, r], aNormal: nrm, aLimb: [...limb, v], aWood: [barkAlong, order, ownAt(along), barkShare], aFrame: u, aAxis: d });
+          b.putAt(P, c[0], c[1], c[2]);
+          b.putAt(RADIAL, e0 * m, e1 * m, e2 * m, r);
+          b.putAt(NORMAL, n0, n1, n2);
+          b.putAt(LIMB, limb[0], limb[1], limb[2], v);
+          b.putAt(WOOD, barkAlong, order, own, barkShare);
+          b.putAt(FRAME, u[0], u[1], u[2]);
+          b.putAt(AXIS, d[0], d[1], d[2]);
+          const k = b.next();
           if (first < 0) first = k;
         }
         if (last >= 0) stitch(last, lastSides, first, sides, Math.max(lastR, r));
@@ -864,9 +967,19 @@ export function woodPieces(trees: readonly GrownTree[], shape: TierShape): Piece
       const ribbonRing = (c: number[], d: number[], r: number, limb: number[], order: number, along: number) => {
         u = u.length ? norm(sub(u, scale(d, dot(u, d)))) : basis(d)[0];
         if (!Number.isFinite(u[0]) || Math.hypot(u[0], u[1], u[2]) < 0.5) u = basis(d)[0];
-        const attrs = { aNormal: [0, 0, 0], aLimb: [...limb, v], aWood: [along, order, ownAt(along), 1], aFrame: u, aAxis: d };
-        const k = b.vertex({ position: c, aRadial: [-RIBBON_WIDE, 0, 0, r], ...attrs });
-        b.vertex({ position: c, aRadial: [RIBBON_WIDE, 0, 0, r], ...attrs });
+        const own = ownAt(along);
+        let k = -1;
+        for (const side of [-RIBBON_WIDE, RIBBON_WIDE]) {
+          b.putAt(P, c[0], c[1], c[2]);
+          b.putAt(RADIAL, side, 0, 0, r);
+          b.putAt(NORMAL, 0, 0, 0);
+          b.putAt(LIMB, limb[0], limb[1], limb[2], v);
+          b.putAt(WOOD, along, order, own, 1);
+          b.putAt(FRAME, u[0], u[1], u[2]);
+          b.putAt(AXIS, d[0], d[1], d[2]);
+          const at = b.next();
+          if (k < 0) k = at;
+        }
         if (last >= 0) bands[bandOf(Math.max(lastR, r))].push(last, last + 1, k, last + 1, k + 1, k);
         last = k;
         lastSides = 2;
@@ -979,7 +1092,16 @@ const CUSHION_RISE = 1;
  * leaves over the twigs where it hangs, and the grower keeps the twigs inside one for that (grow.ts
  * `leafy`); a twig's end that no clump hangs on goes to the clump it is deepest in, if it is in one.
  */
+/** Each grown tree's clumps' twigs (`clumpTwigs`), worked out once: its dabs, near cards and mid cards each ask. */
+const TWIGS = new WeakMap<GrownTree, number[][]>();
+
 export function clumpTwigs(tree: GrownTree): number[][] {
+  let twigs = TWIGS.get(tree);
+  if (!twigs) TWIGS.set(tree, (twigs = twigsOf(tree)));
+  return twigs;
+}
+
+function twigsOf(tree: GrownTree): number[][] {
   const { clumps: cl, skeleton: sk } = tree;
   const out: number[][] = [];
   const hung = new Uint8Array(sk.count);
@@ -1527,6 +1649,7 @@ export interface FixedCards {
 
 export function cardPieces(trees: readonly GrownTree[], perClump: number, size: number, skip?: readonly boolean[], fixed?: readonly (FixedCards | null)[], rises?: readonly number[], upright?: readonly boolean[], sizes?: readonly number[]): Pieces {
   const b = new Builder({ position: 3, aDab: 4, aNormal: 4, aOffset: 4, aTangent: 4, aLimb: 4 });
+  const [P, DAB, NORMAL, OFFSET, TANGENT, LIMB] = ["position", "aDab", "aNormal", "aOffset", "aTangent", "aLimb"].map((k) => b.slot(k));
   trees.forEach((tree, v) => {
     b.begin();
     if (skip?.[v]) {
@@ -1638,7 +1761,13 @@ export function cardPieces(trees: readonly GrownTree[], perClump: number, size: 
           // (How high the corner is in its clump, in the clump's radii: along the twig, which the card keeps
           // however it is turned to the eye. A dense clump's needles low in it are in its own shade.)
           const inClump = Math.max(-1.5, Math.min(1.5, (at[1] + tangent[1] * cy * half - cl.y[c]) / Math.max(r, 1e-3)));
-          const i = b.vertex({ position: at, aDab: [cx, cy, half, own], aNormal: [...n, cl.depth[c]], aOffset: [...facing, filler ? 1 : 0], aTangent: [...tangent, inClump], aLimb: [...limb, v] });
+          b.putAt(P, at[0], at[1], at[2]);
+          b.putAt(DAB, cx, cy, half, own);
+          b.putAt(NORMAL, n[0], n[1], n[2], cl.depth[c]);
+          b.putAt(OFFSET, facing[0], facing[1], facing[2], filler ? 1 : 0);
+          b.putAt(TANGENT, tangent[0], tangent[1], tangent[2], inClump);
+          b.putAt(LIMB, limb[0], limb[1], limb[2], v);
+          const i = b.next();
           if (f < 0) f = i;
         }
         b.index.push(f, f + 1, f + 2, f, f + 2, f + 3);

@@ -261,21 +261,34 @@ function bakeSky(v: LightVolume): void {
   let sigAbove = new Float32Array(layer);
   let sigHere = new Float32Array(layer);
   v.sky.fill(0);
-  const read = (a: Float32Array, fi: number, fk: number): number => {
-    // (Between the cells' centres; nothing past the box's sides.)
-    if (fi < -0.5 || fk < -0.5 || fi > nx - 0.5 || fk > nz - 0.5) return 0;
-    const ci = Math.min(nx - 1, Math.max(0, fi));
-    const ck = Math.min(nz - 1, Math.max(0, fk));
-    const i0 = Math.min(nx - 2, Math.floor(ci));
-    const k0 = Math.min(nz - 2, Math.floor(ck));
-    const ti = ci - i0;
-    const tk = ck - k0;
+  // (Where a cell reads the layer above, between its cells' centres, nothing past the box's sides: the same for
+  // every cell of a column or a row along one direction, so worked out once a direction, by column and by row.)
+  const i0s = new Int32Array(nx);
+  const tis = new Float64Array(nx);
+  const iIn = new Uint8Array(nx);
+  const k0s = new Int32Array(nz);
+  const tks = new Float64Array(nz);
+  const kIn = new Uint8Array(nz);
+  const place = (f: number, n: number, at: Int32Array, t: Float64Array, inside: Uint8Array, q: number) => {
+    inside[q] = f < -0.5 || f > n - 0.5 ? 0 : 1;
+    const c = Math.min(n - 1, Math.max(0, f));
+    at[q] = Math.min(n - 2, Math.floor(c));
+    t[q] = c - at[q];
+  };
+  const read = (a: Float32Array, i: number, k: number): number => {
+    if (!iIn[i] || !kIn[k]) return 0;
+    const i0 = i0s[i];
+    const k0 = k0s[k];
+    const ti = tis[i];
+    const tk = tks[k];
     return (a[k0 * nx + i0] * (1 - ti) + a[k0 * nx + i0 + 1] * ti) * (1 - tk) + (a[(k0 + 1) * nx + i0] * (1 - ti) + a[(k0 + 1) * nx + i0 + 1] * ti) * tk;
   };
   for (const [dx, dy, dz, w] of SKY_DIRECTIONS) {
     const run = cy / dy;
     const si = (dx * run) / cx;
     const sk = (dz * run) / cz;
+    for (let i = 0; i < nx; i++) place(i + si, nx, i0s, tis, iIn, i);
+    for (let k = 0; k < nz; k++) place(k + sk, nz, k0s, tks, kIn, k);
     for (let j = ny - 1; j >= 0; j--) {
       for (let k = 0; k < nz; k++)
         for (let i = 0; i < nx; i++) {
@@ -283,11 +296,7 @@ function bakeSky(v: LightVolume): void {
           const s = v.sigma[j * layer + q];
           sigHere[q] = s;
           if (j === ny - 1) here[q] = s * run * 0.5;
-          else {
-            const fi = i + si;
-            const fk = k + sk;
-            here[q] = read(above, fi, fk) + 0.5 * (s + read(sigAbove, fi, fk)) * run;
-          }
+          else here[q] = read(above, i, k) + 0.5 * (s + read(sigAbove, i, k)) * run;
           v.sky[j * layer + q] += w * Math.exp(-here[q]);
         }
       [above, here] = [here, above];

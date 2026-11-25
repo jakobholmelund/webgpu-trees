@@ -667,8 +667,11 @@ manifest to its files and the library's species.
 *Course sizes* (`?fitted=1`, or `fitted: true` from a script) draws each
 species at the sizes the game's courses give it (`lab/courseSizes.ts`: the
 10th, 50th and 90th percentiles of height, crown radius and crown base on
-the first holes of Riviera, Torrey Pines and Walton Heath, measured in the
-game; for a species on none of them, a young and a typical course tree),
+the first holes of Torrey Pines and Walton Heath and all of Riviera's,
+measured in the game; for a species on none of them, a young and a typical
+course tree), and Riviera's five broadleaves at the corners of its spread
+(`cornersOf`: tall and narrow, tall with a low base, tall with a high base,
+short and wide, and shallow),
 under its specimen and its reference pictures, from the tee (25 m), from
 60 m and from the gallery's own tee (two and a half crown widths off), in
 the reference pictures' light. A wood's species (Walton Heath's Scots pine
@@ -687,7 +690,18 @@ sheet into that folder and returns where.
 `growTree(species, size, seed)` grows one tree, the same every time for the
 same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
 
-0. **Its habit at its size** (`age.ts`). A species' row is its specimen, a
+0. **Its crown, kept to its top where it is an umbrella pine's.** A stone
+   pine's crown (an umbrella's: a flat top, `crownRound` over 3, on limbs
+   that divide in V-forks, `forkSplits`) is never deeper than one and a half
+   of its radius, or three tenths of its height if that is more, up to 1.8
+   of its radius, its stem clean under it (`umbrellaCap`): drawn up in a wood or a planting, its
+   crown is "small and confined to the top", and a survey's crown base under
+   it is its neighbours' or a few low shoots. Fitted 20 m tall on a crown
+   from 3 m, its crown down the whole column was a tower of stacked
+   cushions. It keeps the size it was asked for, as a crown its stand has
+   lifted does, so the fit leaves its crown at its top.
+
+   **Its habit at its size** (`age.ts`). A species' row is its specimen, a
    tree old enough to show all it comes to, and most trees a survey hands
    over are smaller or narrower. So a broadleaf's row is taken as its own
    size grows it: how young it is, by its height or its crown's reach beside
@@ -758,7 +772,15 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
    by as much (to 0.6 of what its height gives them, at the least): as many of
    its sprays across it as its specimen has, not its specimen's few big ones
    crowded in (a stone pine of 12 m on a crown half its specimen's width was a
-   tower of four or five big cushions stacked). A column's leaves are in pads
+   tower of four or five big cushions stacked); but a crown of bunches
+   (`clusters`, a blue gum's) keeps its bunches' size, fewer across a narrower
+   crown, and keeps them in a narrow crown three quarters as much, with sky
+   between them (`CLUMP_BUNCHED`, `CLUSTER_NARROW`): a blue gum 26 m tall on a
+   crown 3 to 5 m round is drawn up, not young, an open crown of a few heavy
+   ascending limbs hung with bunches; of small sprays all through, it was a mop
+   on a pole. A broadleaf's clumps are no more than 0.15 of its crown's depth
+   (`CLUMP_OF_DEPTH`; a flat-topped kind's cushions and pads excepted): a blue
+   gum's crown 2.6 m deep and 10 m across was one sheet of clumps, a lid. A column's leaves are in pads
    at most 0.4 (`pads`): its sky comes from round it as much as from above,
    and a Scots pine drawn up in a wood kept in its old plates was a pagoda of
    balls up its stem.
@@ -776,7 +798,19 @@ same arguments, in plain arithmetic (no three), in 1 to 20 ms on this Mac.
 7. **Dead twigs dropped**: once crowding clumps are thinned, every twig
    that neither bears a clump, nor lies inside one, nor leads to one is
    shed back to the wood that does. So no twig ends bare, and every clump
-   has wood leading to it (`test/borne.test.ts`).
+   has wood leading to it (`test/borne.test.ts`). Wood that strays out of
+   the tree's space is shed too: past its reach, or hanging down below its
+   crown's base. A forked trunk's or a clump's stems are trunks all the way
+   up their leaders, and a limb that leaves a stem low and rises into the
+   crown is kept: shed as strays, a Monterey cypress forked low was a bare
+   stump. A crown under 1.5 m round, or under four of its trunk's radii, is
+   one stem's (`FORK_ROOM_R`): a blue gum's two stems under a crown 1 m
+   round leaned out of it. A V-forked stem's arms reach no further out than
+   its crown's inside leaves room for, and rise no higher than into its
+   crown, however steep its narrow crown holds them (a stone pine with a
+   short crown on a tall stem had grown its limbs above its crown, and no
+   leaves). A leaning kind (`lean`, a sycamore's) leans at least half as far
+   under a narrow crown, and its forked stems bow as crooked as it is.
 8. **Fitted to its size**: across so its leaves reach the crown radius, up
    so they reach its height and come down to its crown's base, and drawn in
    to the outline where that moved them out of it. The growing aims at all
@@ -805,20 +839,46 @@ upper crowns to Rautiainen's exponents.
 
 - **A few are grown.** Each species' trees are sorted by where they stand
   (in the open, at a wood's edge, inside a wood: see *Where a tree
-  stands*), then into shapes by how wide their crowns are for their height,
-  how high the crown starts and how tall they are for their kind (a
-  doubling counting as a crown a sixth of its height wider: a tree's habit
-  changes with its size, so a 14 m Torrey pine is not a 4 m one's young
-  habit stretched) (and, in a wood, how closed in they are);
-  each shape is grown once a seed (two by default), at the shape's typical
+  stands*), then into shapes, as many as it takes for every tree to be
+  fitted from a variant of nearly its own shape (`VariantOptions.stretch`,
+  `FIT_STRETCH`): its crown no more than 1.3 times deeper or shallower for
+  its width than its variant's, scaled as a whole no more than 1.3 to the
+  2.5 (1.9), its trunk beside its crown no more than 1.3 cubed (2.2) (and,
+  in a wood, its closeness within a quarter). A tree's size counts: its
+  habit changes with it, so a 14 m Torrey pine is not a 4 m one's young
+  habit stretched. Two shapes at the fewest (`shapes`), twelve at the most
+  for each way of standing (`mostShapes`), a palm's two: a palm takes many
+  times a broadleaf's time to grow, and its head is its fronds whatever its
+  crown's numbers. Each shape is grown once a seed (up to two by default,
+  one more for every eight of its trees, `SEED_TREES`; and in a class of
+  many shapes about as many trees grown as its fewest shapes would have
+  with all their seeds, one a shape at the least: its shapes vary it), at the shape's
   size (see *How a tree grows*), in the light its trees' neighbours leave
   them. Leaves hang in clumps at the twigs, never in the air. A species
   whose trees differ in form at the foot (`forkShare`, `stemShare`) is grown
-  from three seeds a shape at the least, each seed chosen so the shape's
-  variants are spread over its forms by their shares (`FORM_SEEDS`): a stand
-  of twelve shows its forked trunks and clumps among its single stems, not
-  two seeds that both came up one stem. `VariantOptions.seed` grows another
-  set of the same shapes (the gallery's `?seed=`, by species).
+  from up to three seeds a shape (one for every three of its trees,
+  `FORM_TREES`), each seed chosen so the shape's variants, and the shapes,
+  are spread over its forms by their shares (`FORM_SEEDS`): a stand of
+  twelve shows its forked trunks and clumps among its single stems, not two
+  seeds that both came up one stem. `VariantOptions.seed` grows another set
+  of the same shapes (the gallery's `?seed=`, by species).
+
+  Sorted into two shapes by how wide and how high, Riviera's trees (eucalyptus
+  4.7 to 26 m tall on crowns 1 to 5.3 m round, its crown bases 2 to 13.5 m)
+  were fitted from variants grown 8 m tall, some stretched six times as far up
+  as across. A tree's clumps keep their size as it is stretched (the mean of
+  its stretches) while the spaces between them and the wood under them
+  stretch, so a Monterey cypress's pads were drawn apart up its crown, each on
+  a bare spike, the top of its crown floating over them; a stone pine of 33 m
+  was its 12 m variant's cushions stacked into a tower; a blue gum's crown was
+  squashed to a thin lid, its limbs pressed into loops. On Riviera's 1st hole
+  that is 102 variants where there were 83 (`node tools/cost/course.ts c01`),
+  each of its shapes grown about once; the trees' frame costs the same (the
+  counter's near tier 0.47 to 0.45 ms), and with the growing and laying made
+  faster (the same trees to the bit), making them takes no longer than before:
+  `createTrees` for its 1st hole 3.5 to 3.2 s painted, 4.1 to 3.5 s
+  realistic; for its 5th, 3.5 to 3.7 s and 4.2 to 3.9 s (this Mac, in the
+  browser). `stretch` and `mostShapes` trade the fit against the time.
 - **Every tree is fitted to its own numbers.** Up the tree in two
   stretches (the trunk to its crown's base, the crown to its top), across
   to its crown radius, and the wood thickened to its trunk radius apart
