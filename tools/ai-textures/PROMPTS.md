@@ -290,3 +290,21 @@ Douglas fir shoot (tall portrait): one branch tip with soft flat needles 2 to 3 
 
 ### Corsican pine shoot — file: `real-corsican-shoot` (tall portrait)
 Corsican pine shoot (tall portrait): one stout twig ending in a dense brush of long, stiff, straight dark green needles in pairs, 10 to 15 cm long, spreading forward.
+
+## Ten new species' bark (added 2026-11-25)
+
+Made by the owner in the Antigravity app with Nano Banana, two variations each, 1024 px JPEG (the app gave JPEG although
+PNG was asked; bark ships at 1024, so nothing is lost). Header for every bark: "A straight-on photographic bark texture
+filling the whole square frame edge to edge, even diffuse light, no shadows, no perspective, no trunk edges visible,
+photographic scan quality, neutral colour."
+
+- `real-ash-bark`: European ash (Fraxinus excelsior), mature trunk: pale grey bark in a tight net of narrow interlacing vertical ridges, the ridges forming long diamond shapes, the fissures shallow and slightly darker.
+- `real-sycmaple-bark`: Sycamore maple (Acer pseudoplatanus), mature trunk: grey to pinkish-grey bark flaking off in small irregular square-ish plates, showing fresh orange-brown and pale buff patches where the plates have fallen.
+- `real-whitewillow-bark`: White willow (Salix alba), mature trunk: grey-brown bark in deep, coarse vertical furrows, the thick ridges crossing and joining in a rough net.
+- `real-larch-bark`: European larch (Larix decidua), mature trunk: thick reddish-brown to grey-brown scaly plates split by deep fissures, a pinkish-red inner bark showing in the cracks.
+- `real-lime-bark`: Small-leaved lime (Tilia cordata), mature trunk: grey-brown bark with fine, close, shallow vertical fissures and long flat ridges, a few dark burrs and small shoots.
+- `real-hemlock-bark`: Western hemlock (Tsuga heterophylla), mature trunk: dark reddish-brown to russet bark in thick flat-topped scaly ridges with deep fissures between them.
+- `real-redalder-bark`: Red alder (Alnus rubra), mature trunk: smooth thin pale ash-grey bark, almost white in patches, with whitish lichen blotches and faint small horizontal lenticels.
+- `real-normaple-bark`: Norway maple (Acer platanoides), mature trunk: grey bark in close, regular, shallow vertical ridges that sometimes cross, the ridges never flaking off in plates.
+- `real-hornbeam-bark`: Common hornbeam (Carpinus betulus), mature trunk: smooth steel-grey bark with faint paler vertical streaks and twisted muscle-like ripples, a few fine darker cracks.
+- `real-aspen-bark`: Aspen (Populus tremula), mature trunk: smooth pale greenish-grey to cream bark with dark diamond-shaped lenticel marks and black rough patches, a few horizontal lines.
