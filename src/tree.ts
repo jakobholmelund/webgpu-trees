@@ -147,7 +147,10 @@ export interface Clumps {
 
 /** A tree, grown. */
 export interface GrownTree {
-  /** The size it was grown to. */
+  /**
+   * The size it was grown to: as asked, the size its fit is stretched from. (An umbrella pine's crown is kept to the
+   * top of it, grow.ts `umbrellaCap`, as a crown its stand has lifted is: its crown's base is its lowest leaves'.)
+   */
   size: TreeSize;
   skeleton: Skeleton;
   clumps: Clumps;

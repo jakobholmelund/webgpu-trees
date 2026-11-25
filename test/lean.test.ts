@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formOf, growTree } from "../src/grow.ts";
+import { formOf, growTree, umbrellaCap } from "../src/grow.ts";
 import { ALL_SPECIES, type TreeSpecies } from "../src/species.ts";
 import { type GrownTree, type TreeSize } from "../src/tree.ts";
 
@@ -115,13 +115,16 @@ test("a lifted canopy (`canopyLift`) only on an open-grown crown: fitted as a co
       for (let i = 0; i < c.count; i++) if (Math.hypot(c.x[i], c.z[i]) < 0.5 * t.size.crownRadius && c.y[i] < t.size.crownBase + 0.3 * depth) n++;
       return n;
     };
-    // (Open-grown: the middle of its underside cleared, against the same tree unlifted.)
-    const wide = growTree(sp, own(sp), 1);
-    const wideFlat = growTree(flat, own(sp), 1);
-    console.log(`${name}: ${low(wide)} clumps under the middle of its crown lifted, ${low(wideFlat)} unlifted`);
-    assert.ok(low(wide) < low(wideFlat), `${name}: ${low(wide)} clumps under its middle lifted, ${low(wideFlat)} not`);
-    // (A column, as a survey hands over for a tree in a wood: not lifted at all, the very tree grown unlifted.)
+    // (Open-grown: the middle of its underside cleared, against the same tree unlifted; over a few seeds, a single
+    // tree's lowest limbs, rising into its crown from low on its stems, may carry a few leaves there either way.)
+    const lifted = [1, 2, 3].reduce((n, seed) => n + low(growTree(sp, own(sp), seed)), 0);
+    const unlifted = [1, 2, 3].reduce((n, seed) => n + low(growTree(flat, own(sp), seed)), 0);
+    console.log(`${name}: ${lifted} clumps under the middle of its crown lifted, ${unlifted} unlifted`);
+    assert.ok(lifted < unlifted, `${name}: ${lifted} clumps under its middle lifted, ${unlifted} not`);
+    // (A column, as a survey hands over for a tree in a wood: not lifted at all, the very tree grown unlifted. An
+    // umbrella pine's crown so deep is kept to its top, no column: grow.ts `umbrellaCap`.)
     const column: TreeSize = { height: 18, crownRadius: 1.8, crownBase: 6, trunkRadius: 0.25 };
+    if (umbrellaCap(sp, column) !== column) continue;
     assert.deepEqual(Array.from(growTree(sp, column, 1).clumps.y), Array.from(growTree(flat, column, 1).clumps.y), `${name}: a column is lifted`);
   }
 });

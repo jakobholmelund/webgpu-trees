@@ -165,7 +165,12 @@ export function dabPieces(trees: readonly GrownTree[], shape: TierShape, part: "
     if (part === "stroke") {
       // (The trunk, far off: one upright stroke from the ground into the crown.)
       if (shape.woodFrom >= 1) {
-        const top = tree.size.crownBase + (tree.size.height - tree.size.crownBase) * 0.25;
+        // (From its lowest leaves: a crown kept to the top of its size's, a stone pine's or one its stand has
+        // lifted, has its trunk bare up to it.)
+        let low = tree.size.height;
+        for (let c = 0; c < cl.count; c++) low = Math.min(low, cl.y[c] - cl.radius[c]);
+        const from = Math.max(tree.size.crownBase, low < tree.size.height ? low : tree.size.crownBase);
+        const top = from + (tree.size.height - from) * 0.25;
         quad([0, top / 2, 0], top / 2, 0.5, [trunkHalfWidth(tree), 0, 0], 0, [0, 0, 0], 1, [0, -1, 0], v);
       }
     } else if (skip?.[v]) {

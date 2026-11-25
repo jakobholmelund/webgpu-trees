@@ -145,6 +145,17 @@ const FORK_INTO = 0.3;
 /** How far out from its stem all its arms together may lean, a share of its crown's radius (a narrow crown's rise steeply). */
 const FORK_REACH = 0.55;
 const FORK_SHORTER = 0.72;
+/** How far a crooked tree's leaning lean (`lean`) is kept under a narrow crown, at the least (a column's: 0 before). */
+const LEAN_NARROW = 0.5;
+/** How far aside a leaning kind's forked trunk's or clump's stem bows on its way up, out in the open, a share of its rise for each of its `crooked`, and of the crown's radius at most. */
+const STEM_BOW = 0.06;
+const STEM_BOW_ROOM = 0.15;
+/** The least crown (m, and in its trunk's radii) a forked trunk's or a clump's stems have room in. */
+const FORK_ROOM_R = 1.5;
+const FORK_ROOM_TRUNKS = 4;
+/** How far out a V-forked stem's arms reach and its stem sways, at most, as shares of the crown's inside (its radius less a clump's room). */
+const FORK_ROOM = 0.7;
+const FORK_SWAY_ROOM = 0.25;
 const FORK_SWING = 0.5;
 const FORK_WANDER = 0.16;
 /** How far apart up the stem a third or fourth stem leaves it (m). */
@@ -234,8 +245,14 @@ const CLUSTER_REACH = 0.8;
 const CLUSTER_BARE = 0.3;
 const CLUSTER_GROW = 0.6;
 const CLUSTER_HANG = 0.15;
-/** How far a small or narrow crown's leaves still gather into bunches, beside an open-grown one's. */
-const CLUSTER_NARROW = 0;
+/**
+ * How far a small crown's leaves still gather into bunches, beside an open-grown one's (a crown a few metres across is
+ * many sprays all through it); and a narrow one's, of a tall tree (a column's radius under NARROW of its depth, its
+ * radius SMALL_CROWN or more). A blue gum 26 m tall on a crown 3 m round is drawn up, not young: its crown is open,
+ * a few heavy ascending limbs hung with bunches, sky between them; made of sprays all through, it was a mop on a pole.
+ */
+const CLUSTER_SMALL = 0;
+const CLUSTER_NARROW = 0.75;
 // The wood, smoothed and simplified, then bowed by its weight.
 /** Laplacian passes over the wood, forks held, each moving a node this share of the way to its neighbours' middle. */
 const SMOOTH_PASSES = 2;
@@ -353,6 +370,11 @@ const CLUMP_MIN = 0.55;
 const CLUMP_MAX = 1.6;
 /** The largest a clump's radius may be, as a share of the crown's radius: five clumps across it at the least. */
 const CLUMP_OF_CROWN = 0.2;
+/**
+ * ... and of its depth, a broadleaf's or a shrub's: three clumps and more deep. A blue gum fitted 10 m tall on a crown
+ * 2.6 m deep and 5.3 m round, its clumps as big as its height gives them, was a thin flat lid of them, a single sheet.
+ */
+const CLUMP_OF_DEPTH = 0.15;
 /** ... and of a column's (a crown narrower than NARROW of its depth): six across it. */
 const CLUMP_OF_COLUMN = 0.17;
 /**
@@ -363,8 +385,26 @@ const CLUMP_OF_COLUMN = 0.17;
  * tufts are its needles' size, and do not shrink with its crown.
  */
 const CLUMP_NARROW = 1;
+/** ... less by this share of its `clusters`: a blue gum's bunches are its habit, at any width; smaller, its crown is a mop of sprays. */
+const CLUMP_BUNCHED = 1;
+/**
+ * ... and less in an open crown, from none at the first openness to all at the second: a California sycamore's patchy
+ * masses with its pale limbs between them are its kind's at any width (open 0.7); in fine sprays all through, a sycamore
+ * 11 m tall on a crown 3.8 m round was a ball on a pole.
+ */
+const CLUMP_OPEN = [0.45, 0.75] as const;
 /** ... down to this share of what its height gives them, at the least: a pine's tufts drawn up in a wood stay tufts, not beads. */
 const CLUMP_NARROW_LEAST = 0.6;
+
+/** An umbrella pine's crown (`umbrellaCap`): flatter-topped than this, and at most this many of its radii deep. */
+const UMBRELLA_ROUND = 3;
+const UMBRELLA_DEPTH = 1.5;
+/**
+ * ... and never less deep than this share of its height, a forest-grown stone pine's crown being its top third or so;
+ * but never deeper than UMBRELLA_DEEPEST of its radius: a crown 1 m round kept to 5 m was a column of cushions still.
+ */
+const UMBRELLA_SHARE = 0.3;
+const UMBRELLA_DEEPEST = 1.8;
 
 // Fitting to size.
 /** How far the outermost clump reaches, as a share of the crown radius. */
@@ -586,7 +626,11 @@ function branchAngle(sp: TreeSpecies, rng: Random): number {
  * frame: its open side along +x) grows it in the light its neighbours leave it; left out, it stands alone.
  */
 export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?: Stand): GrownTree {
-  const sz = soundSize(size);
+  // (An umbrella pine's crown deep for its width is its top's: `umbrellaCap`. Grown so, it keeps the size it was
+  // asked for, as a crown its stand has lifted does: the fit stretches its trunk and its crown from that size's crown
+  // base, and its crown, kept to its top, stays at its top.)
+  const asked = soundSize(size);
+  const sz = umbrellaCap(row, asked);
   // (Its row as a tree of its own size grows: a small or narrow one as a younger tree of its kind, age.ts.)
   const species = habitAt(row, sz);
   const rng = new Random(seed);
@@ -601,16 +645,29 @@ export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?:
   const budGrown = species.architecture === "broadleaf" || species.architecture === "shrub";
   // And smaller in a crown narrower for its height than its specimen's (CLUMP_NARROW).
   const narrower = (sz.crownRadius / Math.max(0.01, species.crownRadius)) / (sz.height / Math.max(0.01, species.height));
-  const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height) * (budGrown ? Math.max(CLUMP_NARROW_LEAST, Math.min(1, narrower) ** CLUMP_NARROW) : 1);
+  // (A crown of bunches, `clusters`, keeps its bunches' size, as many fewer across a narrower crown: CLUMP_BUNCHED.)
+  // (And an open crown keeps its masses' size, as far as it is open: CLUMP_OPEN.)
+  const opened = Math.min(1, Math.max(0, (species.openness - CLUMP_OPEN[0]) / (CLUMP_OPEN[1] - CLUMP_OPEN[0])));
+  const narrowing = CLUMP_NARROW * (1 - CLUMP_BUNCHED * Math.min(1, Math.max(0, species.clusters ?? 0))) * (1 - opened);
+  const own = 0.5 * species.clumpSize * Math.sqrt(sz.height / species.height) * (budGrown ? Math.max(CLUMP_NARROW_LEAST, Math.min(1, narrower) ** narrowing) : 1);
   // (A broadleaf's column, narrower than NARROW of its depth, a little smaller again: its clumps are round its stem,
   // CLUMP_OF_COLUMN. A conifer's boughs are laid whorl by whorl, as long as its crown is wide, whatever its shape.)
   const ofCrown = budGrown && sz.crownRadius / Math.max(0.01, sz.height - sz.crownBase) < NARROW ? CLUMP_OF_COLUMN : CLUMP_OF_CROWN;
-  const clumpR = species.architecture === "palm" ? own : Math.min(own, ofCrown * sz.crownRadius);
+  // (Nor more than CLUMP_OF_DEPTH of a broadleaf's crown's depth: a shallow crown is still leaves in layers, not one sheet of
+  // clumps as deep as it is.)
+  // (A flat-topped kind's, an umbrella's or a shelf's, `crownRound` over UMBRELLA_ROUND, is a shallow crown of its own:
+  // its cushions and pads keep their size.)
+  const layered = budGrown && !((row.crownRound ?? 0) > UMBRELLA_ROUND);
+  const clumpR = species.architecture === "palm" ? own : Math.min(own, ofCrown * sz.crownRadius, layered ? CLUMP_OF_DEPTH * (sz.height - sz.crownBase) : Infinity);
   // (How fine that is beside its kind's clump at its height, as a crown of its kind's width would have them.)
   const kinds = Math.min(0.5 * species.clumpSize * Math.sqrt(sz.height / species.height), CLUMP_OF_CROWN * sz.crownRadius);
   const clumpShare = budGrown ? Math.min(1, clumpR / Math.max(1e-6, kinds)) : 1;
   // (Its form at the foot, from its own seed: one stem, a forked trunk, or a clump of stems.)
-  const form = species.architecture === "broadleaf" ? formOf(species, seed, st) : { stems: 1, fork: 1, clump: false, join: 0 };
+  // (Not where its crown has no room for its stems side by side: a crown under FORK_ROOM_R round, or under
+  // FORK_ROOM_TRUNKS of its trunk's radius, is one stem's. A blue gum's clump of two stems 24 m tall under a crown 1 m
+  // round leaned its stems out of it, and bore one clump of leaves.)
+  const roomy = sz.crownRadius >= FORK_ROOM_R && sz.crownRadius >= FORK_ROOM_TRUNKS * sz.trunkRadius;
+  const form = species.architecture === "broadleaf" && roomy ? formOf(species, seed, st) : { stems: 1, fork: 1, clump: false, join: 0 };
   let hung: Hung;
   switch (species.architecture) {
     case "conifer":
@@ -629,11 +686,28 @@ export function growTree(row: TreeSpecies, size: TreeSize, seed: number, stand?:
   const vForkY = form.stems > 1 && species.forkSplits !== undefined ? forkHeight(species, sz, form) : undefined;
   // (A forked trunk's or a clump's: where its stems part and their first pieces are kept as grown by the fit.)
   const keepBelow = form.stems > 1 && species.forkSplits === undefined ? forkHeight(species, sz, form) + stemFirst(sz) + 0.05 : 0;
-  const tree = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st);
+  const grown = boleStubs(species, finish(species, sz, wood, hung, st ? lift : undefined, vForkY, keepBelow), rng.fork(), st);
+  const tree = sz === asked ? grown : { ...grown, size: asked };
   const habit = { sprayHang: species.sprayHang, pads: species.pads, clusters: species.clusters };
   const said = Object.values(habit).some((v) => v !== undefined && v > 0);
   const fine = clumpShare < 1 - 1e-6;
   return species.buttress || said || fine ? { ...tree, ...(species.buttress ? { buttress: species.buttress } : {}), ...(said ? { habit } : {}), ...(fine ? { clumpShare } : {}) } : tree;
+}
+
+/**
+ * The crown an umbrella pine grows (a stone pine's: its flat top, `crownRound` over UMBRELLA_ROUND, on limbs that
+ * divide in V-forks, `forkSplits`): no deeper than UMBRELLA_DEPTH of its radius (or UMBRELLA_SHARE of its height,
+ * if that is more, up to UMBRELLA_DEEPEST of its radius), at the top of the tree, its stem
+ * clean under it. Open-grown, its crown is a wide flat dome some three times as wide as deep; drawn up in a wood or
+ * a planting, it is a short crown on a long clean stem (EUFORGEN: "in dense stands, the crown is small and
+ * confined to the top"), not a column of its cushions: a survey's crown base under such a crown is its neighbours',
+ * or its own few low shoots. Fitted 20 m tall on a crown from 3 m, its cushions stacked up the column were a tower
+ * of plates. Other kinds keep their size as asked.
+ */
+export function umbrellaCap(sp: TreeSpecies, size: TreeSize): TreeSize {
+  if (sp.architecture !== "broadleaf" || sp.forkSplits === undefined || !((sp.crownRound ?? 0) > UMBRELLA_ROUND)) return size;
+  const base = size.height - Math.max(UMBRELLA_DEPTH * size.crownRadius, Math.min(UMBRELLA_SHARE * size.height, UMBRELLA_DEEPEST * size.crownRadius));
+  return base > size.crownBase ? { ...size, crownBase: Math.min(base, 0.95 * size.height) } : size;
 }
 
 /** A size growing can use: positive, with its crown's base under its top. */
@@ -954,7 +1028,9 @@ function leanOf(sp: TreeSpecies, inStand: boolean, way: number, to: number, R: n
   const h = Math.max(0.01, to);
   const p = LEAN_HOLD;
   // (A crown narrow for its depth, a tree drawn up straight, leans less, as its canopy is lifted less; a column not at all.)
-  const wide = Math.min(1, Math.max(0, (R / Math.max(0.01, depth) - NARROW) / (LIFT_WIDE - NARROW)));
+  // (Never less than LEAN_NARROW of it, out in the open: a California sycamore drawn up tall on a narrow crown still
+  // leans, as its kind does; upright, it was a lollipop on a pole. Its crown stays over its foot as before.)
+  const wide = LEAN_NARROW + (1 - LEAN_NARROW) * Math.min(1, Math.max(0, (R / Math.max(0.01, depth) - NARROW) / (LIFT_WIDE - NARROW)));
   // (Slope t·(1 - (y/h)^p): aside by h, t·h·p/(p + 1).)
   const t = (sp.lean ?? 0) > 0 && !inStand ? wide * Math.min(Math.tan(Math.min(35, sp.lean ?? 0) * DEG), (LEAN_OUT * R * (p + 1)) / (p * h)) : 0;
   if (t === 0) return { slope: () => [0, 0], at: () => [0, 0] };
@@ -1383,7 +1459,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       // of the way to its crown's base, its stem sinuous or leaning a little on the way, as crooked as it is.
       const yF = forkHeight(sp, size, form);
       const lean = rng.range(0, 2 * Math.PI);
-      const sway = STEM_SWAY * sp.crooked * yF * rng.range(0.6, 1);
+      // (No further aside than its crown leaves room for its arms: `reachOut`.)
+      // (Its inside where its arms end, a share FORK_INTO into its crown: a domed crown is narrow at its foot.)
+      const inner = Math.max(0.05, widthAt(Math.min(hi, base + FORK_INTO * depth)) * (1 - LOBE_DEPTH * Math.min(1, Math.max(0, sp.lobes ?? 0))) - side);
+      const sway = Math.min(STEM_SWAY * sp.crooked * yF, FORK_SWAY_ROOM * inner) * rng.range(0.6, 1);
       const wave = rng.range(0.7, 1.1);
       const steps = Math.max(2, Math.ceil(yF / TRUNK_STEP));
       let at = add(0, 0, 0, -1, true, 0, [0, 1, 0]);
@@ -1416,9 +1495,25 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
       // (Its first arms as long as rise, with the arms after them, from its fork a little into its crown.)
       let levels = 0;
       for (let q = 0; q <= splits; q++) levels += FORK_SHORTER ** q;
-      const first = (Math.max(0.5, base - yF) + FORK_INTO * depth) / (levels * Math.cos(0.5 * (FORK_TILT[0] + FORK_TILT[1]) + FORK_TILT_STEP));
       /** The most an arm `len` long may lean (from upright): its share of how far out they all may. */
-      const most = (len: number) => Math.asin(Math.min(1, (FORK_REACH * R) / (splits + 1) / Math.max(len, 1e-3)));
+      // (Its arms' ends within the crown's inside, where its limbs may grow: in a narrow crown, its reach out from
+      // its stem's sway, within FORK_ROOM of the room a clump leaves at its side. Reaching its kind's share of the
+      // crown's radius, a narrow crown's arms all ended outside it, and their limbs grew no leaves.)
+      const reachOut = Math.min(FORK_REACH * R, Math.max(0.05, FORK_ROOM * inner - Math.abs(sway)));
+      const most = (len: number) => Math.asin(Math.min(1, reachOut / (splits + 1) / Math.max(len, 1e-3)));
+      // (How far they rise, each level as steep as it may lean: in a narrow crown its arms are held nearer upright
+      // than their kind's lean, and reckoned at that lean they rose out of the top of a short crown on a tall stem,
+      // its limbs all above it and not a leaf on them.)
+      const rise = Math.max(0.5, base - yF) + FORK_INTO * depth;
+      let first = rise / (levels * Math.cos(0.5 * (FORK_TILT[0] + FORK_TILT[1]) + FORK_TILT_STEP));
+      for (let pass = 0; pass < 4; pass++) {
+        let up = 0;
+        for (let q = 0; q <= splits; q++) {
+          const len = first * FORK_SHORTER ** q;
+          up += len * Math.cos(Math.min(0.5 * (FORK_TILT[0] + FORK_TILT[1]) + q * FORK_TILT_STEP, most(len)) + 0.25 * FORK_TILT_STEP);
+        }
+        first *= rise / Math.max(1e-3, up);
+      }
       let scaffold = 0;
       /** A piece of fork from `from`, `len` metres at `tilt` from upright round `a`, wandering; then its V-fork, or its limb. */
       const arm = (from: number, onAxis: boolean, a: number, lean: number, len: number, left: number) => {
@@ -1434,7 +1529,16 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
           const e = 0.5 * Math.PI - Math.max(4 * DEG, Math.min(80 * DEG, tilt + 0.5 * FORK_TILT_STEP * (j / m) + we));
           const d: V3 = [Math.cos(e) * Math.cos(a + wa), Math.sin(e), Math.cos(e) * Math.sin(a + wa)];
           // (Bare below its crown; in it, its buds put out shoots as a limb's do.)
-          node = add(px[node] + d[0] * (len / m), py[node] + d[1] * (len / m), pz[node] + d[2] * (len / m), node, j > 0 || onAxis, 1, d);
+          // (And however it wanders, no further out than its crown's inside leaves room for, FORK_ROOM of it: wandering
+          // up a tall stem to a short crown, its arms ended outside the crown.)
+          let ax = px[node] + d[0] * (len / m);
+          let az = pz[node] + d[2] * (len / m);
+          const out = Math.hypot(ax, az);
+          if (out > FORK_ROOM * inner) {
+            ax *= (FORK_ROOM * inner) / out;
+            az *= (FORK_ROOM * inner) / out;
+          }
+          node = add(ax, py[node] + d[1] * (len / m), az, node, j > 0 || onAxis, 1, d);
         }
         const t = tilt + FORK_TILT_STEP;
         if (left <= 0) {
@@ -1545,6 +1649,8 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
         let wz = 0;
         let first = true;
         const phase = rng.range(0, 2 * Math.PI);
+        // (A leaning kind's, `lean`: its stems wander as its trunk leans.)
+        const bowOut = (sp.lean ?? 0) > 0 && !liveAt ? Math.min(STEM_BOW * sp.crooked * (top - yF), STEM_BOW_ROOM * R) : 0;
         for (const lv of levels) {
           const j = rng.onSphere();
           // (Its stems stand side by side in the trunk where they part, each stepping out from its middle to its
@@ -1553,7 +1659,10 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
           wx = 0.6 * wx + 0.08 * sp.crooked * j[0] * calm;
           wz = 0.6 * wz + 0.08 * sp.crooked * j[2] * calm;
           const sl = slope(0.5 * (py[node] + lv.y));
-          const dir = norm([wx + sl * Math.cos(a), 1, wz + sl * Math.sin(a)]);
+          // (And bows in a long sinuous bend, as crooked as its kind: STEM_BOW. Straight, a sycamore's two stems were poles.)
+          const u = (0.5 * (py[node] + lv.y) - yF) / Math.max(L, top - yF);
+          const bow = (bowOut * Math.PI * Math.cos(Math.PI * 1.5 * u) * 1.5) / Math.max(L, top - yF);
+          const dir = norm([wx + sl * Math.cos(a) + bow * Math.cos(phase), 1, wz + sl * Math.sin(a) + bow * Math.sin(phase)]);
           const len = (lv.y - py[node]) / dir[1];
           node = add(px[node] + dir[0] * len, lv.y, pz[node] + dir[2] * len, node, first ? k === 0 : true, 0, dir);
           if (first) owner[node] = k;
@@ -1876,7 +1985,9 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   // the lighter the bigger; each at its node, a little on along its twig and out of the crown.
   // (A small or narrow crown is lit through and full of leaves to its middle, along its leader too: kept to
   // a shell, a crown two or three metres across is a ring, which from afar reads as a hook.)
-  const lit = R / depth < NARROW || R < SMALL_CROWN;
+  // (A crown of bunches (`clusters`) wide enough for them keeps them, narrow or not, and its sky between them: CLUSTER_NARROW.)
+  const bunched = (sp.clusters ?? 0) > 0 && R >= SMALL_CROWN;
+  const lit = (R / depth < NARROW && !bunched) || R < SMALL_CROWN;
   const reach = lit ? LEAF_REACH + LEAF_REACH_DEPTH : LEAF_REACH + Math.round(LEAF_REACH_DEPTH * Math.min(1, Math.max(0, sp.foliageDepth)));
   const fromTip = new Int32Array(count).fill(1 << 20);
   for (let i = count - 1; i >= 0; i--) {
@@ -1899,7 +2010,7 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   const padding = R / depth < NARROW ? Math.min(PAD_COLUMN, sp.pads ?? 0) : lit ? Math.min(PAD_LIT, sp.pads ?? 0) : (sp.pads ?? 0);
   // (Bunches only where the crown has room for them: a small or narrow crown, a tree grown in a wood, is many
   // sprays all through it, as below.)
-  const clustering = Math.min(1, Math.max(0, sp.clusters ?? 0)) * (R / depth < NARROW || R < SMALL_CROWN ? CLUSTER_NARROW : 1);
+  const clustering = Math.min(1, Math.max(0, sp.clusters ?? 0)) * (R < SMALL_CROWN ? CLUSTER_SMALL : R / depth < NARROW ? CLUSTER_NARROW : 1);
   if (padding > 0 || clustering > 0) {
     for (let i = 0; i < count; i++) {
       if (!alive[i]) continue;
@@ -2764,9 +2875,11 @@ function finish(sp: TreeSpecies, size: TreeSize, w: Wood, hung: Hung, lift?: num
     clumps.tz[k] = t[2];
   }
   if (sp.architecture === "palm") return { size, skeleton, clumps };
-  // (A trunk's stems, a forked one's or a clump's, are not strays however low they leave it.)
+  // (A trunk's stems, a forked one's or a clump's, are not strays however low they leave it: each all the way up its
+  // leader, past its first limb. Marked only to its first limb, a stem whose first limb the fit drew down under its
+  // crown's base was shed from there as a stray, with all it bore: a Monterey cypress forked low was a bare stump.)
   const trunks = new Uint8Array(n);
-  for (const start of stemStarts(w)) for (const i of trunkBole(w, start)) trunks[i] = 1;
+  for (const start of stemStarts(w)) for (const i of stemLeader(w, start)) trunks[i] = 1;
   return shedStrays(size, skeleton, clumps, forkY, trunks);
 }
 
@@ -2954,7 +3067,10 @@ function shedStrays(size: TreeSize, sk: Skeleton, cl: Clumps, forkY?: number, tr
   const keep = new Uint8Array(sk.count);
   for (let i = 0; i < sk.count; i++) {
     const p = sk.parent[i];
-    const out = sk.order[i] > 0 && !trunks?.[i] && (sk.y[i] < low || Math.hypot(sk.x[i], sk.z[i]) > far);
+    // (Under its crown only going down: a limb leaving a stem low and rising into the crown is the limb its crown
+    // hangs on, not a stray. Shed from where it left, a cypress forked low, its limbs leaving its stems under the
+    // crown's base and rising to its shelves, was a bare stump.)
+    const out = sk.order[i] > 0 && !trunks?.[i] && ((sk.y[i] < low && (p < 0 || sk.y[i] < sk.y[p])) || Math.hypot(sk.x[i], sk.z[i]) > far);
     keep[i] = (p < 0 || keep[p]) && !out ? 1 : 0;
   }
   // (What is left bare by that goes too: a twig whose leaves were all on the wood shed past it is dead.)
@@ -3323,6 +3439,18 @@ function trunkBole(w: Wood, start: number): number[] {
     const kids = w.kids[at];
     const next = kids.find((c) => w.cont[c] && w.stem[c] === s);
     if (next === undefined || kids.some((c) => c !== next && w.stem[c] === s)) return out;
+    at = next;
+    out.push(at);
+  }
+}
+
+/** A stem's leader: from where it starts, on along it (its own stem's next node on its axis) to its top. */
+function stemLeader(w: Wood, start: number): number[] {
+  const out = [start];
+  const s = w.stem[start];
+  for (let at = start; ; ) {
+    const next = w.kids[at].find((c) => w.cont[c] && w.stem[c] === s);
+    if (next === undefined) return out;
     at = next;
     out.push(at);
   }

@@ -97,8 +97,20 @@ export function seedOfPlace(x: number, z: number): number {
 }
 
 export interface VariantOptions {
-  /** How many shapes each species' trees are sorted into (each grown once a seed): more fit closer and cost more to hold. */
+  /**
+   * How many shapes each species' trees are sorted into, at the fewest (each grown once a seed): more fit closer
+   * and cost more to hold. More are made where its trees' shapes spread further than `stretch` lets one variant
+   * be fitted to them all.
+   */
   shapes: number;
+  /**
+   * How far a tree's crown may be stretched from its variant's, one way more than the other (its depth beside its
+   * width: 1.3, a crown grown as deep as it is wide fitted to one 1.3 times as deep as wide); a variant may be
+   * scaled as a whole by this to the 2.5, and its trunk beside its crown to the 3. Left out, `FIT_STRETCH`.
+   */
+  stretch?: number;
+  /** The most shapes a species' trees are sorted into for one way of standing, whatever their spread (`MOST_SHAPES` left out). */
+  mostShapes?: number;
   /** How many trees are grown for each shape, from different seeds. */
   seeds: number;
   /** How far a tree may lean from upright (degrees), at most. */
@@ -138,6 +150,33 @@ function spreadSeed(base: number, k: number, m: number, c: number, shapes: numbe
 }
 
 export const DEFAULT_VARIANT_OPTIONS: VariantOptions = { shapes: 2, seeds: 2, lean: 3, mirror: true, stands: true };
+
+/**
+ * How far a tree's crown may be stretched from the variant it is fitted from (see `VariantOptions.stretch`).
+ * Every tree is a variant stretched to its own size, up its trunk, up its crown and across it, and the stretch is
+ * not the tree's: its clumps keep their size ((across + up) / 2: engine.ts `fitOf`) while the spaces between them
+ * and the wood under them stretch. Sorted into two shapes by k-means, Riviera's eucalyptus of 4.7 to 26 m on crowns
+ * of 1 to 5.3 m were fitted from variants grown 7.8 and 8 m tall, some crowns stretched six times as far up as
+ * across: a Monterey cypress's pads drawn apart up its crown, each on a bare spike of stretched twig with the
+ * top of its crown floating over them; a stone pine of 33 m a tower of its 12 m variant's cushions stacked; a
+ * blue gum's crown squashed into a thin lid, its limbs pressed into loops; a sycamore's crown a ball on poles.
+ */
+export const FIT_STRETCH = 1.3;
+/**
+ * How much further (as a power of `stretch`) a variant may be scaled as a whole, and its trunk beside its crown,
+ * than its crown one way beside the other: a tree scaled whole is still its shape (its twigs and clumps a little
+ * bigger or smaller), and a trunk is bare.
+ */
+const WHOLE_STRETCH = 2.5;
+const TRUNK_STRETCH = 3;
+/** A shape is grown from a seed more for every this many of its trees, up to `VariantOptions.seeds`. */
+export const SEED_TREES = 8;
+/** ... and for every this many, of a species whose trees differ in form at the foot (`formsVary`). */
+export const FORM_TREES = 3;
+/** The most shapes a species' trees are sorted into for one way of standing (see `VariantOptions.mostShapes`). */
+export const MOST_SHAPES = 12;
+/** A crown base is reckoned this much higher (m) when its share is set beside its crown's: a crown on the ground is not infinitely low. */
+const BASE_FLOOR = 0.5;
 
 /** A tree to grow. */
 export interface Variant {
@@ -189,14 +228,14 @@ function median(values: number[]): number {
 }
 
 /** Sorts points into `k` groups by nearness (k-means, from spread-out starts, a fixed number of rounds: the same every time). */
-function groups(points: number[][], k: number): { centres: number[][]; of: number[] } {
+function groups(points: number[][], k: number, starts?: number[][]): { centres: number[][]; of: number[] } {
   const n = points.length;
   const dims = n > 0 ? points[0].length : 0;
   k = Math.max(1, Math.min(k, n));
-  // (Starts: the points at even steps through them sorted by the first number, then by the second.)
+  // (Starts: those given, or the points at even steps through them sorted by the first number, then by the second.)
   const order = points.map((_, i) => i).sort((a, b) => points[a][0] - points[b][0] || points[a][1] - points[b][1]);
-  const centres: number[][] = [];
-  for (let c = 0; c < k; c++) centres.push([...points[order[Math.floor(((c + 0.5) * n) / k)]]]);
+  const centres: number[][] = starts ? starts.slice(0, k).map((c) => [...c]) : [];
+  for (let c = centres.length; c < k; c++) centres.push([...points[order[Math.floor(((c + 0.5) * n) / k)]]]);
   const of = new Array<number>(n).fill(0);
   for (let round = 0; round < 12; round++) {
     for (let i = 0; i < n; i++) {
@@ -226,6 +265,96 @@ function groups(points: number[][], k: number): { centres: number[][]; of: numbe
   return { centres, of };
 }
 
+/** How far apart (in its enclosure) two trees in a wood may stand and be grown as one shape. */
+const ENCLOSURE_SPREAD = 0.25;
+
+/**
+ * A tree's shape, as a variant is stretched to fit it (`fitPoint`): its crown's depth beside its width, its
+ * crown's size (the root of the two multiplied), and its crown's base beside that, each a logarithm, so a
+ * difference between two trees is how far one is stretched to the other: `aspect` its crown's depth beside its
+ * width, `whole` all of it, `trunk` its trunk beside its crown.
+ */
+function featuresOf(z: TreeSize): [aspect: number, whole: number, trunk: number] {
+  const depth = Math.max(0.05, z.height - z.crownBase);
+  const r = Math.max(0.05, z.crownRadius);
+  const whole = 0.5 * Math.log(depth * r);
+  return [Math.log(depth / r), whole, Math.log((z.crownBase + BASE_FLOOR) / Math.sqrt(depth * r))];
+}
+
+/** The size whose shape is these features (`featuresOf` undone). */
+function sizeOfFeatures(f: readonly number[]): { height: number; crownRadius: number; crownBase: number } {
+  const depth = Math.exp(f[1] + 0.5 * f[0]);
+  const crownRadius = Math.exp(f[1] - 0.5 * f[0]);
+  const crownBase = Math.max(0, Math.exp(f[2] + f[1]) - BASE_FLOOR);
+  return { height: crownBase + depth, crownRadius, crownBase };
+}
+
+/**
+ * Sorts points into groups so that every point is within 1 of its group's centre in every number (the
+ * centre the middle of its group's extent), with as few groups as k-means finds that for: from `k` (`groups`),
+ * a group more at a time started at the point furthest from its centre, up to `most` (then as near as `most`
+ * groups come). The same every time.
+ */
+function coveringGroups(points: number[][], k: number, most: number): { centres: number[][]; of: number[] } {
+  const n = points.length;
+  if (n === 0) return { centres: [], of: [] };
+  const dims = points[0].length;
+  const far = (p: number[], c: number[]) => {
+    let d = 0;
+    for (let q = 0; q < dims; q++) d = Math.max(d, Math.abs(p[q] - c[q]));
+    return d;
+  };
+  // (Each group's centre the middle of its extent, and each point to the centre it is least far from, a few rounds.)
+  const settle = (centres: number[][], of: number[]) => {
+    for (let round = 0; round < 4; round++) {
+      for (let c = 0; c < centres.length; c++) {
+        const lo = new Array<number>(dims).fill(Infinity);
+        const hi = new Array<number>(dims).fill(-Infinity);
+        for (let i = 0; i < n; i++) {
+          if (of[i] !== c) continue;
+          for (let q = 0; q < dims; q++) {
+            lo[q] = Math.min(lo[q], points[i][q]);
+            hi[q] = Math.max(hi[q], points[i][q]);
+          }
+        }
+        if (Number.isFinite(lo[0])) centres[c] = lo.map((v, q) => 0.5 * (v + hi[q]));
+      }
+      for (let i = 0; i < n; i++) {
+        let best = of[i];
+        let bestD = far(points[i], centres[best]);
+        for (let c = 0; c < centres.length; c++) {
+          const d = far(points[i], centres[c]);
+          if (d < bestD - 1e-12) {
+            bestD = d;
+            best = c;
+          }
+        }
+        of[i] = best;
+      }
+    }
+  };
+  let { centres, of } = groups(points, k);
+  settle(centres, of);
+  while (centres.length < Math.min(most, n)) {
+    let worst = -1;
+    let worstD = 1;
+    for (let i = 0; i < n; i++) {
+      const d = far(points[i], centres[of[i]]);
+      if (d > worstD + 1e-9) {
+        worstD = d;
+        worst = i;
+      }
+    }
+    if (worst < 0) break;
+    ({ centres, of } = groups(points, centres.length + 1, [...centres, [...points[worst]]]));
+    settle(centres, of);
+  }
+  // (Groups no point is left in are dropped.)
+  const used = [...new Set(of)].sort((a, b) => a - b);
+  const to = new Map(used.map((c, j) => [c, j]));
+  return { centres: used.map((c) => centres[c]), of: of.map((c) => to.get(c)!) };
+}
+
 /** A tree's own size: its own numbers where it has them, its species' where not, and never one that cannot be grown. */
 export function sizeOf(packed: Float32Array, i: number, species: TreeSpecies): TreeSize {
   const o = i * TREE_STRIDE;
@@ -238,12 +367,6 @@ export function sizeOf(packed: Float32Array, i: number, species: TreeSpecies): T
   const trunkRadius = pick(packed[o + 7], species.trunkRadius * (height / species.height));
   return { height, crownRadius: Math.max(0.15, crownRadius), crownBase, trunkRadius: Math.max(0.01, trunkRadius) };
 }
-
-/**
- * How far apart two trees' heights set their shapes, for each doubling of one over the other, beside their
- * crowns' shares of their heights (a doubling counts as much as a crown a sixth of its height wider).
- */
-const HEIGHT_WEIGHT = 0.17;
 
 /** The classes of variant, in the order they are grown, and how many shapes each takes of `shapes`. */
 const STANDINGS: { standing: Standing; shapes: (n: number) => number }[] = [
@@ -303,6 +426,8 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
   const worked = options.stands !== false ? standsOf(xs, zs, allSizes) : null;
   const standOf = (i: number): Stand => standOver(worked ? worked[i] : { ...OPEN_STAND }, stands?.[i]);
   const leanMax = Math.sin((options.lean * Math.PI) / 180);
+  const stretch = Math.max(1.01, options.stretch ?? FIT_STRETCH);
+  const mostShapes = options.mostShapes ?? MOST_SHAPES;
   for (const { s, pruning, members } of [...bySpecies.values()].sort((a, b) => a.s - b.s || (a.pruning ?? "").localeCompare(b.pruning ?? ""))) {
     const sp = species[s];
     // (A shrub or a palm is grown as it stands in the open wherever it is: it is not shaped by a wood.)
@@ -314,21 +439,31 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
       if (inClass.length === 0) return;
       const stOf = ownStand.filter((_, j) => classOf[j] === standing);
       const sizes = inClass.map((i) => allSizes[i]);
-      // (A tree's shape: how wide its crown is for its height, how high its crown starts, as shares of its height;
-      // and, in a wood, how closed it stands, which shapes it as much: a tree one row in from the edge is not
-      // one deep inside.)
-      // And how tall it is for its kind (on a log scale, HEIGHT_WEIGHT a doubling): a tree's habit changes with its
-      // size (age.ts: a stone pine of 4 m is a young rounded one, of 15 m an umbrella), so a shape's variant is
-      // grown near its trees' heights, not a 4 m tree's habit stretched over a 14 m one.
-      const tall = (z: TreeSize) => HEIGHT_WEIGHT * Math.log2(z.height / sp.height);
-      const shapes = sizes.map((z, j) => (standing === "open" ? [z.crownRadius / z.height, z.crownBase / z.height, tall(z)] : [z.crownRadius / z.height, z.crownBase / z.height, 0.5 * stOf[j].enclosure, tall(z)]));
-      const { centres, of } = groups(shapes, shapesOf(options.shapes));
+      // (A tree's shape: how deep its crown is for its width, how big it is, and how high its crown starts beside
+      // its crown's size, each on a log scale by how far a tree may be stretched that way from its variant; and,
+      // in a wood, how closed it stands, which shapes it as much: a tree one row in from the edge is not one deep
+      // inside. Its size counts: a tree's habit changes with it (age.ts: a stone pine of 4 m is a young rounded
+      // one, of 15 m an umbrella), so a shape's variant is grown near its trees' heights.)
+      const aspectLog = Math.log(stretch);
+      const wholeLog = WHOLE_STRETCH * aspectLog;
+      const trunkLog = TRUNK_STRETCH * aspectLog;
+      const shapes = sizes.map((z, j) => {
+        const f = featuresOf(z);
+        const out = [f[0] / aspectLog, f[1] / wholeLog, f[2] / trunkLog];
+        if (standing !== "open") out.push(stOf[j].enclosure / ENCLOSURE_SPREAD);
+        return out;
+      });
+      // (A palm's head is its fronds, as long as its kind's whatever its crown's numbers, and a palm takes many
+      // times a broadleaf's time to grow: its few shapes stay few.)
+      const fewest = shapesOf(options.shapes);
+      const { centres: scaled, of } = coveringGroups(shapes, fewest, sp.architecture === "palm" ? fewest : Math.max(fewest, mostShapes));
+      const centres = scaled.map((c) => sizeOfFeatures([c[0] * aspectLog, c[1] * wholeLog, c[2] * trunkLog]));
       const firstOf: number[] = [];
       const seedsOf: number[] = [];
       for (let c = 0; c < centres.length; c++) {
         firstOf.push(variants.length);
         const inShape = sizes.filter((_, j) => of[j] === c);
-        const height = median(inShape.map((z) => z.height)) || sp.height;
+        const { height, crownRadius, crownBase } = centres[c];
         const trunkShare = median(inShape.map((z) => z.trunkRadius / z.height)) || sp.trunkRadius / sp.height;
         // (Its stand: its trees' on the whole, its open side along +x. An open tree's is the open ground's, so
         // it grows as it always has.)
@@ -337,13 +472,15 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
         const stand: Stand = standing === "open" ? { ...OPEN_STAND } : { enclosure: mean((x) => x.enclosure), lopsided: mean((x) => x.lopsided), openX: 1, openZ: 0, canopy: mean((x) => x.canopy), gap: mean((x) => x.gap) };
         // (No more seeds than trees of this shape: a second variant nothing is fitted to is grown for nothing.)
         const varied = formsVary(sp);
-        const seeds = Math.max(1, Math.min(varied ? Math.max(options.seeds, FORM_SEEDS) : options.seeds, inShape.length));
+        // (And a seed more only for every `SEED_TREES` of its trees (`FORM_TREES`, of a species whose forms vary): a
+        // shape of a few trees is one or two trees. The forms are spread over the shapes too, `spreadSeed`.)
+        const seeds = Math.max(1, Math.min(varied ? Math.max(options.seeds, FORM_SEEDS) : options.seeds, Math.ceil(inShape.length / (varied ? FORM_TREES : SEED_TREES))));
         for (let k = 0; k < seeds; k++) {
           // (An open tree's seed as it always was; an edge or interior tree's its own; another set's mixed.)
           const base = (s * 7919 + (c + 16 * which) * 104729 + k * 1299709 + 17 + Math.imul(Math.round(options.seed ?? 0), 0x2545f491)) >>> 0;
           variants.push({
             species: s,
-            size: { height, crownRadius: centres[c][0] * height, crownBase: centres[c][1] * height, trunkRadius: trunkShare * height },
+            size: { height, crownRadius, crownBase, trunkRadius: trunkShare * height },
             seed: varied ? spreadSeed(base, k, seeds, c, centres.length) : base,
             trees: 0,
             standing,
