@@ -121,6 +121,77 @@ const WANDER = 0.22;
 const BEND_KEEP = 0.4;
 /** A bud sees the voxels within this angle of its way (the cosine), two voxels round. */
 const PERCEIVE = Math.cos(60 * DEG);
+/**
+ * The voxels a bud sees (`lookForLight`): every one two round it, as offsets and the unit way to each, in a fixed
+ * order; and, for each of a cube map's cells of the way a bud looks, those it may see from a way in that cell (within
+ * the cone and the cell's own spread), in the same order. Asked at every internode grown, it tests a third of them.
+ */
+const SEEN = (() => {
+  const off: number[] = [];
+  for (let a = -2; a <= 2; a++)
+    for (let b = -2; b <= 2; b++)
+      for (let c = -2; c <= 2; c++) {
+        if (a === 0 && b === 0 && c === 0) continue;
+        const k = Math.hypot(a, b, c);
+        off.push(a, b, c, a / k, b / k, c / k);
+      }
+  return off;
+})();
+const SEEN_N = SEEN.length / 6;
+const SEEN_CELLS = 8;
+/** The cube map's cell of a way (unit or not): its face (by its largest part and that part's sign) and its place on it. */
+function seenCell(x: number, y: number, z: number): number {
+  const ax = Math.abs(x);
+  const ay = Math.abs(y);
+  const az = Math.abs(z);
+  let face: number;
+  let u: number;
+  let v: number;
+  if (ax >= ay && ax >= az) {
+    face = x >= 0 ? 0 : 1;
+    u = y / ax;
+    v = z / ax;
+  } else if (ay >= az) {
+    face = y >= 0 ? 2 : 3;
+    u = x / ay;
+    v = z / ay;
+  } else {
+    face = z >= 0 ? 4 : 5;
+    u = x / az;
+    v = y / az;
+  }
+  const iu = Math.min(SEEN_CELLS - 1, Math.max(0, Math.floor(((u + 1) / 2) * SEEN_CELLS)));
+  const iv = Math.min(SEEN_CELLS - 1, Math.max(0, Math.floor(((v + 1) / 2) * SEEN_CELLS)));
+  return (face * SEEN_CELLS + iu) * SEEN_CELLS + iv;
+}
+const SEEN_BUCKETS: Int32Array[] = (() => {
+  const out: Int32Array[] = [];
+  const way = (face: number, u: number, v: number): V3 => {
+    const w: V3 = face < 2 ? [face === 0 ? 1 : -1, u, v] : face < 4 ? [u, face === 2 ? 1 : -1, v] : [u, v, face === 4 ? 1 : -1];
+    const k = Math.hypot(w[0], w[1], w[2]);
+    return [w[0] / k, w[1] / k, w[2] / k];
+  };
+  for (let face = 0; face < 6; face++)
+    for (let iu = 0; iu < SEEN_CELLS; iu++)
+      for (let iv = 0; iv < SEEN_CELLS; iv++) {
+        const u0 = (iu / SEEN_CELLS) * 2 - 1;
+        const u1 = ((iu + 1) / SEEN_CELLS) * 2 - 1;
+        const v0 = (iv / SEEN_CELLS) * 2 - 1;
+        const v1 = ((iv + 1) / SEEN_CELLS) * 2 - 1;
+        const mid = way(face, 0.5 * (u0 + u1), 0.5 * (v0 + v1));
+        // (The cell's spread: the angle from its middle to its furthest corner, and a little more.)
+        let spread = 0;
+        for (const [cu, cv] of [[u0, v0], [u0, v1], [u1, v0], [u1, v1]]) {
+          const c = way(face, cu, cv);
+          spread = Math.max(spread, Math.acos(Math.min(1, mid[0] * c[0] + mid[1] * c[1] + mid[2] * c[2])));
+        }
+        const least = Math.cos(Math.min(Math.PI, 60 * DEG + spread + 0.01));
+        const list: number[] = [];
+        for (let k = 0; k < SEEN_N; k++) if (SEEN[6 * k + 3] * mid[0] + SEEN[6 * k + 4] * mid[1] + SEEN[6 * k + 5] * mid[2] >= least) list.push(k);
+        out.push(Int32Array.from(list));
+      }
+  return out;
+})();
 /** The light a branch must gather for each of its internodes to be kept, from `openness` and `branchiness`, when `shed` is not given. */
 const SHED_BASE = 0.05;
 const SHED_OPEN = 0.1;
@@ -1240,54 +1311,94 @@ function budGrow(sp: TreeSpecies, size: TreeSize, rng: Random, w: Wood, clumpR: 
   };
   // What a bud sees: the voxels two round it, within its cone. The least shaded three of them in the crown
   // give the way to the light (straight on, where they are alike), as the mean of their directions.
-  const seen: number[] = [];
-  for (let a = -2; a <= 2; a++)
-    for (let b = -2; b <= 2; b++)
-      for (let c = -2; c <= 2; c++) {
-        if (a === 0 && b === 0 && c === 0) continue;
-        const k = Math.hypot(a, b, c);
-        seen.push(a, b, c, a / k, b / k, c / k);
-      }
+  // (As typed arrays, each with its voxel offset: this is asked at every internode grown, and was a sixth of a
+  // crown's growing. Only those its way's cell may see are tested: SEEN_BUCKETS.)
+  const seenN = SEEN_N;
+  const seenA = new Int32Array(seenN);
+  const seenB = new Int32Array(seenN);
+  const seenC = new Int32Array(seenN);
+  const seenX = new Float64Array(seenN);
+  const seenY = new Float64Array(seenN);
+  const seenZ = new Float64Array(seenN);
+  const seenAt = new Int32Array(seenN);
+  for (let q = 0; q < seenN; q++) {
+    seenA[q] = SEEN[6 * q];
+    seenB[q] = SEEN[6 * q + 1];
+    seenC[q] = SEEN[6 * q + 2];
+    seenX[q] = SEEN[6 * q + 3];
+    seenY[q] = SEEN[6 * q + 4];
+    seenZ[q] = SEEN[6 * q + 5];
+    seenAt[q] = seenA[q] + nx * (seenC[q] + nz * seenB[q]);
+  }
   const toLight: V3 = [0, 0, 0];
   const best = new Float64Array(3);
   const bestAt = new Int32Array(3);
+  const lean = 0.05 * SHADOW_A;
   const lookForLight = (x: number, y: number, z: number, d: V3): boolean => {
     const ix = Math.floor((x - ox) / vs);
     const iy = Math.floor((y - oy) / vs);
     const iz = Math.floor((z - oz) / vs);
-    best.fill(Infinity);
-    bestAt.fill(-1);
-    for (let k = 0; k < seen.length; k += 6) {
-      const dot = seen[k + 3] * d[0] + seen[k + 4] * d[1] + seen[k + 5] * d[2];
+    // (Two voxels clear of the grid's sides every way: none of what it sees is off the grid.)
+    const inside = ix >= 2 && iy >= 2 && iz >= 2 && ix < nx - 2 && iy < ny - 2 && iz < nz - 2;
+    const here = ix + nx * (iz + nz * iy);
+    const d0 = d[0];
+    const d1 = d[1];
+    const d2 = d[2];
+    let b0 = Infinity;
+    let b1 = Infinity;
+    let b2 = Infinity;
+    let a0 = -1;
+    let a1 = -1;
+    let a2 = -1;
+    const cands = SEEN_BUCKETS[seenCell(d0, d1, d2)];
+    for (let q = 0; q < cands.length; q++) {
+      const k = cands[q];
+      const dot = seenX[k] * d0 + seenY[k] * d1 + seenZ[k] * d2;
       if (dot < PERCEIVE) continue;
-      const jx = ix + seen[k];
-      const jy = iy + seen[k + 1];
-      const jz = iz + seen[k + 2];
-      if (jx < 0 || jy < 0 || jz < 0 || jx >= nx || jy >= ny || jz >= nz) continue;
-      const c = jx + nx * (jz + nz * jy);
-      if (!room[c]) continue;
-      const score = shadow[c] + (standAt ? standShadow[c] : 0) - 0.05 * SHADOW_A * dot;
-      // (Kept in order, least first.)
-      let j = 2;
-      if (score >= best[j]) continue;
-      while (j > 0 && score < best[j - 1]) {
-        best[j] = best[j - 1];
-        bestAt[j] = bestAt[j - 1];
-        j--;
+      let c: number;
+      if (inside) c = here + seenAt[k];
+      else {
+        const jx = ix + seenA[k];
+        const jy = iy + seenB[k];
+        const jz = iz + seenC[k];
+        if (jx < 0 || jy < 0 || jz < 0 || jx >= nx || jy >= ny || jz >= nz) continue;
+        c = jx + nx * (jz + nz * jy);
       }
-      best[j] = score;
-      bestAt[j] = k;
+      if (!room[c]) continue;
+      const score = shadow[c] + (standAt ? standShadow[c] : 0) - lean * dot;
+      // (Kept in order, least first.)
+      if (score >= b2) continue;
+      if (score < b1) {
+        b2 = b1;
+        a2 = a1;
+        if (score < b0) {
+          b1 = b0;
+          a1 = a0;
+          b0 = score;
+          a0 = k;
+        } else {
+          b1 = score;
+          a1 = k;
+        }
+      } else {
+        b2 = score;
+        a2 = k;
+      }
     }
-    if (bestAt[0] < 0) return false;
+    if (a0 < 0) return false;
+    best[0] = b0;
+    bestAt[0] = a0;
+    bestAt[1] = a1;
+    bestAt[2] = a2;
     let sx = 0;
     let sy = 0;
     let sz = 0;
     for (let j = 0; j < 3; j++) {
       const k = bestAt[j];
       if (k < 0) break;
-      sx += seen[k + 3];
-      sy += seen[k + 4];
-      sz += seen[k + 5];
+      sx += seenX[k];
+      sy += seenY[k];
+      sz += seenZ[k];
     }
     const l = Math.hypot(sx, sy, sz);
     toLight[0] = sx / l;
