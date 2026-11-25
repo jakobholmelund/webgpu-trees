@@ -58,6 +58,21 @@ test("a species' documented crown proportions are sane, and its specimen is of t
   }
 });
 
+test("every species says how tall its real trees grow, its specimen within it", () => {
+  for (const s of ALL_SPECIES) {
+    assert.ok(s.heightRange, `${s.name}: no heightRange`);
+    const [typical, most] = s.heightRange!;
+    assert.ok(typical > 0 && typical < most, `${s.name}: [${typical}, ${most}]`);
+    // (A specimen is a typical course tree, never one taller than its kind grows.)
+    assert.ok(s.height <= most, `${s.name}: its specimen ${s.height} m over ${most} m`);
+    assert.deepEqual(checkSpecies(s), [], s.name);
+  }
+  // (The ones the matching leans on: a stone pine, a date palm, a tall eucalyptus.)
+  const by = (n: string) => ALL_SPECIES.find((s) => s.name === n)!.heightRange!;
+  assert.ok(by("Canary date palm")[1] <= 20 && by("Eucalyptus")[1] >= 50 && by("Shrub")[1] <= 3);
+  for (const bad of [[10, 5], [0, 20], [5, 200], [12]]) assert.match(checkSpecies({ ...STARTER_SPECIES[0], heightRange: bad as [number, number] }).join(), /heightRange/, JSON.stringify(bad));
+});
+
 test("bad documented crown proportions are caught", () => {
   for (const [field, value] of [
     ["crownRatio", [0.5, 0.2]],

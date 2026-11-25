@@ -36,9 +36,10 @@ export const COURSES: readonly Course[] = [
     by: {
       Eucalyptus: { n: 350, h: [4.9, 10.6, 26.5], r: [1.4, 3.6, 6], base: [2, 4.5, 11.5] },
       "Stone pine": { n: 29, h: [3.6, 5.7, 10.5], r: [2.3, 3, 5], base: [2, 3.5, 5.5] },
-      "Mexican fan palm": { n: 66, h: [6.8, 14, 31], r: [1, 1.4, 4.7], base: [4.6, 9.3, 22] },
+      // (Its palms over all 18 holes, as the game chose them before it matched heights (scripts/tree-mix.mjs, 2026-11-25).)
+      "Mexican fan palm": { n: 263, h: [4.9, 12.6, 27.2], r: [1.2, 2.9, 5.1], base: [2, 5.6, 15] },
       "California sycamore": { n: 41, h: [4, 6.7, 10.5], r: [2, 3.1, 4.4], base: [1.4, 2.5, 4.5] },
-      "Canary date palm": { n: 17, h: [5, 9, 24.5], r: [2.1, 4, 5.4], base: [2, 5, 9.5] },
+      "Canary date palm": { n: 335, h: [4.4, 8.6, 26.9], r: [1.4, 3.2, 5.6], base: [2, 4, 10.5] },
       Shrub: { n: 512, h: [1.2, 2, 2.7], r: [0.7, 1.3, 1.5], base: [0.1, 0.1, 0.1] },
     },
   },
@@ -72,7 +73,20 @@ export const COURSES: readonly Course[] = [
 /** Single trees seen in the game, worth a row of their own (the owner's, by eye). */
 const SEEN: Record<string, { label: string; note: string; height: number; crownRadius: number; crownBase: number }[]> = {
   "Stone pine": [{ label: "Riviera, seen", note: "a stone pine the owner saw grown as a layer cake (its base not measured: p90's)", height: 12, crownRadius: 5.9, crownBase: 5.5 }],
+  // (A tall palm the survey hands over: the owner's giant carrot of boots was a 27 m fan palm on Riviera.)
+  "Mexican fan palm": [{ label: "27 m", note: "a 27 m palm, its head Riviera's p50 (r 2.9) from 22 m", height: 27, crownRadius: 2.9, crownBase: 22 }],
+  "Canary date palm": [{ label: "27 m", note: "a 27 m palm, its head Riviera's p50 (r 3.2) from 21 m", height: 27, crownRadius: 3.2, crownBase: 21 }],
+  "California fan palm": [
+    { label: "Riviera's p50", note: "at the Mexican fan palm's Riviera p50: 12.6 m tall, r 2.9, base 5.6", height: 12.6, crownRadius: 2.9, crownBase: 5.6 },
+    { label: "27 m", note: "a 27 m palm, its head r 2.9 from 22 m", height: 27, crownRadius: 2.9, crownBase: 22 },
+  ],
 };
+
+/**
+ * The trunk's radius the game's survey hands over with a tree: 3 % of its height, to 0.6 m at the most (it is
+ * not measured), so a fitted palm is drawn with the trunk the game gives it.
+ */
+export const surveyTrunk = (height: number): number => Math.min(0.6, 0.03 * height);
 
 /** A size the gallery draws a species at, with what it is. */
 export interface FitSize {
@@ -110,8 +124,8 @@ export function fitSizesFor(sp: TreeSpecies): FitSize[] {
       if (wood) out.push({ key: `${c.id}-${PCT[i]}-edge`, label: `${c.name} ${PCT[i]}, wood edge`, note: `${what}, at a wood's edge`, ...size, stand: EDGE_TO_EYE });
     }
   }
-  for (const s of SEEN[sp.name] ?? []) out.push({ key: `seen-${slugOf(s.label)}`, ...s });
-  if (out.length > 0) return out;
+  const seen = (SEEN[sp.name] ?? []).map((s) => ({ key: `seen-${slugOf(s.label)}`, ...s }));
+  if (out.length > 0) return [...out, ...seen];
   // (On none of the courses: a young tree, a typical course tree (smaller and narrower than the specimen, as
   // most measured ones are), and the specimen's own size, old.)
   const H = sp.height;
@@ -125,7 +139,7 @@ export function fitSizesFor(sp: TreeSpecies): FitSize[] {
     const size = { height: H * h, crownRadius: R * r, crownBase: Math.min(B * b, 0.9 * H * h) };
     out.push({ key: label, label, note: `${note}: ${f1(size.height)} m tall, r ${f1(size.crownRadius)}, base ${f1(size.crownBase)}`, ...size });
   }
-  return out;
+  return [...out, ...seen];
 }
 
 function slugOf(s: string): string {

@@ -6,10 +6,11 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { bakeLight, leafAreaIndex } from "../src/light.ts";
-import { FROND_CLASSES, GOLDEN_ANGLE, PRUNINGS, STEM_BOOTS, type Pruning, frondSurface, growPalm } from "../src/palm.ts";
+import { BOOTS_OUT, FROND_CLASSES, GOLDEN_ANGLE, PALM_GIRTH, PRUNINGS, STEM_BOOTS, type Pruning, frondSurface, growPalm } from "../src/palm.ts";
 import { PALM_ATLAS, PALM_PICTURES } from "../src/palmAtlas.ts";
 import { palmPieces } from "../src/palmGeometry.ts";
 import { growTree } from "../src/grow.ts";
+import { fitPoint, packTrees, planVariants } from "../src/variants.ts";
 import { ALL_SPECIES, type TreeSpecies } from "../src/species.ts";
 import { type TreeSize } from "../src/tree.ts";
 
@@ -93,8 +94,10 @@ test("pruning does what it says: a pineapple cut has its ball and no dead leaves
   for (const sp of palms) {
     const grow = (p: Pruning) => growPalm(sp, sizeOf(sp), 11, p).palm!;
     const pine = grow("pineapple");
-    const under = pine.stem.radius[pine.stem.y.findIndex((y) => y >= pine.ball!.y0)];
-    assert.ok(pine.ball && pine.ball.radius > 1.3 * under, `${sp.name}: a pineapple cut's ball`);
+    // (1.3–1.6 times the trunk across, docs/MORPHOLOGY.md 22: against the stem just under it, a fan palm's tapered.)
+    const bark = pine.stem.y.map((y, i) => (y < pine.ball!.y0 && pine.stem.surface[i] === 0 ? i : -1)).filter((i) => i >= 0);
+    const under = pine.stem.radius[bark[bark.length - 1]];
+    assert.ok(pine.ball && pine.ball.radius > 1.25 * under && pine.ball.radius < 1.7 * under, `${sp.name}: a pineapple cut's ball ${pine.ball?.radius.toFixed(2)} m round on a stem ${under.toFixed(2)} m`);
     assert.ok(pine.stem.surface.some((s) => s === 2), `${sp.name}: the ball's trimmed bases on the stem`);
     assert.equal(pine.fronds.filter((f) => f.cls === "dead").length, 0, sp.name);
     assert.ok(pine.fronds.every((f) => f.tangent[0][1] > -0.12), `${sp.name}: a pineapple cut keeps the leaves above the level`);
@@ -186,18 +189,72 @@ test("the palms' pictures are in assets/, AI-generated and credited as such with
   }
 });
 
-test("a fan palm's leaves leave its stem down the top 2 m of it (SMM), round its collar of boots, wider than its stem", () => {
+test("a fan palm's leaves leave its stem down the top 2 m of it (SMM), round its collar of boots, a little wider than its stem", () => {
   const sp = ALL_SPECIES.find((s) => s.name === "Mexican fan palm")!;
   for (const seed of [1, 2, 3]) {
     const p = growPalm(sp, sizeOf(sp), seed).palm!;
     const feet = p.fronds.filter((f) => f.cls !== "dead").map((f) => f.points[0][1]);
     const span = Math.max(...feet) - Math.min(...feet);
     assert.ok(span >= 1.2 && span <= 2.4, `seed ${seed}: its leaves' feet span ${span.toFixed(2)} m of its stem`);
-    // (Its collar: the crown shaft, its boots, half again as wide as its stem below them at the least.)
+    // (Its collar: the crown shaft, its boots, standing out from its stem below them, not a bulge round it.)
     const st = p.stem;
     const below = st.radius[st.y.findIndex((y) => y >= p.boots!.y0) - 1];
     const collar = Math.max(...st.radius.filter((_, i) => st.surface[i] === STEM_BOOTS));
-    assert.ok(collar >= 1.5 * below, `seed ${seed}: its collar ${collar.toFixed(2)} m round on a stem ${below.toFixed(2)} m`);
+    assert.ok(collar >= 1.1 * below && collar <= BOOTS_OUT * below + 1e-9, `seed ${seed}: its collar ${collar.toFixed(2)} m round on a stem ${below.toFixed(2)} m`);
+  }
+});
+
+test("a skinned fan palm's collar of boots is 1–3.5 m deep and about its trunk's girth, from 8 m to 30 m tall, its trunk its kind's", () => {
+  // (docs/MORPHOLOGY.md 23: "about 1–3 m deep ... below the lowest green petiole"; the owner's 27 m palm wore
+  // a bulging carrot of them a third of its height, wider than its trunk.)
+  for (const sp of palms.filter((s) => s.palmLeaf === "fan")) {
+    for (const H of [8, 12, 18, 24, 30]) {
+      // (Riviera's heads, narrow and wide, shallow and deep; the trunk the game's survey hands over, 3 % of its height.)
+      for (const [r, b] of [
+        [1.2, 0.4],
+        [2.9, 0.45],
+        [5.1, 0.55],
+        [2.9, 0.8],
+      ]) {
+        const size = { height: H, crownRadius: r, crownBase: b * H, trunkRadius: Math.min(0.6, 0.03 * H) };
+        const p = growPalm(sp, size, 7, "skinned").palm!;
+        const st = p.stem;
+        const lowestFoot = Math.min(...p.fronds.filter((f) => f.cls !== "dead").map((f) => f.points[0][1]));
+        const deep = lowestFoot - p.boots!.y0;
+        const what = `${sp.name} ${H} m, r ${r}, base ${(b * H).toFixed(1)}`;
+        assert.ok(deep >= 1 && deep <= 3.5, `${what}: its boots ${deep.toFixed(2)} m deep below its lowest green leaf`);
+        assert.ok(p.heart[1] - p.boots!.y0 <= 5, `${what}: its collar and crown shaft ${(p.heart[1] - p.boots!.y0).toFixed(2)} m deep`);
+        // (Its girth: the trunk at breast height, and the stem just under the collar.)
+        const at = Math.min(1.3, 0.1 * H);
+        const bh = st.radius[st.y.reduce((k, y, i) => (Math.abs(y - at) < Math.abs(st.y[k] - at) ? i : k), 0)];
+        const below = st.radius[st.y.findIndex((y) => y >= p.boots!.y0) - 1];
+        const collar = Math.max(...st.radius.filter((_, i) => st.surface[i] === STEM_BOOTS));
+        assert.ok(collar <= 1.3 * bh && collar <= 1.3 * below, `${what}: its collar ${collar.toFixed(2)} m round, its trunk ${bh.toFixed(2)} m, under the collar ${below.toFixed(2)} m`);
+        // (Its trunk its kind's girth, not the survey's 3 % of its height.)
+        assert.ok(bh <= PALM_GIRTH[1] * sp.trunkRadius * 1.1 && bh >= PALM_GIRTH[0] * sp.trunkRadius * 0.9, `${what}: its trunk ${bh.toFixed(2)} m against its kind's ${sp.trunkRadius}`);
+      }
+    }
+  }
+});
+
+test("a Canary palm's pineapple ball is 1.3–1.6 times its trunk across and 1.2–2 times it tall, whatever its height", () => {
+  const sp = ALL_SPECIES.find((s) => s.name === "Canary date palm")!;
+  // (Riviera's p10, p50 and p90, and 27 m, with the survey's trunk.)
+  for (const [H, r, b] of [
+    [4.4, 1.4, 2],
+    [8.6, 3.2, 4],
+    [26.9, 5.6, 10.5],
+    [27, 3.2, 21],
+  ]) {
+    const p = growPalm(sp, { height: H, crownRadius: r, crownBase: b, trunkRadius: Math.min(0.6, 0.03 * H) }, 5).palm!;
+    const st = p.stem;
+    const under = st.radius[st.y.findIndex((y) => y >= p.ball!.y0) - 1];
+    const across = p.ball!.radius / under;
+    const tall = (p.ball!.y1 - p.ball!.y0) / (2 * under);
+    // (A young palm's ball is held inside its narrow head: a little smaller.)
+    assert.ok(across >= (H < 6 ? 1.1 : 1.3) && across <= 1.7, `${H} m: its ball ${across.toFixed(2)} times its stem across`);
+    assert.ok(tall >= (H < 6 ? 0.9 : 1.2) && tall <= 2.1, `${H} m: its ball ${tall.toFixed(2)} times its stem tall`);
+    assert.ok(p.ball!.radius <= 1.3, `${H} m: its ball ${(2 * p.ball!.radius).toFixed(2)} m across`);
   }
 });
 
@@ -219,4 +276,46 @@ test("a skinned fan palm's head too shallow for its leaves to hang keeps them lo
     assert.ok(reach >= 0.65 * size.crownRadius, `${size.height}/${size.crownBase}: it reaches ${reach.toFixed(2)} of ${size.crownRadius}`);
     assert.ok(green < sp.whorl && green >= 0.6 * sp.whorl, `${size.height}/${size.crownBase}: ${green} of ${sp.whorl} green leaves`);
   }
+});
+
+test("a course's palms drawn from their variants keep their collar of boots 1–3.5 m deep and about their trunk's girth, from 8 m to 35 m tall", () => {
+  // (As the game hands them over: Riviera's fan and date palms, 5–35 m, heads narrow to wide, from low to
+  // high, the survey's trunk 3 % of the height. The owner's 27 m fan palm was drawn from a 10 m variant
+  // stretched to it: its collar of boots a carrot 9 m deep.)
+  const fan = ALL_SPECIES.findIndex((s) => s.name === "Mexican fan palm");
+  const date = ALL_SPECIES.findIndex((s) => s.name === "Canary date palm");
+  const list = [];
+  for (let i = 0; i < 120; i++) {
+    const h = 5 * Math.pow(7, (i % 40) / 39);
+    const r = [1.2, 2.9, 5.1][i % 3];
+    const b = h * [0.3, 0.5, 0.75][(i >> 2) % 3];
+    list.push({ x: i * 13.7, y: 0, z: (i * 7.1) % 90, species: i % 2 ? fan : date, height: h, crownRadius: r, crownBase: b, trunkRadius: Math.min(0.6, 0.03 * h) });
+  }
+  const plan = planVariants(packTrees(list), ALL_SPECIES);
+  const grown = plan.variants.map((v) => growPalm(ALL_SPECIES[v.species], v.size, v.seed, v.pruning));
+  plan.placements.forEach((pl, i) => {
+    const g = grown[pl.variant];
+    const p = g.palm!;
+    const up = (y: number) => fitPoint(g.size, pl.size, 1, [0, y, 0])[1];
+    const H = pl.size.height;
+    const what = `${ALL_SPECIES[list[i].species].name} ${H.toFixed(1)} m from a ${g.size.height.toFixed(1)} m variant`;
+    // (Stretched up evenly, by no more than a third either way.)
+    assert.ok(Math.abs(Math.log(up(p.heart[1]) / p.heart[1])) < Math.log(1.35), `${what}: stretched ${(up(p.heart[1]) / p.heart[1]).toFixed(2)}`);
+    assert.ok(Math.abs(up(1) - H / g.size.height) < 1e-6, `${what}: its stem and its head stretched alike`);
+    // (Its stem its kind's, as it is grown: the fit thickens it by its trunk over its variant's.)
+    assert.equal(pl.size.trunkRadius, g.size.trunkRadius, what);
+    if (p.boots && H >= 8) {
+      const lowestFoot = Math.min(...p.fronds.filter((f) => f.cls !== "dead").map((f) => f.points[0][1]));
+      const deep = up(lowestFoot) - up(p.boots.y0);
+      assert.ok(deep >= 1 && deep <= 3.5, `${what}: its boots drawn ${deep.toFixed(2)} m deep`);
+      const st = p.stem;
+      const below = st.radius[st.y.findIndex((y) => y >= p.boots!.y0) - 1];
+      const collar = Math.max(...st.radius.filter((_, k) => st.surface[k] === STEM_BOOTS));
+      assert.ok(collar <= 1.3 * below, `${what}: its collar ${collar.toFixed(2)} m round on a stem ${below.toFixed(2)} m`);
+    }
+    if (p.ball) assert.ok(up(p.ball.y1) - up(p.ball.y0) <= 2.6, `${what}: its pineapple ${(up(p.ball.y1) - up(p.ball.y0)).toFixed(2)} m tall`);
+  });
+  // (Grown near their heights, at a few more variants than two shapes would be.)
+  const palmsGrown = plan.variants.length;
+  assert.ok(palmsGrown <= 40, `${palmsGrown} variants for 120 palms`);
 });

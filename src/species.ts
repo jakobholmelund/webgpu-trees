@@ -65,6 +65,14 @@ export interface TreeSpecies {
    */
   crownRatio?: [number, number];
   baseRatio?: [number, number];
+  /**
+   * How tall its real trees grow (m), [typical, most]: the low end of the height its grown trees commonly
+   * reach, and the most the sources give for the species (beyond the odd record tree). Read by no grower or
+   * shader: for a host telling which species a measured tree is, so a tree taller than its kind grows is not
+   * taken for it (a young tree is well under the typical). From docs/MORPHOLOGY.md and its sources, noted on
+   * each species.
+   */
+  heightRange?: [number, number];
   architecture: Architecture;
 
   // A tree of this kind, when nothing gives its own size (the lab's specimen, a host with no survey).
@@ -331,6 +339,7 @@ export const OPTIONAL_SPECIES_FIELDS = {
   regions: "strings",
   crownRatio: "pair",
   baseRatio: "pair",
+  heightRange: "pair",
   crownPeak: "number",
   crownRound: "number",
   lobes: "number",
@@ -400,6 +409,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     // 0.66). Base: live crown 0.75–0.90 open-grown, 0.30–0.45 in a wood [est.].
     crownRatio: [0.18, 0.8],
     baseRatio: [0.1, 0.7],
+    // Height (docs/MORPHOLOGY.md): TSO's open-grown 18–24 m; 20–30 m, exceptionally 40 m.
+    heightRange: [18, 40],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 13.5,
@@ -450,6 +461,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     // 0.2 [est.]. Base: low in parks, raised on streets [est.].
     crownRatio: [0.2, 0.45],
     baseRatio: [0.1, 0.6],
+    // Height (docs/MORPHOLOGY.md): 25–35 m typical, to 50 m (TSO; one tree at Pau past 52 m).
+    heightRange: [25, 50],
     architecture: "broadleaf",
     height: 22,
     crownRadius: 10,
@@ -494,6 +507,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     // open-grown 0.20–0.35 [est.]. Base: live crown 0.6–0.8 open-grown, 0.25–0.40 in groves [est.].
     crownRatio: [0.08, 0.35],
     baseRatio: [0.2, 0.75],
+    // Height (docs/MORPHOLOGY.md): 30–55 m typical, to 70 m (EUCLID); planted in California 30–50 m.
+    heightRange: [30, 70],
     architecture: "broadleaf",
     height: 26,
     crownRadius: 10,
@@ -546,6 +561,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     // 0), live crown 0.35–0.55 in plantations [est.].
     crownRatio: [0.09, 0.31],
     baseRatio: [0, 0.65],
+    // Height (docs/MORPHOLOGY.md): 30–50 m typical, up to 50–60 m (EUAT); the record 62.7 m (GDB).
+    heightRange: [30, 60],
     architecture: "conifer",
     height: 20,
     crownRadius: 5.8,
@@ -592,6 +609,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
     // (photographed, base 0.46), 0.25–0.40 in plantations [est.].
     crownRatio: [0.1, 0.43],
     baseRatio: [0.2, 0.75],
+    // Height (docs/MORPHOLOGY.md): 23–27 m on average, over 40 m possible (EUAT); to 40 m (GDB).
+    heightRange: [23, 40],
     architecture: "broadleaf",
     height: 19,
     crownRadius: 8,
@@ -637,6 +656,8 @@ export const STARTER_SPECIES: readonly TreeSpecies[] = [
   {
     name: "Shrub",
     regions: ["california", "pacific-northwest", "great-britain", "france", "ontario", "netherlands", "denmark"],
+    // Height (docs/MORPHOLOGY.md): a course's understorey and rough, 0.5–3 m (MORPHOLOGY.md 30).
+    heightRange: [0.5, 3],
     architecture: "shrub",
     height: 2.4,
     crownRadius: 1.6,
@@ -691,6 +712,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // 0.35–0.50 in a wood [est.].
     crownRatio: [0.14, 0.5],
     baseRatio: [0.05, 0.65],
+    // Height (docs/MORPHOLOGY.md): commonly 30–40 m, up to 50 m (EUAT); the record 49.2 m (TSO).
+    heightRange: [30, 50],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 12,
@@ -743,6 +766,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // open-grown 0.20–0.30 [est.]. Base: live crown 0.6–0.8 open-grown, 0.3–0.5 in a stand [est.].
     crownRatio: [0.1, 0.3],
     baseRatio: [0.2, 0.7],
+    // Height (docs/MORPHOLOGY.md): 15–25 m typical, to 30 m (WT).
+    heightRange: [15, 30],
     architecture: "broadleaf",
     height: 18,
     crownRadius: 6,
@@ -789,6 +814,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // open-grown 0.15–0.25 [est.]. Base: live crown 0.6–0.8 open-grown, 0.35–0.55 in a stand [est.].
     crownRatio: [0.09, 0.25],
     baseRatio: [0.2, 0.65],
+    // Height (docs/MORPHOLOGY.md): usually 15–25 m [est.], to 35 m (TSO).
+    heightRange: [15, 35],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 4,
@@ -835,6 +862,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // clone) 0.10–0.21, so up to 0.16 [est.]. Base: branched from low on the stem [est.].
     crownRatio: [0.05, 0.16],
     baseRatio: [0.03, 0.5],
+    // Height (docs/MORPHOLOGY.md): about 15 m at 25 years, the largest 30–35 m (TSO; the UK champion 38.5 m).
+    heightRange: [15, 35],
     architecture: "broadleaf",
     height: 22,
     crownRadius: 2.5,
@@ -877,6 +906,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // Base: its curtains hang near the ground [est.].
     crownRatio: [0.3, 0.6],
     baseRatio: [0, 0.4],
+    // Height (docs/MORPHOLOGY.md): 15–23 m; the largest 'Chrysocoma' 23 m (TSO).
+    heightRange: [15, 23],
     architecture: "broadleaf",
     height: 11,
     crownRadius: 7.5,
@@ -925,6 +956,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // height); open-grown 0.40–0.60 [est.]. Base: live crown 0.7–0.9 [est.].
     crownRatio: [0.17, 0.6],
     baseRatio: [0.1, 0.3],
+    // Height (docs/MORPHOLOGY.md): usually 5–10 m [est.], to about 15 m (WT).
+    heightRange: [5, 15],
     architecture: "broadleaf",
     height: 6,
     crownRadius: 3,
@@ -963,6 +996,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     name: "Gorse",
     latin: "Ulex europaeus",
     regions: ["great-britain", "denmark", "netherlands"],
+    // Height (docs/MORPHOLOGY.md): usually about 2 m, up to 4 m left uncut (BSBI).
+    heightRange: [1.5, 4],
     architecture: "shrub",
     height: 1.6,
     crownRadius: 1.0,
@@ -1004,6 +1039,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // forest (FEIS), live crown 0.30–0.50 in plantations, 0.85–1.0 open-grown [est.].
     crownRatio: [0.13, 0.22],
     baseRatio: [0, 0.7],
+    // Height (docs/MORPHOLOGY.md): British plantations 25–40 m at harvest [est.]; in Europe rarely over 50 m
+    // (EUAT), in its own range to 80 m (GDB).
+    heightRange: [25, 80],
     architecture: "conifer",
     height: 28,
     crownRadius: 4.5,
@@ -1049,6 +1087,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // [est.].
     crownRatio: [0.16, 0.26],
     baseRatio: [0.2, 0.75],
+    // Height (docs/MORPHOLOGY.md): UK plantations 25–35 m [est.]; commonly 30 m, exceptionally 40 m (EUAT); to
+    // 50 m (GDB).
+    heightRange: [25, 50],
     architecture: "conifer",
     height: 18,
     crownRadius: 4.5,
@@ -1094,6 +1135,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // crown 0.30–0.50 in managed stands [est.].
     crownRatio: [0.08, 0.22],
     baseRatio: [0, 0.7],
+    // Height (docs/MORPHOLOGY.md): plantations in Europe 35–55 m [est.]; old growth commonly 76 m (FEIS),
+    // exceptionally over 100 m (EUAT).
+    heightRange: [35, 100],
     architecture: "conifer",
     height: 30,
     crownRadius: 5,
@@ -1138,6 +1182,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // [est.].
     crownRatio: [0.1, 0.27],
     baseRatio: [0, 0.6],
+    // Height (docs/MORPHOLOGY.md): ornamental and UK trees 20–35 m [est.]; 50(–70) m (GDB).
+    heightRange: [20, 70],
     architecture: "conifer",
     height: 20,
     crownRadius: 4.5,
@@ -1188,6 +1234,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // major limbs near the trunk's foot, live crown 0.6–1.0 [est.].
     crownRatio: [0.25, 1],
     baseRatio: [0, 0.4],
+    // Height (docs/MORPHOLOGY.md): no low end is given (its specimen's); typical maximum 25 m, planted trees to
+    // 31 m in the US and 48 m in San Francisco (GDB).
+    heightRange: [12, 48],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 12,
@@ -1244,6 +1293,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // 0.6–0.9 [est.].
     crownRatio: [0.12, 0.45],
     baseRatio: [0.1, 0.9],
+    // Height (docs/MORPHOLOGY.md): 15–30 m typical (GDB), 15–35 m (FEIS); occasionally 64 m (GDB).
+    heightRange: [15, 64],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 7.5,
@@ -1299,6 +1350,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // stand-grown end at 0.25 [est.]. Base: crowns from low on the bluffs to high in a stand [est.].
     crownRatio: [0.25, 0.7],
     baseRatio: [0.1, 0.55],
+    // Height (docs/MORPHOLOGY.md): natural trees often 5–12 m [est.]; to 15(–23) m, the tallest cultivated
+    // (GDB).
+    heightRange: [5, 23],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 8,
@@ -1350,6 +1404,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // photographed one's base 0.125.
     crownRatio: [0.18, 0.48],
     baseRatio: [0.12, 0.6],
+    // Height (docs/MORPHOLOGY.md): 15–25 m (GDB); up to 20 m (EUAT).
+    heightRange: [15, 25],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 6.5,
@@ -1402,6 +1458,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // 0.25–0.45 when mature [est.], the photographed one's base 0.25.
     crownRatio: [0.22, 0.74],
     baseRatio: [0.25, 0.75],
+    // Height (docs/MORPHOLOGY.md): 12–25(–35) m (GDB); up to 25–30 m (EUAT).
+    heightRange: [12, 35],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 11.5,
@@ -1458,6 +1516,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // tall old palms to 0.2 [est.]. Base: the head's lowest fronds, half to most of the height [est.].
     crownRatio: [0.2, 0.6],
     baseRatio: [0.2, 0.85],
+    // Height (docs/MORPHOLOGY.md): UF/IFAS 40–60 ft (12–18 m); old planted palms 15–20 m [est.]; 6 m in the
+    // Santa Monica range, potentially 15 m or more (SMM).
+    heightRange: [12, 20],
     architecture: "palm",
     height: 12,
     crownRadius: 6,
@@ -1506,6 +1567,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // a small head at the top of a tall trunk [est.].
     crownRatio: [0.05, 0.2],
     baseRatio: [0.4, 0.92],
+    // Height (docs/MORPHOLOGY.md): under 16 m in the Santa Monica range, old cultivated palms over 30 m (SMM);
+    // UF/IFAS 80–100 ft (24–30 m).
+    heightRange: [16, 30],
     architecture: "palm",
     height: 18,
     crownRadius: 3,
@@ -1557,6 +1621,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // 1.2–2.4 m and foliage to the ground, branchless to about 6 m in dense stands (FEIS).
     crownRatio: [0.25, 0.8],
     baseRatio: [0, 0.5],
+    // Height (docs/MORPHOLOGY.md): 6–25 m (FEIS); up to 30 m (VT).
+    heightRange: [6, 30],
     architecture: "broadleaf",
     height: 12,
     crownRadius: 11,
@@ -1614,6 +1680,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // Base: forked low or leaning by creeks, higher in a riparian stand [est.].
     crownRatio: [0.2, 0.5],
     baseRatio: [0.1, 0.5],
+    // Height (docs/MORPHOLOGY.md): 12–30 m (VT, 40–100 ft); to about 40 m (TSO).
+    heightRange: [12, 40],
     architecture: "broadleaf",
     height: 15,
     crownRadius: 10,
@@ -1669,6 +1737,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // forest (NRCAN), live crown 0.75–0.90 open-grown [est.].
     crownRatio: [0.13, 0.45],
     baseRatio: [0.1, 0.7],
+    // Height (docs/MORPHOLOGY.md): 27–37 m, exceptionally 40 m (FEIS); up to 35 m (NRCAN).
+    heightRange: [27, 40],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 6.5,
@@ -1709,6 +1779,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // 0.70–0.85 open-grown, 0.35–0.45 in the forest [est.].
     crownRatio: [0.16, 0.5],
     baseRatio: [0.15, 0.65],
+    // Height (docs/MORPHOLOGY.md): 20–30 m, up to 49 m on good sites (FEIS).
+    heightRange: [20, 49],
     architecture: "broadleaf",
     height: 20,
     crownRadius: 8,
@@ -1753,6 +1825,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // live crown 0.6–0.9 open-grown [est.].
     crownRatio: [0.14, 0.35],
     baseRatio: [0.1, 0.7],
+    // Height (docs/MORPHOLOGY.md): to 30 m, occasionally more (NRCAN), so 20 m its low end [est.];
+    // virgin-forest trees 46 m (FEIS; the record 57.6 m, GDB).
+    heightRange: [20, 46],
     architecture: "conifer",
     height: 22,
     crownRadius: 5.5,
@@ -1797,6 +1872,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): UF/IFAS: 3–4.5 m across on 12–18 m; a
     // healthy planted palm 5–7 m across on 12 m [est.].
     crownRatio: [0.08, 0.28],
+    // Height (docs/MORPHOLOGY.md): commonly 12–15 m, capable of 24 m (UF/IFAS); 9–15 m (FEIS), to 20 m (HOD14).
+    heightRange: [12, 24],
     architecture: "palm",
     height: 12,
     crownRadius: 3,
@@ -1842,6 +1919,8 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // Real crowns, stand-grown to open-grown (docs/MORPHOLOGY.md): UF/IFAS: 6–7.5 m across, up to 15 m
     // tall; 8–12 m tall on a course [est.].
     crownRatio: [0.2, 0.47],
+    // Height (docs/MORPHOLOGY.md): usually 10–15 m, to 20 m (BBNE); up to 15 m (UF/IFAS, VT).
+    heightRange: [10, 20],
     architecture: "palm",
     height: 10,
     crownRadius: 3.2,
@@ -1885,6 +1964,9 @@ export const MORE_SPECIES: Readonly<Record<string, TreeSpecies>> = {
     // open-grown 0.12–0.18 [est.]. Base: live crown close to the ground (FEIS), 0.5–0.7 in a stand [est.].
     crownRatio: [0.08, 0.18],
     baseRatio: [0, 0.5],
+    // Height (docs/MORPHOLOGY.md): Ontario 15–30 m [est.]; average about 25 m, over 30 m on good sites (FEIS);
+    // up to 50 m (GDB).
+    heightRange: [15, 50],
     architecture: "conifer",
     height: 16,
     crownRadius: 2.8,
@@ -1933,6 +2015,7 @@ export function cloneSpecies(s: TreeSpecies): TreeSpecies {
     ...(s.regions ? { regions: [...s.regions] } : {}),
     ...(s.crownRatio ? { crownRatio: [s.crownRatio[0], s.crownRatio[1]] as [number, number] } : {}),
     ...(s.baseRatio ? { baseRatio: [s.baseRatio[0], s.baseRatio[1]] as [number, number] } : {}),
+    ...(s.heightRange ? { heightRange: [s.heightRange[0], s.heightRange[1]] as [number, number] } : {}),
   };
 }
 
@@ -1979,6 +2062,7 @@ export function checkSpecies(s: TreeSpecies): string[] {
   if (!(s.bend >= -1 && s.bend <= 1)) out.push("bend must be -1..1");
   if (s.crownRatio !== undefined && !(s.crownRatio.length === 2 && s.crownRatio[0] > 0 && s.crownRatio[0] < s.crownRatio[1] && s.crownRatio[1] <= 1.5)) out.push("crownRatio must be [least, most], above 0 and to 1.5, the least under the most");
   if (s.baseRatio !== undefined && !(s.baseRatio.length === 2 && s.baseRatio[0] >= 0 && s.baseRatio[0] < s.baseRatio[1] && s.baseRatio[1] < 1)) out.push("baseRatio must be [least, most], from 0 to under 1, the least under the most");
+  if (s.heightRange !== undefined && !(s.heightRange.length === 2 && s.heightRange[0] > 0 && s.heightRange[0] < s.heightRange[1] && s.heightRange[1] <= 150)) out.push("heightRange must be [typical, most] in metres, above 0 and to 150, the typical under the most");
   if (s.regions && !s.regions.every((r) => REGION_ROWS.includes(r))) out.push(`regions must be from ${REGION_ROWS.join(", ")}`);
   if (s.leafColors && !s.leafColors.every((c) => /^#[0-9a-f]{6}$/i.test(c))) out.push("leafColors must be hex colours like #5b7f3a");
   return out;

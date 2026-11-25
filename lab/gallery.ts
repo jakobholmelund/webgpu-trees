@@ -43,7 +43,7 @@ import { type Reference, readReferences } from "./references";
 import manifestText from "./references/manifest.json?raw";
 import { SKY, makeGround, makeSky, sunAt, sunFromLeft, tintsFor } from "./stage";
 import { ALL_VIEWS, GROUP, REFERENCE_SCREEN, REF_VIEWS, REF_VIEW_NAMES, type Screen, type Shot, type Standing, VIEWS, VIEW_NAMES, type ViewName, aspectOf, detailScale, groupSpacing, shotFor } from "./views";
-import { type FitSize, fitSizesFor } from "./courseSizes";
+import { type FitSize, fitSizesFor, surveyTrunk } from "./courseSizes";
 import { measured } from "./world";
 
 declare const __COMMIT__: string;
@@ -305,8 +305,9 @@ async function start() {
   const standOf = (row: number, look: TreeLook, group: boolean, over?: Partial<TreeStyle>, fit?: FitSize): Stand => {
     const sp = species[row];
     const step = groupSpacing(sp.crownRadius);
-    // (At a course's size, its trunk as its species' for its height, as the game's survey leaves it.)
-    const one: TreeInstance = fit ? { x: 0, y: 0, z: 0, species: row, height: fit.height, crownRadius: fit.crownRadius, crownBase: fit.crownBase, ...(fit.stand ? { stand: fit.stand } : {}) } : { x: 0, y: 0, z: 0, species: row };
+    // (At a course's size, its trunk as its species' for its height, as the game's survey leaves it; a palm's
+    // the survey's own, 3 % of its height.)
+    const one: TreeInstance = fit ? { x: 0, y: 0, z: 0, species: row, height: fit.height, crownRadius: fit.crownRadius, crownBase: fit.crownBase, ...(sp.architecture === "palm" ? { trunkRadius: surveyTrunk(fit.height) } : {}), ...(fit.stand ? { stand: fit.stand } : {}) } : { x: 0, y: 0, z: 0, species: row };
     const list: TreeInstance[] = group ? GROUP.map(([x, z], k) => measured(sp, row, x * step, z * step, k + 1)) : [one];
     const trees = createTrees({ trees: list, species, look, variants: { ...DEFAULT_VARIANT_OPTIONS, seed: seedFor(row) } });
     Object.assign(trees.style, LOOK_STYLES[look], over);

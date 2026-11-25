@@ -289,6 +289,31 @@ function naturalLength(sp: TreeSpecies, pruning: Pruning): number {
   return L;
 }
 
+/**
+ * A palm's stem is its kind's girth at any height: a monocot has no secondary growth, so it does not thicken
+ * as it grows taller (it reaches its girth before it rises: a Mexican fan palm 0.6 m at its flared foot and
+ * 0.2–0.3 m up it, a Canary palm 0.5–1 m, docs/MORPHOLOGY.md 22, 23). A survey's trunk is not measured: the
+ * game's is 3 % of a tree's height, a 27 m Mexican fan palm's 1.2 m through, twice its kind's. So a size's
+ * trunk is kept within PALM_GIRTH of its species' (its specimen's trunk radius).
+ */
+export const PALM_GIRTH: readonly [number, number] = [0.75, 1.3];
+export function palmGirth(sp: TreeSpecies, trunkRadius: number): number {
+  const own = sp.trunkRadius;
+  return Math.min(own * PALM_GIRTH[1], Math.max(own * PALM_GIRTH[0], Number.isFinite(trunkRadius) && trunkRadius > 0 ? trunkRadius : own));
+}
+
+/**
+ * A skinned fan palm's collar of boots, below its lowest green leaf's foot: "about 1–3 m deep (roughly 10–25
+ * rows of bases) below the lowest green petiole, ending in a fairly clean horizontal line" (docs/MORPHOLOGY.md
+ * 23): in metres, whatever the palm's height, BOOTS_PER_M of its height between BOOTS_DEPTH's least and most
+ * (a short young palm's the least). Its boots stand out from the stem, the more the nearer the crown, to
+ * BOOTS_OUT of the stem just under them at the most, and its crown shaft, its leaves' feet, as little: a
+ * collar about as wide as the trunk, not a bulge round it.
+ */
+export const BOOTS_DEPTH: readonly [number, number] = [1.2, 2.2];
+const BOOTS_PER_M = 0.1;
+export const BOOTS_OUT = 1.25;
+
 /** Points along a frond's rachis: POINTS pieces, the last ones shorter (a frond bends most towards its tip). */
 const POINTS = 14;
 
@@ -442,7 +467,9 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   const leaf = leafOf(sp);
   const form = FORMS[leaf];
   const pruning = pruningOf(sp, pruningOver);
-  const { height: H, crownRadius: R, crownBase: base, trunkRadius } = size;
+  const { height: H, crownRadius: R, crownBase: base } = size;
+  // (Its stem its kind's girth, not the survey's guess: `palmGirth`.)
+  const trunkRadius = palmGirth(sp, size.trunkRadius);
   const live = Math.max(3, Math.round(sp.whorl));
   const turn = rng.range(0, 2 * Math.PI);
   const bend = Math.min(1, Math.max(-1, sp.bend));
@@ -642,14 +669,20 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   let boots: PalmCrown["boots"] = null;
   let skirt: Skirt | null = null;
   if (pruning === "pineapple") {
-    // (A ball of trimmed leaf bases, widest a third of the way down, as tall as it is wide or a little more:
-    // about one and a half times the stem across.)
-    const radius = Math.min(rTop * 1.75, 0.4 * R);
-    const tall = Math.min(2.4 * radius, 0.45 * heartY);
+    // (A ball of trimmed leaf bases, widest a third of the way down: 1.3–1.6 times the trunk across and 1.2–2
+    // times it tall (docs/MORPHOLOGY.md 22), so about one and a half times the stem across, and as tall again
+    // as it is wide or a little more.)
+    const radius = Math.min(1.5 * stemR(Math.max(0, heartY - 1.5), heartY), 0.4 * R);
+    const tall = Math.min(2.1 * radius, 0.45 * heartY);
     ball = { y0: heartY - tall, y1: heartY + 0.15 * radius, radius };
   } else if (leaf === "fan" && pruning === "skinned") {
-    // (Leaf bases still firm on the stem are left when it is skinned: a collar of boots under the green.)
-    boots = { y0: Math.max(0.3 * heartY, knobLow - Math.min(2.2, 0.12 * H)), y1: heartY };
+    // (Leaf bases still firm on the stem are left when it is skinned: a collar of boots under the green,
+    // `BOOTS_DEPTH` metres below its lowest green leaf's foot.)
+    const deep = Math.min(BOOTS_DEPTH[1], Math.max(BOOTS_DEPTH[0], BOOTS_PER_M * H));
+    boots = { y0: Math.max(0.3 * heartY, knobLow - deep), y1: heartY };
+  } else if (pruning === "skinned") {
+    // (A skinned feather palm keeps its firm leaf bases under the green as well: no deeper than a fan palm's.)
+    boots = { y0: Math.max(0.25 * heartY, knobLow - Math.min(BOOTS_DEPTH[1], 0.12 * H)), y1: heartY };
   } else {
     // (Unskinned: old leaf bases all down the crown shaft and a way below it.)
     boots = { y0: Math.max(0.25 * heartY, knobLow - (leaf === "fan" ? 0.25 : 0.12) * H), y1: heartY };
@@ -677,23 +710,26 @@ export function growPalm(sp: TreeSpecies, size: TreeSize, seed: number, pruningO
   if (ball) for (let k = 0; k <= 10; k++) ringYs.push(ball.y0 + ((ball.y1 - ball.y0) * k) / 10);
   if (boots) ringYs.push(boots.y0 - 0.05, boots.y0);
   const ys = [...new Set(ringYs.map((y) => Math.round(y * 1000) / 1000))].filter((y) => y >= 0 && y <= top).sort((a, b) => a - b);
+  // (A fan palm's collar, its boots and its crown shaft, no wider than BOOTS_OUT of its stem just under it.)
+  const collarMost = leaf === "fan" && pruning !== "pineapple" ? BOOTS_OUT * stemR(boots ? boots.y0 : shaft, heartY) : Infinity;
   for (const y of ys) {
     const [cx, cz] = stemAt(Math.min(y, heartY), heartY);
     let r = stemR(Math.min(y, heartY), heartY);
     let surface = STEM_BARK;
     // (The crown shaft: the leaves' bases wrapping the stem's top, swelling, rounding over at the heart; a fan
-    // palm's, unless its bases are trimmed to a ball, its broad collar of split boots, near twice the stem across.)
+    // palm's its collar of split boots on, a little wider than the stem under it: BOOTS_OUT.)
     if (y > shaft) {
       const u = (y - shaft) / Math.max(1e-3, top - shaft);
-      r *= (1 + (leaf === "fan" ? (pruning === "pineapple" ? 0.22 : 0.75) : 0.35) * Math.sin(Math.PI * Math.min(1, u * 0.85 + 0.15))) * Math.sqrt(Math.max(0.04, 1 - Math.pow(Math.max(0, u - 0.55) / 0.45, 2)));
+      r *= (1 + (leaf === "fan" ? 0.22 : 0.35) * Math.sin(Math.PI * Math.min(1, u * 0.85 + 0.15))) * Math.sqrt(Math.max(0.04, 1 - Math.pow(Math.max(0, u - 0.55) / 0.45, 2)));
       surface = STEM_BOOTS;
     }
     if (boots && y >= boots.y0 && y <= boots.y1) {
       surface = STEM_BOOTS;
       // (Boots stand out from the stem, the more the nearer the crown: a fan palm's collar of split leaf bases
-      // under its green, as wide again as its stem at the top.)
-      if (y <= shaft) r *= 1.12 + (leaf === "fan" ? 0.55 * Math.pow(Math.max(0, (y - boots.y0) / Math.max(1e-3, shaft - boots.y0)), 1.5) : 0);
+      // under its green, a fifth wider than its stem under them at the top.)
+      if (y <= shaft) r *= 1.08 + (leaf === "fan" ? 0.14 * Math.pow(Math.max(0, (y - boots.y0) / Math.max(1e-3, shaft - boots.y0)), 1.5) : 0);
     }
+    if (y >= (boots ? boots.y0 : shaft)) r = Math.min(r, collarMost);
     if (ball && y >= ball.y0 - 1e-6 && y <= ball.y1 + 1e-6) {
       const u = (y - ball.y0) / (ball.y1 - ball.y0);
       // (Widest a third of the way down from its top, tapering into the stem below and into the leaves above.)

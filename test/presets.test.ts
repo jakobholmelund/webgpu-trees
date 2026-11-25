@@ -62,7 +62,8 @@ test("the documented crown proportions go out and come back with a preset, and a
     assert.deepEqual([back.crownRatio, back.baseRatio], [s.crownRatio, s.baseRatio], s.name);
     assert.equal(speciesProblem({ ...back, crownRatio: [0.4] }, i)?.includes("crownRatio"), true, `${s.name}: one number is not a range`);
     const copy = cloneSpecies(s);
-    assert.ok(copy.crownRatio !== s.crownRatio && copy.baseRatio !== s.baseRatio, `${s.name}: its ranges copied, not shared`);
+    assert.ok(copy.crownRatio !== s.crownRatio && copy.baseRatio !== s.baseRatio && copy.heightRange !== s.heightRange, `${s.name}: its ranges copied, not shared`);
+    assert.deepEqual(back.heightRange, s.heightRange, s.name);
   }
   const read = readPreset(resetPreset("stylized"));
   assert.notEqual(typeof read, "string", `${read}`);

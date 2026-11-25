@@ -226,6 +226,48 @@ function groups(points: number[][], k: number): { centres: number[][]; of: numbe
   return { centres, of };
 }
 
+/**
+ * A palm's trees sorted into shapes, each within a band of heights: no tree more than PALM_BAND times as tall
+ * as the shortest of its band. A palm's head and the collar of boots under it are its kind's size in metres at
+ * any height (palm.ts), and a variant fitted to a tree is stretched up its trunk and its crown by the tree's
+ * height over its own (`fitPoint`): a 10 m variant drawn as a 28 m palm made its 2 m collar of boots a carrot of
+ * 6–9 m. So a palm is grown near its trees' heights (stretched a sixth either way on Riviera, a third at most), and a band of
+ * fewer than PALM_BAND_SHAPED palms in one shape: a course has few palms, so the few more variants cost little.
+ */
+export const PALM_BAND = 1.4;
+const PALM_BAND_SHAPED = 8;
+function palmGroups(heights: number[], points: number[][], k: number): { centres: number[][]; of: number[] } {
+  const order = heights.map((_, i) => i).sort((a, b) => heights[a] - heights[b]);
+  const centres: number[][] = [];
+  const of = new Array<number>(heights.length).fill(0);
+  for (let at = 0; at < order.length; ) {
+    let end = at;
+    while (end < order.length && heights[order[end]] <= heights[order[at]] * PALM_BAND) end++;
+    const band = order.slice(at, end);
+    // (A band of few palms one shape: its head's shape tells less than its height.)
+    const g = groups(
+      band.map((i) => points[i]),
+      band.length >= PALM_BAND_SHAPED ? k : 1,
+    );
+    band.forEach((i, j) => (of[i] = centres.length + g.of[j]));
+    centres.push(...g.centres);
+    at = end;
+  }
+  return { centres, of };
+}
+
+/**
+ * The size a palm is drawn at from its variant: its own height and crown radius, and its variant's crown base
+ * and trunk for that height. So it is stretched evenly up its height (the fit's trunk and crown stretches one:
+ * `fitPoint`), its head and its collar its variant's shape a little taller or shorter, and its stem its kind's
+ * girth (palm.ts `palmGirth`). Its survey's crown base would stretch its head and its collar apart from its
+ * stem: a 24 m palm drawn from a 24 m variant whose head started 6 m higher had its collar of boots 4 m deep.
+ */
+function palmFitted(own: TreeSize, grown: TreeSize): TreeSize {
+  const k = own.height / grown.height;
+  return { height: own.height, crownRadius: own.crownRadius, crownBase: grown.crownBase * k, trunkRadius: grown.trunkRadius };
+}
+
 /** A tree's own size: its own numbers where it has them, its species' where not, and never one that cannot be grown. */
 export function sizeOf(packed: Float32Array, i: number, species: TreeSpecies): TreeSize {
   const o = i * TREE_STRIDE;
@@ -322,7 +364,8 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
       // grown near its trees' heights, not a 4 m tree's habit stretched over a 14 m one.
       const tall = (z: TreeSize) => HEIGHT_WEIGHT * Math.log2(z.height / sp.height);
       const shapes = sizes.map((z, j) => (standing === "open" ? [z.crownRadius / z.height, z.crownBase / z.height, tall(z)] : [z.crownRadius / z.height, z.crownBase / z.height, 0.5 * stOf[j].enclosure, tall(z)]));
-      const { centres, of } = groups(shapes, shapesOf(options.shapes));
+      // (A palm's, within bands of height: `palmGroups`.)
+      const { centres, of } = sp.architecture === "palm" ? palmGroups(sizes.map((z) => z.height), shapes, shapesOf(options.shapes)) : groups(shapes, shapesOf(options.shapes));
       const firstOf: number[] = [];
       const seedsOf: number[] = [];
       for (let c = 0; c < centres.length; c++) {
@@ -390,7 +433,7 @@ export function planVariants(packed: Float32Array, species: readonly TreeSpecies
           y: packed[o + 1],
           z,
           yaw,
-          size: sizes[j],
+          size: sp.architecture === "palm" ? palmFitted(sizes[j], variants[v].size) : sizes[j],
           leanX: Math.cos(leanA) * leanR,
           leanZ: Math.sin(leanA) * leanR,
           mirror,

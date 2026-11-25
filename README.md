@@ -290,12 +290,14 @@ real trees are documented to be is apart from it: `crownRatio`, crown radius
 over height, and `baseRatio`, crown base over height, each [least, most]
 from drawn up in a stand to open-grown (docs/MORPHOLOGY.md: Tallo's lower
 quartile at 10–18 m for the stand, the open-grown figures and photographed
-outlines for the open), with their sources over each. A host that tells
+outlines for the open), with their sources over each; and `heightRange`,
+[typical, most] in metres, the low end of the height its grown trees commonly
+reach and the most the sources give for the species (every row has one, so a
+host can tell a 27 m tree is not a 20 m palm). A host that tells
 which species a measured tree is matches it against these, so a showpiece
 retuned does not change which trees a course has. Rows no source gives
-figures for leave them out (plane, Lombardy poplar, weeping willow, gorse,
-Torrey pine, the date and Mexican fan palms, California sycamore, the
-generic shrub), and a host has only the specimen's.
+proportions for leave them out (gorse and the generic shrub; the California
+fan and queen palms' crown base), and a host has only the specimen's.
 
 | Name | Latin | Look | Regions | Height (m) | Crown radius (m) | Crown base (m) |
 | --- | --- | --- | --- | ---: | ---: | ---: |
